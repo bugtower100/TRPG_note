@@ -1,0 +1,226 @@
+{
+  "format": "trpg-note-v1",
+  "sourceProjectName": "附件导入",
+  "exportedAt": "",
+  "memoContent": "",
+  "characters": [
+    {
+      "id": "char-sample",
+      "name": "示例人物",
+      "details": "这里填写人物的详细设定、背景、行为特征等。",
+      "identity": "调查员",
+      "appearance": "身形瘦高，穿深色风衣。",
+      "desireOrGoal": "查明失踪案真相。",
+      "characterCardAttributes": "",
+      "relatedLocations": [
+        {
+          "id": "loc-sample",
+          "relation": "常去地点"
+        }
+      ],
+      "relatedOrganizations": [
+        {
+          "id": "org-sample",
+          "relation": "合作对象"
+        }
+      ],
+      "relatedCharacters": [],
+      "relatedEvents": [
+        {
+          "id": "evt-sample",
+          "relation": "参与调查"
+        }
+      ],
+      "relatedClues": [
+        {
+          "id": "clue-sample",
+          "relation": "持有线索"
+        }
+      ],
+      "relatedTimelines": [
+        {
+          "id": "timeline-sample",
+          "relation": "相关时间线"
+        }
+      ],
+      "relatedImages": []
+    }
+  ],
+  "locations": [
+    {
+      "id": "loc-sample",
+      "name": "示例地点",
+      "details": "这里填写地点的用途、历史、可调查信息等。",
+      "environment": "老城区边缘的一栋废弃宅邸。",
+      "relatedLocations": [],
+      "relatedOrganizations": [
+        {
+          "id": "org-sample",
+          "relation": "占用此地"
+        }
+      ],
+      "relatedCharacters": [
+        {
+          "id": "char-sample",
+          "relation": "经常出入"
+        }
+      ],
+      "relatedEvents": [
+        {
+          "id": "evt-sample",
+          "relation": "案发地点"
+        }
+      ],
+      "relatedClues": [
+        {
+          "id": "clue-sample",
+          "relation": "发现于此"
+        }
+      ],
+      "relatedTimelines": [],
+      "relatedImages": []
+    }
+  ],
+  "organizations": [
+    {
+      "id": "org-sample",
+      "name": "示例组织",
+      "details": "这里填写组织背景、目标、行动方式等。",
+      "notes": "秘密资助多起调查行动。",
+      "relatedLocations": [
+        {
+          "id": "loc-sample",
+          "relation": "活动据点"
+        }
+      ],
+      "relatedOrganizations": [],
+      "relatedCharacters": [
+        {
+          "id": "char-sample",
+          "relation": "合作成员"
+        }
+      ],
+      "relatedEvents": [
+        {
+          "id": "evt-sample",
+          "relation": "涉及事件"
+        }
+      ],
+      "relatedClues": [],
+      "relatedTimelines": [],
+      "relatedImages": []
+    }
+  ],
+  "events": [
+    {
+      "id": "evt-sample",
+      "name": "示例事件",
+      "details": "这里填写事件经过、影响、参与者等。",
+      "time": "雨夜",
+      "relatedLocations": [
+        {
+          "id": "loc-sample",
+          "relation": "发生于"
+        }
+      ],
+      "relatedOrganizations": [
+        {
+          "id": "org-sample",
+          "relation": "幕后相关"
+        }
+      ],
+      "relatedCharacters": [
+        {
+          "id": "char-sample",
+          "relation": "参与者"
+        }
+      ],
+      "relatedEvents": [],
+      "relatedClues": [
+        {
+          "id": "clue-sample",
+          "relation": "留下线索"
+        }
+      ],
+      "relatedTimelines": [
+        {
+          "id": "timeline-sample",
+          "relation": "属于该时间线"
+        }
+      ],
+      "relatedImages": []
+    }
+  ],
+  "clues": [
+    {
+      "id": "clue-sample",
+      "name": "示例线索",
+      "details": "这里填写线索内容、来源、用途、解读方式等。",
+      "type": "书信",
+      "relatedLocations": [
+        {
+          "id": "loc-sample",
+          "relation": "发现地点"
+        }
+      ],
+      "relatedOrganizations": [],
+      "relatedCharacters": [
+        {
+          "id": "char-sample",
+          "relation": "掌握者"
+        }
+      ],
+      "relatedEvents": [
+        {
+          "id": "evt-sample",
+          "relation": "关联事件"
+        }
+      ],
+      "relatedClues": [],
+      "relatedTimelines": [],
+      "relatedImages": []
+    }
+  ],
+  "timelines": [
+    {
+      "id": "timeline-sample",
+      "name": "示例时间线",
+      "details": "这里填写该时间线的整体说明。",
+      "timelineEvents": [
+        {
+          "id": "timeline-event-sample",
+          "time": "第一夜",
+          "content": "示例人物在示例地点发现了一条关键线索。",
+          "relatedLocations": [
+            {
+              "id": "loc-sample",
+              "relation": "发生地点"
+            }
+          ],
+          "relatedOrganizations": [],
+          "relatedCharacters": [
+            {
+              "id": "char-sample",
+              "relation": "行动者"
+            }
+          ],
+          "relatedEvents": [
+            {
+              "id": "evt-sample",
+              "relation": "对应事件"
+            }
+          ],
+          "relatedClues": [
+            {
+              "id": "clue-sample",
+              "relation": "发现线索"
+            }
+          ],
+          "relatedTimelines": [],
+          "relatedImages": []
+        }
+      ]
+    }
+  ],
+  "images": []
+}
