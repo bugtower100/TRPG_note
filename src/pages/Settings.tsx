@@ -23,7 +23,7 @@ const Settings: React.FC = () => {
   };
 
   const themes: { id: CampaignTheme; label: string; icon: React.ReactNode; desc: string }[] = [
-    { id: 'default', label: '默认风格', icon: <Monitor size={20} />, desc: '简洁的蓝白配色，适合现代阅读。' },
+    { id: 'default', label: '默认风格', icon: <Monitor size={20} />, desc: '淡雅的紫色调，柔和且适合现代阅读。' },
     { id: 'scroll', label: '复古羊皮纸', icon: <Scroll size={20} />, desc: '温暖的黄色调，带来经典 TRPG 氛围。' },
     { id: 'archive', label: '未来科技', icon: <Archive size={20} />, desc: '高对比度深色调，适合科幻或调查模组。' },
     { id: 'nature', label: '自然护眼', icon: <Monitor size={20} />, desc: '柔和的绿色调，保护视力。' },

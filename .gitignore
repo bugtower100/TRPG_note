@@ -141,3 +141,6 @@ vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 *.exe
 release/*.exe
+server/resource/assets/index-*.js
+server/resource/assets/index-*.css
+tatus --short'

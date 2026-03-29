@@ -3,15 +3,15 @@
 @tailwind utilities;
 
 @layer base {
-  /* Default Theme (Clean/Blue) */
+  /* Default Theme (Elegant Purple/Off-White) */
   :root {
-    --bg-page: #fafaf9; /* stone-50 */
-    --bg-card: #ffffff;
-    --text-primary: #111827;
-    --text-secondary: #4b5563;
-    --border-color: #e5e7eb;
-    --primary-color: #3b82f6;
-    --primary-light: #eff6ff; /* blue-50 */
+    --bg-page: #dfcded; /* Soft off-white with hint of purple */
+    --bg-card: #f7effde7; /* Warm off-white for cards instead of pure white */
+    --text-primary: #373143; /* Deep muted purple/grey for text */
+    --text-secondary: #5d546e; /* Lighter muted purple/grey */
+    --border-color: #e9defe; /* Soft lilac border */
+    --primary-color: #d3c8eb; /* Elegant soft purple (tailwind violet-500) */
+    --primary-light: #f5f3ff; /* Very light purple background (violet-50) */
     --font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   }
 
@@ -45,8 +45,8 @@
     --bg-card: #dcfce7; /* Green-100 - Light Green Card */
     --text-primary: #451a03; /* Amber-950 - Dark Brown Text */
     --text-secondary: #78350f; /* Amber-900 - Brown Secondary */
-    --border-color: #86efac; /* Green-300 */
-    --primary-color: #b1de6e; /* Green-700 - Primary Green */
+    --border-color: #a9f5ad; /* Green-300 */
+    --primary-color: #9ac9ad; /* Green-700 - Primary Green */
     --primary-light: #f0fdf4; /* Green-50 */
     --font-family: "Georgia", "Times New Roman", serif; /* Serif font like Scroll */
   }
@@ -100,7 +100,7 @@
   }
 
   .section-link {
-    @apply cursor-pointer text-[11px] font-medium px-1 py-0.5 rounded border transition-all;
+    @apply cursor-pointer text-sm font-semibold px-1.5 py-0.5 rounded border transition-all;
     border-color: var(--border-color) !important;
     color: var(--text-secondary) !important;
     background-color: color-mix(in srgb, var(--bg-card) 78%, var(--primary-light) 22%);

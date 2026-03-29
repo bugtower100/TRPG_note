@@ -9,6 +9,8 @@ export interface Tab {
   type: string;
   entityId: string;
   title: string;
+  targetSectionTitleLower?: string;
+  targetSubItemId?: string;
 }
 
 interface CampaignContextType {
@@ -50,7 +52,13 @@ interface CampaignContextType {
   // Tabs
   tabs: Tab[];
   activeTabId: string | null;
-  openInTab: (type: string, entityId: string, title: string) => void;
+  openInTab: (
+    type: string,
+    entityId: string,
+    title: string,
+    targetSectionTitleLower?: string,
+    targetSubItemId?: string
+  ) => void;
   closeTab: (tabId: string) => void;
   setActiveTabId: (tabId: string) => void;
 }
@@ -291,15 +299,42 @@ export const CampaignProvider: React.FC<{ children: ReactNode }> = ({ children }
   };
 
   // --- Tab Management ---
-  const openInTab = (type: string, entityId: string, title: string) => {
-    const existing = tabs.find(t => t.type === type && t.entityId === entityId);
-    if (existing) {
-      setActiveTabId(existing.id);
-    } else {
-      const newTab = { id: uuidv4(), type, entityId, title };
-      setTabs([...tabs, newTab]);
-      setActiveTabId(newTab.id);
+  const openInTab = (
+    type: string,
+    entityId: string,
+    title: string,
+    targetSectionTitleLower?: string,
+    targetSubItemId?: string
+  ) => {
+    const current = tabs.find(t => t.type === type && t.entityId === entityId);
+    if (current) {
+      if (targetSectionTitleLower || targetSubItemId) {
+        setTabs((prevTabs) =>
+          prevTabs.map((tab) =>
+            tab.id === current.id
+              ? {
+                  ...tab,
+                  targetSectionTitleLower: targetSectionTitleLower || tab.targetSectionTitleLower,
+                  targetSubItemId: targetSubItemId || tab.targetSubItemId,
+                }
+              : tab
+          )
+        );
+      }
+      setActiveTabId(current.id);
+      return;
     }
+
+    const newTab = {
+      id: uuidv4(),
+      type,
+      entityId,
+      title,
+      targetSectionTitleLower,
+      targetSubItemId,
+    };
+    setTabs((prevTabs) => [...prevTabs, newTab]);
+    setActiveTabId(newTab.id);
   };
 
   const closeTab = (tabId: string) => {

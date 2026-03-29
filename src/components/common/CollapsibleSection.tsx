@@ -10,6 +10,7 @@ interface CollapsibleSectionProps {
   onRemove?: () => void;
   editableTitle?: boolean;
   onRenameTitle?: (title: string) => void;
+  sectionTitleLower?: string;
 }
 
 const CollapsibleSection: React.FC<CollapsibleSectionProps> = ({
@@ -22,6 +23,7 @@ const CollapsibleSection: React.FC<CollapsibleSectionProps> = ({
   onRemove,
   editableTitle = false,
   onRenameTitle,
+  sectionTitleLower,
 }) => {
   const handleRename = () => {
     if (!onRenameTitle) return;
@@ -32,7 +34,11 @@ const CollapsibleSection: React.FC<CollapsibleSectionProps> = ({
   };
 
   return (
-    <section className={`p-3 rounded-lg shadow-sm border theme-card ${className}`}>
+    <section
+      data-section-title={sectionTitleLower || title.toLowerCase()}
+      data-collapsed={collapsed ? 'true' : 'false'}
+      className={`p-3 rounded-lg shadow-sm border theme-card ${className}`}
+    >
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2">
           <h3 className="text-base font-medium">{title}</h3>
@@ -59,6 +65,7 @@ const CollapsibleSection: React.FC<CollapsibleSectionProps> = ({
           <button
             type="button"
             onClick={onToggle}
+            data-role="section-toggle"
             className="text-xs font-semibold text-primary hover:text-primary-dark px-2 py-1 border-2 border-primary/30 rounded hover:bg-primary/10"
           >
             {collapsed ? '展开内容 ▼' : '收起内容 ▲'}

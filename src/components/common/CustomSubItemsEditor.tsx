@@ -105,7 +105,12 @@ const CustomSubItemsEditor: React.FC<CustomSubItemsEditorProps> = ({
       {filteredItems.map((item) => {
         const collapsed = Boolean(item.collapsed);
         return (
-          <div key={item.id} className="border border-theme rounded-lg p-3 bg-theme-card">
+          <div
+            key={item.id}
+            data-subitem-id={item.id}
+            data-subitem-title={item.title.toLowerCase()}
+            className="border border-theme rounded-lg p-3 bg-theme-card"
+          >
             <div className="flex items-center gap-2 mb-2">
               <button
                 type="button"

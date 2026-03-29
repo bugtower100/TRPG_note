@@ -13,11 +13,39 @@ interface TooltipState {
   visible: boolean;
   x: number;
   y: number;
-  kind: 'entity' | 'section' | null;
+  kind: 'entity' | 'section' | 'subitem' | null;
   entityId: string | null;
   entityType: string | null;
   sectionTitleLower: string | null;
+  subItemTitleLower: string | null;
 }
+
+const DEFAULT_SECTION_KEYS: Record<string, Array<{ key: string; title: string }>> = {
+  characters: [
+    { key: 'basic', title: '基本信息' },
+    { key: 'goals', title: '属性与目标' },
+  ],
+  monsters: [
+    { key: 'basic', title: '基本信息' },
+    { key: 'combat', title: '数据与掉落' },
+  ],
+  locations: [
+    { key: 'detail', title: '地点详情' },
+  ],
+  organizations: [
+    { key: 'detail', title: '组织详情' },
+  ],
+  events: [
+    { key: 'detail', title: '事件详情' },
+  ],
+  clues: [
+    { key: 'detail', title: '线索详情' },
+  ],
+  timelines: [
+    { key: 'intro', title: '简介' },
+    { key: 'events', title: '事件节点' },
+  ],
+};
 
 const RichTextDisplay: React.FC<RichTextDisplayProps> = ({ content, className = '' }) => {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -31,6 +59,7 @@ const RichTextDisplay: React.FC<RichTextDisplayProps> = ({ content, className = 
     entityId: null,
     entityType: null,
     sectionTitleLower: null,
+    subItemTitleLower: null,
   });
 
   const entityMap = React.useMemo(() => {
@@ -66,33 +95,6 @@ const RichTextDisplay: React.FC<RichTextDisplayProps> = ({ content, className = 
       Array<{ entityId: string; entityType: string; entityName: string; sectionKey: string; sectionTitle: string }>
     >();
 
-    const defaultSectionKeys: Record<string, Array<{ key: string; title: string }>> = {
-      characters: [
-        { key: 'basic', title: '基本信息' },
-        { key: 'goals', title: '属性与目标' },
-      ],
-      monsters: [
-        { key: 'basic', title: '基本信息' },
-        { key: 'combat', title: '数据与掉落' },
-      ],
-      locations: [
-        { key: 'detail', title: '地点详情' },
-      ],
-      organizations: [
-        { key: 'detail', title: '组织详情' },
-      ],
-      events: [
-        { key: 'detail', title: '事件详情' },
-      ],
-      clues: [
-        { key: 'detail', title: '线索详情' },
-      ],
-      timelines: [
-        { key: 'intro', title: '简介' },
-        { key: 'events', title: '事件节点' },
-      ],
-    };
-
     const addEntry = (
       title: string,
       payload: { entityId: string; entityType: string; entityName: string; sectionKey: string; sectionTitle: string }
@@ -105,7 +107,7 @@ const RichTextDisplay: React.FC<RichTextDisplayProps> = ({ content, className = 
 
     const process = (list: any[], entityType: string) => {
       list.forEach((item) => {
-        const defs = defaultSectionKeys[entityType] || [];
+        const defs = DEFAULT_SECTION_KEYS[entityType] || [];
         defs.forEach((def) => {
           if (item.sectionVisibility?.[def.key] === false) return;
           const title = item.sectionTitles?.[def.key] || def.title;
@@ -144,10 +146,78 @@ const RichTextDisplay: React.FC<RichTextDisplayProps> = ({ content, className = 
     return map;
   }, [campaignData]);
 
+  const subItemTitleMap = React.useMemo(() => {
+    const map = new Map<
+      string,
+      Array<{
+        entityId: string;
+        entityType: string;
+        entityName: string;
+        sectionKey: string;
+        sectionTitle: string;
+        subItemId: string;
+        subItemTitle: string;
+      }>
+    >();
+
+    const addEntry = (
+      title: string,
+      payload: {
+        entityId: string;
+        entityType: string;
+        entityName: string;
+        sectionKey: string;
+        sectionTitle: string;
+        subItemId: string;
+        subItemTitle: string;
+      }
+    ) => {
+      const key = title.toLowerCase();
+      const list = map.get(key) || [];
+      list.push(payload);
+      map.set(key, list);
+    };
+
+    const process = (list: any[], entityType: string) => {
+      list.forEach((item) => {
+        const defs = DEFAULT_SECTION_KEYS[entityType] || [];
+        const defaultTitleByKey = new Map(defs.map((def) => [def.key, def.title]));
+        const sectionSubItems = item.sectionSubItems || {};
+        Object.entries(sectionSubItems).forEach(([sectionKey, rawItems]) => {
+          if (item.sectionVisibility?.[sectionKey] === false) return;
+          const sectionTitle = item.sectionTitles?.[sectionKey] || defaultTitleByKey.get(sectionKey) || '未命名区块';
+          const items = Array.isArray(rawItems) ? rawItems : [];
+          items.forEach((subItem: any) => {
+            if (!subItem?.id || !subItem?.title) return;
+            addEntry(subItem.title, {
+              entityId: item.id,
+              entityType,
+              entityName: item.name || '未命名',
+              sectionKey,
+              sectionTitle,
+              subItemId: subItem.id,
+              subItemTitle: subItem.title,
+            });
+          });
+        });
+      });
+    };
+
+    process(campaignData.characters, 'characters');
+    process(campaignData.monsters, 'monsters');
+    process(campaignData.locations, 'locations');
+    process(campaignData.organizations, 'organizations');
+    process(campaignData.events, 'events');
+    process(campaignData.clues, 'clues');
+    process(campaignData.timelines, 'timelines');
+
+    return map;
+  }, [campaignData]);
+
   const allKeywords = React.useMemo(() => {
-    const set = new Set<string>([...entityMap.keys(), ...sectionTitleMap.keys()]);
+    const set = new Set<string>([...entityMap.keys(), ...sectionTitleMap.keys(), ...subItemTitleMap.keys()]);
     return Array.from(set).sort((a, b) => b.length - a.length);
-  }, [entityMap, sectionTitleMap]);
+  }, [entityMap, sectionTitleMap, subItemTitleMap]);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -203,6 +273,7 @@ const RichTextDisplay: React.FC<RichTextDisplayProps> = ({ content, className = 
         const span = document.createElement('span');
         const keywordLower = match.name.toLowerCase();
         const entityInfo = entityMap.get(keywordLower);
+        const subItemInfo = subItemTitleMap.get(keywordLower);
         const sectionInfo = sectionTitleMap.get(keywordLower);
 
         if (entityInfo) {
@@ -210,6 +281,10 @@ const RichTextDisplay: React.FC<RichTextDisplayProps> = ({ content, className = 
           span.dataset.kind = 'entity';
           span.dataset.id = entityInfo.id;
           span.dataset.type = entityInfo.type;
+        } else if (subItemInfo && subItemInfo.length > 0) {
+          span.className = 'section-link';
+          span.dataset.kind = 'subitem';
+          span.dataset.subitemtitle = keywordLower;
         } else if (sectionInfo && sectionInfo.length > 0) {
           span.className = 'section-link';
           span.dataset.kind = 'section';
@@ -230,7 +305,7 @@ const RichTextDisplay: React.FC<RichTextDisplayProps> = ({ content, className = 
       node.parentNode?.replaceChild(fragment, node);
     });
 
-  }, [content, allKeywords, entityMap, sectionTitleMap]);
+  }, [content, allKeywords, entityMap, sectionTitleMap, subItemTitleMap]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -238,23 +313,29 @@ const RichTextDisplay: React.FC<RichTextDisplayProps> = ({ content, className = 
 
     const handleMouseOver = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
-      if (target.classList.contains('entity-link')) {
+      if (target.classList.contains('entity-link') || target.classList.contains('section-link')) {
         const rect = target.getBoundingClientRect();
         setTooltip({
           visible: true,
           x: rect.left + window.scrollX,
           y: rect.bottom + window.scrollY + 5,
-          kind: target.dataset.kind === 'section' ? 'section' : 'entity',
+          kind:
+            target.dataset.kind === 'section'
+              ? 'section'
+              : target.dataset.kind === 'subitem'
+                ? 'subitem'
+                : 'entity',
           entityId: target.dataset.id || null,
           entityType: target.dataset.type || null,
           sectionTitleLower: target.dataset.sectiontitle || null,
+          subItemTitleLower: target.dataset.subitemtitle || null,
         });
       }
     };
 
     const handleMouseOut = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
-      if (target.classList.contains('entity-link')) {
+      if (target.classList.contains('entity-link') || target.classList.contains('section-link')) {
         setTooltip(prev => ({ ...prev, visible: false }));
       }
     };
@@ -276,7 +357,23 @@ const RichTextDisplay: React.FC<RichTextDisplayProps> = ({ content, className = 
           const candidates = sectionTitleMap.get(titleKey) || [];
           if (candidates.length > 0) {
             const first = candidates[0];
-            openInTab(first.entityType, first.entityId, first.entityName);
+            openInTab(first.entityType, first.entityId, first.entityName, first.sectionTitle.toLowerCase());
+            setTooltip(prev => ({ ...prev, visible: false }));
+          }
+        }
+      } else if (kind === 'subitem') {
+        const titleKey = target.dataset.subitemtitle;
+        if (titleKey) {
+          const candidates = subItemTitleMap.get(titleKey) || [];
+          if (candidates.length > 0) {
+            const first = candidates[0];
+            openInTab(
+              first.entityType,
+              first.entityId,
+              first.entityName,
+              first.sectionTitle.toLowerCase(),
+              first.subItemId
+            );
             setTooltip(prev => ({ ...prev, visible: false }));
           }
         }
@@ -292,7 +389,7 @@ const RichTextDisplay: React.FC<RichTextDisplayProps> = ({ content, className = 
       container.removeEventListener('mouseout', handleMouseOut);
       container.removeEventListener('dblclick', handleDblClick);
     };
-  }, [campaignData, openInTab, sectionTitleMap]);
+  }, [campaignData, openInTab, sectionTitleMap, subItemTitleMap]);
 
   const renderTooltipContent = () => {
     if (tooltip.kind === 'section' && tooltip.sectionTitleLower) {
@@ -303,7 +400,7 @@ const RichTextDisplay: React.FC<RichTextDisplayProps> = ({ content, className = 
           <h4 className="font-bold text-sm mb-1 theme-text-primary">匹配到区块标题</h4>
           <div className="space-y-1">
             {matches.slice(0, 6).map((item, idx) => (
-              <div key={`${item.entityId}_${item.sectionKey}_${idx}`} className="text-[11px] leading-4 theme-text-secondary">
+              <div key={`${item.entityId}_${item.sectionKey}_${idx}`} className="text-sm leading-5 theme-text-secondary">
                 <span className="inline-block mr-1 px-1.5 py-0.5 rounded border border-theme section-link">
                   区块
                 </span>
@@ -311,7 +408,28 @@ const RichTextDisplay: React.FC<RichTextDisplayProps> = ({ content, className = 
               </div>
             ))}
           </div>
-          <div className="mt-1 text-[10px] theme-text-secondary opacity-70">双击在右侧打开第一项</div>
+          <div className="mt-1 text-xs theme-text-secondary opacity-70">双击在右侧打开并定位到该区块</div>
+        </div>
+      );
+    }
+
+    if (tooltip.kind === 'subitem' && tooltip.subItemTitleLower) {
+      const matches = subItemTitleMap.get(tooltip.subItemTitleLower) || [];
+      if (matches.length === 0) return null;
+      return (
+        <div className="max-w-xs">
+          <h4 className="font-bold text-sm mb-1 theme-text-primary">匹配到子项目</h4>
+          <div className="space-y-1">
+            {matches.slice(0, 6).map((item, idx) => (
+              <div key={`${item.entityId}_${item.sectionKey}_${item.subItemId}_${idx}`} className="text-sm leading-5 theme-text-secondary">
+                <span className="inline-block mr-1 px-1.5 py-0.5 rounded border border-theme section-link">
+                  子项目
+                </span>
+                {item.entityName} · {item.sectionTitle} · {item.subItemTitle}
+              </div>
+            ))}
+          </div>
+          <div className="mt-1 text-xs theme-text-secondary opacity-70">双击在右侧打开并定位到该子项目</div>
         </div>
       );
     }
@@ -331,7 +449,7 @@ const RichTextDisplay: React.FC<RichTextDisplayProps> = ({ content, className = 
         <p className="text-xs theme-text-secondary line-clamp-3">
           {entity.details || entity.description || '暂无描述'}
         </p>
-        <div className="mt-1 text-[10px] theme-text-secondary opacity-70">
+        <div className="mt-1 text-xs theme-text-secondary opacity-70">
           双击在右侧打开
         </div>
       </div>

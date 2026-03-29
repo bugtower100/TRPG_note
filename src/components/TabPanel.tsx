@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { useCampaign, Tab } from '../context/CampaignContext';
 import { Maximize2, Minimize2, X } from 'lucide-react';
 import CharacterDetail from '../pages/characters/CharacterDetail';
@@ -16,8 +16,7 @@ interface TabPanelProps {
 
 const TabPanel: React.FC<TabPanelProps> = ({ maximized, onToggleMaximize }) => {
   const { tabs, activeTabId, setActiveTabId, closeTab } = useCampaign();
-
-  if (tabs.length === 0) return null;
+  const contentRef = useRef<HTMLDivElement>(null);
 
   const activeTab = tabs.find(t => t.id === activeTabId);
 
@@ -33,6 +32,44 @@ const TabPanel: React.FC<TabPanelProps> = ({ maximized, onToggleMaximize }) => {
       default: return <div>未知类型</div>;
     }
   };
+
+  useEffect(() => {
+    if (!activeTab) return;
+    if (!activeTab.targetSectionTitleLower && !activeTab.targetSubItemId) return;
+    const root = contentRef.current;
+    if (!root) return;
+
+    const escapeAttr = (value: string) => value.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+
+    const runJump = (attempt = 0) => {
+      const sectionSelector = activeTab.targetSectionTitleLower
+        ? `[data-section-title="${escapeAttr(activeTab.targetSectionTitleLower)}"]`
+        : null;
+
+      const section = sectionSelector ? root.querySelector(sectionSelector) as HTMLElement | null : null;
+      if (section && section.dataset.collapsed === 'true') {
+        const toggleBtn = section.querySelector('[data-role="section-toggle"]') as HTMLButtonElement | null;
+        toggleBtn?.click();
+      }
+
+      const target = activeTab.targetSubItemId
+        ? root.querySelector(`[data-subitem-id="${escapeAttr(activeTab.targetSubItemId)}"]`) as HTMLElement | null
+        : section;
+
+      if (target) {
+        target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        return;
+      }
+
+      if (attempt < 8) {
+        window.setTimeout(() => runJump(attempt + 1), 70);
+      }
+    };
+
+    window.setTimeout(() => runJump(0), 30);
+  }, [activeTab]);
+
+  if (tabs.length === 0) return null;
 
   return (
     <div className={`${maximized ? 'w-full' : 'w-1/2'} border-l border-theme bg-theme-card flex flex-col h-screen shadow-xl z-20`}>
@@ -71,7 +108,7 @@ const TabPanel: React.FC<TabPanelProps> = ({ maximized, onToggleMaximize }) => {
       </div>
 
       {/* Tab Content */}
-      <div className="flex-1 overflow-y-auto p-6 bg-theme-card">
+      <div ref={contentRef} className="flex-1 overflow-y-auto p-6 bg-theme-card">
         {activeTab && renderContent(activeTab)}
       </div>
     </div>
