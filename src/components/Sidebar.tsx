@@ -3,11 +3,11 @@ import { NavLink } from 'react-router-dom';
 import { useCampaign } from '../context/CampaignContext';
 import { 
   LayoutDashboard, Users, MapPin, Building, Calendar, 
-  Search, Clock, Settings, LogOut, Skull 
+  Search, Clock, Settings, LogOut, Skull, Home
 } from 'lucide-react';
 
 const Sidebar: React.FC = () => {
-  const { campaignData, logout } = useCampaign();
+  const { campaignData, logout, exitCampaign } = useCampaign();
 
   const navItems = [
     { to: '/', icon: <LayoutDashboard size={20} />, label: '概览' },
@@ -50,6 +50,13 @@ const Sidebar: React.FC = () => {
       </nav>
 
       <div className="p-4 border-t border-theme">
+        <button
+          onClick={exitCampaign}
+          className="flex items-center gap-3 px-4 py-3 w-full text-left theme-text-secondary hover:bg-gray-100/50 hover:text-primary rounded-md transition-colors"
+        >
+          <Home size={20} />
+          <span>返回主页</span>
+        </button>
         <button
           onClick={logout}
           className="flex items-center gap-3 px-4 py-3 w-full text-left text-red-500 hover:bg-red-50 rounded-md transition-colors"
