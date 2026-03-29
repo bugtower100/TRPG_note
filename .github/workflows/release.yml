@@ -1,0 +1,55 @@
+name: Build and Release Windows EXE
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-release:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: server/go.mod
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build frontend
+        run: npm run build
+
+      - name: Build Windows EXE
+        working-directory: server
+        run: go build -o release/TRPG模组笔记.exe
+
+      - name: Create ZIP
+        shell: pwsh
+        run: |
+          Compress-Archive `
+            -Path "server/release/TRPG模组笔记.exe","server/release/data" `
+            -DestinationPath "TRPG模组笔记-windows-amd64.zip" `
+            -Force
+
+      - name: Publish Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: TRPG模组笔记-windows-amd64.zip
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
