@@ -41,8 +41,22 @@ jobs:
       - name: Create ZIP
         shell: pwsh
         run: |
+          $staging = "server/release/package"
+          if (Test-Path $staging) {
+            Remove-Item -Path $staging -Recurse -Force
+          }
+          New-Item -Path $staging -ItemType Directory | Out-Null
+
+          Copy-Item -Path "server/release/TRPG模组笔记.exe" -Destination "$staging/TRPG模组笔记.exe" -Force
+
+          if (Test-Path "server/release/data") {
+            Copy-Item -Path "server/release/data" -Destination "$staging/data" -Recurse -Force
+          } else {
+            New-Item -Path "$staging/data" -ItemType Directory | Out-Null
+          }
+
           Compress-Archive `
-            -Path "server/release/TRPG模组笔记.exe","server/release/data" `
+            -Path "$staging/*" `
             -DestinationPath "TRPG模组笔记-windows-amd64.zip" `
             -Force
 
