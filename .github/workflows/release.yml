@@ -14,6 +14,10 @@ on:
         description: "Release Name"
         required: true
         default: "v1.0.2"
+      prerelease:
+        description: "Mark as prerelease"
+        required: true
+        default: "false"
 
 permissions:
   contents: write
@@ -69,15 +73,25 @@ jobs:
             -DestinationPath "TRPG模组笔记-windows-amd64.zip" `
             -Force
 
+      - name: Validate release tag
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        shell: pwsh
+        run: |
+          if ("${{ inputs.release_tag }}" -notmatch "^v\d+\.\d+\.\d+") {
+            throw "release_tag 必须是 vX.Y.Z 格式，例如 v1.0.2"
+          }
+
       - name: Publish Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || inputs.release_tag }}
           target_commitish: ${{ github.sha }}
           name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || inputs.release_name }}
-          prerelease: false
+          prerelease: ${{ startsWith(github.ref, 'refs/tags/') && false || (inputs.prerelease == 'true') }}
+          draft: false
+          make_latest: true
           body: |
-            ## v1.0.2 更新内容
+            ## ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || inputs.release_name }} 更新内容
             - 修复关系图双向箭头方向与遮挡问题
             - 新增关系线样式与粗细配置（实线/虚线，1~6px）
             - 新增关系线文字底色与透明度可配置
