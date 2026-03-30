@@ -1,4 +1,4 @@
-import { CampaignData, UserProfile, CampaignSummary, BaseEntity, Character, Location, Organization, Event, Clue, Timeline, Monster } from '../types';
+import { CampaignData, UserProfile, CampaignSummary, BaseEntity, Character, Location, Organization, Event, Clue, Timeline, Monster, RelationGraph } from '../types';
 import { v4 as uuidv4 } from 'uuid';
 import { StorageAdapter } from './storageAdapter';
 
@@ -25,6 +25,7 @@ export const DEFAULT_CAMPAIGN_DATA: CampaignData = {
   clues: [],
   timelines: [],
   monsters: [],
+  relationGraphs: [],
 };
 
 class DataService {
@@ -192,6 +193,44 @@ class DataService {
       relations: safeArray<any>(m?.relations, []),
     }));
 
+    const relationGraphs: RelationGraph[] = safeArray<any>(raw?.relationGraphs, []).map((g) => ({
+      id: typeof g?.id === 'string' && g.id ? g.id : uuidv4(),
+      name: typeof g?.name === 'string' && g.name.trim() ? g.name.trim() : '新关系图',
+      nodes: safeArray<any>(g?.nodes, []).map((n) => ({
+        id: typeof n?.id === 'string' && n.id ? n.id : uuidv4(),
+        entityId: typeof n?.entityId === 'string' ? n.entityId : '',
+        entityType: typeof n?.entityType === 'string' ? n.entityType : 'characters',
+        label: typeof n?.label === 'string' ? n.label : '未命名',
+        x: typeof n?.x === 'number' ? n.x : 120,
+        y: typeof n?.y === 'number' ? n.y : 120,
+        note: typeof n?.note === 'string' ? n.note : '',
+        tokenImageRef:
+          typeof n?.tokenImageRef === 'string'
+            ? n.tokenImageRef
+            : (typeof n?.tokenImage === 'string' ? n.tokenImage : ''),
+      })),
+      edges: safeArray<any>(g?.edges, []).map((e) => ({
+        id: typeof e?.id === 'string' && e.id ? e.id : uuidv4(),
+        fromNodeId: typeof e?.fromNodeId === 'string' ? e.fromNodeId : '',
+        toNodeId: typeof e?.toNodeId === 'string' ? e.toNodeId : '',
+        direction: e?.direction === 'forward' || e?.direction === 'backward' || e?.direction === 'bidirectional' ? e.direction : 'none',
+        lineStyle: e?.lineStyle === 'dashed' ? 'dashed' : 'solid',
+        lineWidth:
+          typeof e?.lineWidth === 'number'
+            ? Math.max(1, Math.min(6, e.lineWidth))
+            : 2,
+        label: typeof e?.label === 'string' ? e.label : '',
+        labelFontSize: typeof e?.labelFontSize === 'number' ? e.labelFontSize : 12,
+        labelColor: typeof e?.labelColor === 'string' ? e.labelColor : '#374151',
+        labelBgColor: typeof e?.labelBgColor === 'string' ? e.labelBgColor : '#ffffff',
+        labelBgOpacity:
+          typeof e?.labelBgOpacity === 'number'
+            ? Math.max(0, Math.min(1, e.labelBgOpacity))
+            : 0.5,
+      })),
+      updatedAt: typeof g?.updatedAt === 'number' ? g.updatedAt : Date.now(),
+    }));
+
     const notes = typeof raw?.notes === 'string' ? raw.notes : (typeof raw?.memoContent === 'string' ? raw.memoContent : '');
 
     return {
@@ -211,6 +250,7 @@ class DataService {
       clues,
       timelines,
       monsters,
+      relationGraphs,
     };
   }
 
@@ -470,6 +510,12 @@ class DataService {
 
   // --- Export/Import ---
   exportData(data: CampaignData): void {
+    const hasExternalGraphImages = (data.relationGraphs || []).some((g) =>
+      (g.nodes || []).some((n: any) => typeof n?.tokenImageRef === 'string' && n.tokenImageRef.trim())
+    );
+    if (hasExternalGraphImages) {
+      alert('检测到关系图节点图片资源。当前导出的 JSON 不包含图片文件，导入后请重新上传图片。');
+    }
     const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(data, null, 2));
     const downloadAnchorNode = document.createElement('a');
     downloadAnchorNode.setAttribute("href", dataStr);

@@ -5,6 +5,15 @@ on:
     tags:
       - "v*"
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Release Tag"
+        required: true
+        default: "v1.0.2"
+      release_name:
+        description: "Release Name"
+        required: true
+        default: "v1.0.2"
 
 permissions:
   contents: write
@@ -63,10 +72,20 @@ jobs:
       - name: Publish Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('manual-{0}', github.run_number) }}
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || inputs.release_tag }}
           target_commitish: ${{ github.sha }}
-          name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('manual-{0}', github.run_number) }}
-          prerelease: ${{ !startsWith(github.ref, 'refs/tags/') }}
+          name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || inputs.release_name }}
+          prerelease: false
+          body: |
+            ## v1.0.2 更新内容
+            - 修复关系图双向箭头方向与遮挡问题
+            - 新增关系线样式与粗细配置（实线/虚线，1~6px）
+            - 新增关系线文字底色与透明度可配置
+            - 关系图资源选择器改为悬浮窗，并展示小图 + 可读名称
+            - 新增资源管理接口（上传/列表/删除/批量删除），资源改为文件引用
+            - 修复高频保存导致的卡顿与断连问题（保存节流）
+            - 修复角色详情部分区块无法新增子项目
+            - 修复刷新子路由 404（SPA 回退）
           files: TRPG模组笔记-windows-amd64.zip
           generate_release_notes: true
         env:

@@ -17,6 +17,9 @@
     "clean:data": "node scripts/maintenance.mjs --clean-data"
   },
   "dependencies": {
+    "@capacitor/android": "^8.3.0",
+    "@capacitor/cli": "^8.3.0",
+    "@capacitor/core": "^8.3.0",
     "@types/dompurify": "^3.0.5",
     "@types/marked": "^5.0.2",
     "@types/uuid": "^10.0.0",

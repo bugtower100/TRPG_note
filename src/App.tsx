@@ -19,6 +19,7 @@ import MonsterList from './pages/monsters/MonsterList';
 import MonsterDetail from './pages/monsters/MonsterDetail';
 import LocationDetail from './pages/locations/LocationDetail';
 import OrganizationDetail from './pages/organizations/OrganizationDetail';
+import RelationGraphs from './pages/RelationGraphs';
 
 function AppContent() {
   const { user, currentCampaignId } = useCampaign();
@@ -48,6 +49,7 @@ function AppContent() {
             <Route path="clues/:id" element={<ClueDetail />} />
             <Route path="timelines" element={<TimelineList />} />
             <Route path="timelines/:id" element={<TimelineDetail />} />
+            <Route path="relation-graphs" element={<RelationGraphs />} />
             <Route path="settings" element={<Settings />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>

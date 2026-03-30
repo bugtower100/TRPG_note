@@ -44,8 +44,8 @@ const Layout: React.FC = () => {
   return (
     <div className="flex h-screen overflow-hidden theme-page">
       <Sidebar />
-      <main className="flex-1 ml-64 flex overflow-hidden">
-        <div className="absolute left-64 right-0 top-0 z-50">
+      <main className="flex-1 ml-56 flex overflow-hidden">
+        <div className="absolute left-56 right-0 top-0 z-50">
           {backendStatus?.online === false ? (
             <div className="bg-red-600 text-white px-4 py-2 text-sm flex items-center justify-between">
               <span>
@@ -88,7 +88,7 @@ const Layout: React.FC = () => {
           </span>
         </div>
         {showConflicts && backendStatus?.conflicts && backendStatus.conflicts.length > 0 && (
-          <div className="absolute left-64 right-0 top-10 z-40 bg-white border border-yellow-500 rounded shadow p-3 text-xs">
+          <div className="absolute left-56 right-0 top-10 z-40 bg-white border border-yellow-500 rounded shadow p-3 text-xs">
             {backendStatus.conflicts.map((c) => (
               <div key={c.key} className="py-1 flex items-center justify-between">
                 <span className="font-medium break-all">{c.key}</span>

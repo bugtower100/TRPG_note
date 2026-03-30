@@ -68,6 +68,51 @@ export interface Timeline extends BaseEntity {
   timelineEvents: TimelineEvent[];
 }
 
+export type GraphEntityType =
+  | 'characters'
+  | 'monsters'
+  | 'locations'
+  | 'organizations'
+  | 'events'
+  | 'clues'
+  | 'timelines';
+
+export interface RelationGraphNode {
+  id: string;
+  entityId: string;
+  entityType: GraphEntityType;
+  label: string;
+  x: number;
+  y: number;
+  note?: string;
+  tokenImageRef?: string;
+  tokenImage?: string;
+}
+
+export type RelationEdgeDirection = 'none' | 'forward' | 'backward' | 'bidirectional';
+
+export interface RelationGraphEdge {
+  id: string;
+  fromNodeId: string;
+  toNodeId: string;
+  direction: RelationEdgeDirection;
+  lineStyle: 'solid' | 'dashed';
+  lineWidth: number;
+  label: string;
+  labelFontSize: number;
+  labelColor: string;
+  labelBgColor: string;
+  labelBgOpacity: number;
+}
+
+export interface RelationGraph {
+  id: string;
+  name: string;
+  nodes: RelationGraphNode[];
+  edges: RelationGraphEdge[];
+  updatedAt: number;
+}
+
 export interface CampaignData {
   id?: string; // Add optional ID for multi-campaign support
   meta: {
@@ -84,6 +129,7 @@ export interface CampaignData {
   clues: Clue[];
   timelines: Timeline[];
   monsters: Monster[];
+  relationGraphs?: RelationGraph[];
 }
 
 export interface Monster extends BaseEntity {

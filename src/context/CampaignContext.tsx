@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useRef } from 'react';
 import { CampaignData, UserProfile, CampaignSummary, CampaignTheme } from '../types';
 import { dataService, DEFAULT_CAMPAIGN_DATA } from '../services/dataService';
 import { initializeStorageAdapter } from '../services/storageAdapter';
@@ -77,6 +77,28 @@ export const CampaignProvider: React.FC<{ children: ReactNode }> = ({ children }
   // Tabs
   const [tabs, setTabs] = useState<Tab[]>([]);
   const [activeTabId, setActiveTabId] = useState<string | null>(null);
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingSaveRef = useRef<CampaignData | null>(null);
+
+  const persistCampaign = useCallback((data: CampaignData, immediate = false) => {
+    pendingSaveRef.current = data;
+    if (saveTimerRef.current) {
+      clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = null;
+    }
+    if (immediate) {
+      dataService.saveCampaign(data);
+      pendingSaveRef.current = null;
+      return;
+    }
+    saveTimerRef.current = setTimeout(() => {
+      if (pendingSaveRef.current) {
+        dataService.saveCampaign(pendingSaveRef.current);
+        pendingSaveRef.current = null;
+      }
+      saveTimerRef.current = null;
+    }, 320);
+  }, []);
 
   // --- Initialization ---
   useEffect(() => {
@@ -132,6 +154,18 @@ export const CampaignProvider: React.FC<{ children: ReactNode }> = ({ children }
     );
   }, [campaignData]);
 
+  useEffect(() => {
+    return () => {
+      if (saveTimerRef.current) {
+        clearTimeout(saveTimerRef.current);
+      }
+      if (pendingSaveRef.current) {
+        dataService.saveCampaign(pendingSaveRef.current);
+        pendingSaveRef.current = null;
+      }
+    };
+  }, []);
+
 
   // --- Actions ---
 
@@ -162,7 +196,7 @@ export const CampaignProvider: React.FC<{ children: ReactNode }> = ({ children }
     // Save current if needed? Auto-save is handled on specific actions usually
     // But let's ensure we save current state before switching
     if (currentCampaignId) {
-        dataService.saveCampaign(campaignData);
+        persistCampaign(campaignData, true);
     }
     
     const data = dataService.loadCampaign(id);
@@ -190,14 +224,14 @@ export const CampaignProvider: React.FC<{ children: ReactNode }> = ({ children }
 
   const exitCampaign = () => {
       if (currentCampaignId) {
-          dataService.saveCampaign(campaignData);
+          persistCampaign(campaignData, true);
       }
       setCurrentCampaignId(null);
       setCampaignData(DEFAULT_CAMPAIGN_DATA);
   };
 
   const saveCampaign = async () => {
-    dataService.saveCampaign(campaignData);
+    persistCampaign(campaignData, true);
     refreshCampaignList(user?.id);
     
     // Save to file system if handle exists
@@ -228,7 +262,7 @@ export const CampaignProvider: React.FC<{ children: ReactNode }> = ({ children }
           if (!data.id) data.id = dataService.generateId();
           
           // Save to local storage
-          dataService.saveCampaign(data);
+          persistCampaign(data, true);
           
           // Switch to it
           refreshCampaignList(user.id);
@@ -248,7 +282,7 @@ export const CampaignProvider: React.FC<{ children: ReactNode }> = ({ children }
     if (result) {
         const { data, handle } = result;
         if (user) {
-           dataService.saveCampaign(data);
+           persistCampaign(data, true);
            refreshCampaignList(user.id);
            
            setCampaignData(data);
@@ -278,7 +312,7 @@ export const CampaignProvider: React.FC<{ children: ReactNode }> = ({ children }
       }
 
       const newData = { ...prev, [collection]: newList } as CampaignData;
-      dataService.saveCampaign(newData);
+      persistCampaign(newData, false);
       return newData;
     });
   };
@@ -293,7 +327,7 @@ export const CampaignProvider: React.FC<{ children: ReactNode }> = ({ children }
       const list = prev[collection] as any[];
       const newList = list.filter((i: any) => i.id !== id);
       const newData = { ...prev, [collection]: newList } as CampaignData;
-      dataService.saveCampaign(newData);
+      persistCampaign(newData, false);
       return newData;
     });
   };

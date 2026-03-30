@@ -1,7 +1,8 @@
-import React, { useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useCampaign } from '../context/CampaignContext';
 import { CampaignTheme } from '../types';
-import { FileJson, Upload, Monitor, Scroll, Archive } from 'lucide-react';
+import { FileJson, Upload, Monitor, Scroll, Archive, Trash2, RefreshCw } from 'lucide-react';
+import { resourceService, ResourceItem } from '../services/resourceService';
 
 const Settings: React.FC = () => {
   const { 
@@ -10,6 +11,10 @@ const Settings: React.FC = () => {
   } = useCampaign();
   
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const resourceInputRef = useRef<HTMLInputElement>(null);
+  const [resources, setResources] = useState<ResourceItem[]>([]);
+  const [selectedRefs, setSelectedRefs] = useState<string[]>([]);
+  const [resourceBusy, setResourceBusy] = useState(false);
 
   const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -28,6 +33,51 @@ const Settings: React.FC = () => {
     { id: 'archive', label: '未来科技', icon: <Archive size={20} />, desc: '高对比度深色调，适合科幻或调查模组。' },
     { id: 'nature', label: '自然护眼', icon: <Monitor size={20} />, desc: '柔和的绿色调，保护视力。' },
   ];
+
+  const loadResources = async () => {
+    try {
+      const list = await resourceService.list();
+      setResources(list);
+    } catch {
+      setResources([]);
+    }
+  };
+
+  useEffect(() => {
+    loadResources();
+  }, []);
+
+  const toggleRef = (ref: string) => {
+    setSelectedRefs((prev) =>
+      prev.includes(ref) ? prev.filter((r) => r !== ref) : [...prev, ref]
+    );
+  };
+
+  const handleBatchUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+    setResourceBusy(true);
+    try {
+      await Promise.all(files.map((file) => resourceService.upload(file)));
+      await loadResources();
+      if (resourceInputRef.current) resourceInputRef.current.value = '';
+    } finally {
+      setResourceBusy(false);
+    }
+  };
+
+  const handleDeleteSelected = async () => {
+    if (selectedRefs.length === 0) return;
+    if (!confirm(`确定删除选中的 ${selectedRefs.length} 个资源吗？`)) return;
+    setResourceBusy(true);
+    try {
+      await resourceService.deleteMany(selectedRefs);
+      setSelectedRefs([]);
+      await loadResources();
+    } finally {
+      setResourceBusy(false);
+    }
+  };
 
   return (
     <div className="space-y-8 max-w-4xl mx-auto">
@@ -95,6 +145,77 @@ const Settings: React.FC = () => {
               </button>
             </div>
           </div>
+        </div>
+      </section>
+
+      <section className="bg-theme-card p-6 rounded-lg shadow-sm border border-theme">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-medium">资源管理</h3>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={loadResources}
+              className="px-3 py-2 border border-theme rounded hover:bg-gray-50 flex items-center gap-2"
+              disabled={resourceBusy}
+            >
+              <RefreshCw size={16} />
+              刷新
+            </button>
+            <button
+              onClick={handleDeleteSelected}
+              disabled={resourceBusy || selectedRefs.length === 0}
+              className="px-3 py-2 border border-red-300 text-red-600 rounded hover:bg-red-50 disabled:opacity-50 flex items-center gap-2"
+            >
+              <Trash2 size={16} />
+              删除选中
+            </button>
+          </div>
+        </div>
+        <div className="mb-3">
+          <input
+            type="file"
+            accept="image/png,image/jpeg,image/webp"
+            multiple
+            ref={resourceInputRef}
+            className="hidden"
+            onChange={handleBatchUpload}
+          />
+          <button
+            onClick={() => resourceInputRef.current?.click()}
+            className="px-4 py-2 bg-theme-card border border-theme rounded hover:bg-gray-50 flex items-center gap-2"
+            disabled={resourceBusy}
+          >
+            <Upload size={16} />
+            批量上传图片
+          </button>
+        </div>
+        <div className="border border-theme rounded max-h-72 overflow-auto">
+          {resources.length === 0 ? (
+            <div className="p-4 text-sm theme-text-secondary">暂无资源</div>
+          ) : (
+            <div className="divide-y divide-theme">
+              {resources.map((item) => (
+                <label key={item.ref} className="flex items-center gap-3 p-3 hover:bg-gray-50/40 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={selectedRefs.includes(item.ref)}
+                    onChange={() => toggleRef(item.ref)}
+                  />
+                  <img
+                    src={item.url}
+                    alt={item.ref}
+                    className="w-10 h-10 rounded object-cover border border-theme"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <div className="text-sm truncate">{item.displayName || item.ref}</div>
+                    <div className="text-[11px] theme-text-secondary truncate">{item.ref}</div>
+                    <div className="text-xs theme-text-secondary">
+                      {(item.size / 1024).toFixed(1)} KB · {new Date(item.updatedAt).toLocaleString()}
+                    </div>
+                  </div>
+                </label>
+              ))}
+            </div>
+          )}
         </div>
       </section>
     </div>

@@ -3,17 +3,21 @@ package main
 import (
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"mime"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
+	"unicode"
 
 	"runtime"
 
 	"github.com/gin-gonic/gin"
 	"github.com/glebarez/sqlite"
+	"github.com/google/uuid"
 	"github.com/spf13/viper"
 	"gorm.io/gorm"
 )
@@ -68,6 +72,70 @@ func openDB(cfg Config) *gorm.DB {
 	return db
 }
 
+func normalizeResourceRef(ref string) (string, bool) {
+	p := strings.TrimSpace(ref)
+	p = strings.TrimPrefix(p, "/")
+	if p == "" {
+		return "", false
+	}
+	if strings.Contains(p, "..") {
+		return "", false
+	}
+	if !strings.HasPrefix(p, "graph_assets/") {
+		p = "graph_assets/" + p
+	}
+	if strings.Contains(p, "..") {
+		return "", false
+	}
+	return p, true
+}
+
+func sanitizeFilenameBase(name string) string {
+	base := strings.TrimSpace(name)
+	base = strings.TrimSuffix(base, filepath.Ext(base))
+	if base == "" {
+		return "image"
+	}
+	var b strings.Builder
+	lastUnderscore := false
+	for _, r := range base {
+		if r < 32 || strings.ContainsRune(`<>:"/\|?*`, r) {
+			if !lastUnderscore {
+				b.WriteRune('_')
+				lastUnderscore = true
+			}
+			continue
+		}
+		if unicode.IsSpace(r) {
+			if !lastUnderscore {
+				b.WriteRune('_')
+				lastUnderscore = true
+			}
+			continue
+		}
+		b.WriteRune(r)
+		lastUnderscore = false
+	}
+	out := strings.Trim(b.String(), "._")
+	if out == "" {
+		return "image"
+	}
+	return out
+}
+
+func parseDisplayNameFromStored(filename string) string {
+	ext := filepath.Ext(filename)
+	stem := strings.TrimSuffix(filename, ext)
+	if idx := strings.Index(stem, "__"); idx >= 0 && idx+2 < len(stem) {
+		name := strings.TrimSpace(stem[idx+2:])
+		name = strings.ReplaceAll(name, "_", " ")
+		if name != "" {
+			return name
+		}
+	}
+	return stem
+}
+
 func main() {
 	// flags
 	showConsole := flag.Bool("show-console", false, "Windows上显示控制台界面")
@@ -79,6 +147,10 @@ func main() {
 
 	cfg := loadConfig()
 	db := openDB(cfg)
+	assetDir := filepath.Join(filepath.Dir(cfg.DBPath), "graph_assets")
+	if err := os.MkdirAll(assetDir, 0o755); err != nil {
+		log.Fatalf("failed to create graph asset dir: %v", err)
+	}
 
 	router := gin.Default()
 	webRouter := router.Group("/web")
@@ -88,6 +160,7 @@ func main() {
 	})
 
 	api := router.Group("/api/storage")
+	resourceAPI := router.Group("/api/resources")
 
 	api.GET("/health", func(c *gin.Context) {
 		c.JSON(200, gin.H{"status": "ok"})
@@ -224,13 +297,169 @@ func main() {
 		c.JSON(200, meta)
 	})
 
-	webRouter.GET("/*filepath", func(c *gin.Context) {
-		p := c.Param("filepath")
+	resourceAPI.POST("/upload", func(c *gin.Context) {
+		file, header, err := c.Request.FormFile("file")
+		if err != nil {
+			c.JSON(400, gin.H{"error": "file_required"})
+			return
+		}
+		defer file.Close()
+		ext := strings.ToLower(filepath.Ext(header.Filename))
+		switch ext {
+		case ".png", ".jpg", ".jpeg", ".webp":
+		default:
+			c.JSON(400, gin.H{"error": "unsupported_file_type"})
+			return
+		}
+		id := uuid.New().String()
+		displayBase := sanitizeFilenameBase(header.Filename)
+		filename := id + "__" + displayBase + ext
+		dstPath := filepath.Join(assetDir, filename)
+		dst, err := os.Create(dstPath)
+		if err != nil {
+			c.JSON(500, gin.H{"error": "create_file_failed"})
+			return
+		}
+		defer dst.Close()
+		if _, err := io.Copy(dst, file); err != nil {
+			c.JSON(500, gin.H{"error": "write_file_failed"})
+			return
+		}
+		ref := "graph_assets/" + filename
+		c.JSON(200, gin.H{
+			"ref": ref,
+			"url": "/api/resources/file/" + ref,
+		})
+	})
+
+	resourceAPI.GET("/list", func(c *gin.Context) {
+		entries, err := os.ReadDir(assetDir)
+		if err != nil {
+			c.JSON(500, gin.H{"error": "read_dir_failed"})
+			return
+		}
+		items := make([]gin.H, 0, len(entries))
+		for _, entry := range entries {
+			if entry.IsDir() {
+				continue
+			}
+			name := entry.Name()
+			ext := strings.ToLower(filepath.Ext(name))
+			switch ext {
+			case ".png", ".jpg", ".jpeg", ".webp":
+			default:
+				continue
+			}
+			info, err := entry.Info()
+			if err != nil {
+				continue
+			}
+			ref := "graph_assets/" + name
+			displayName := parseDisplayNameFromStored(name)
+			items = append(items, gin.H{
+				"ref":         ref,
+				"url":         "/api/resources/file/" + ref,
+				"displayName": displayName,
+				"size":        info.Size(),
+				"updatedAt":   info.ModTime().UnixMilli(),
+			})
+		}
+		sort.Slice(items, func(i, j int) bool {
+			return items[i]["updatedAt"].(int64) > items[j]["updatedAt"].(int64)
+		})
+		c.JSON(200, gin.H{"items": items})
+	})
+
+	resourceAPI.DELETE("/file/*filepath", func(c *gin.Context) {
+		raw := strings.TrimPrefix(c.Param("filepath"), "/")
+		ref, ok := normalizeResourceRef(raw)
+		if !ok {
+			c.JSON(400, gin.H{"error": "invalid_ref"})
+			return
+		}
+		full := filepath.Join(filepath.Dir(cfg.DBPath), ref)
+		if !strings.HasPrefix(filepath.Clean(full), filepath.Clean(filepath.Dir(cfg.DBPath))) {
+			c.JSON(403, gin.H{"error": "forbidden"})
+			return
+		}
+		if err := os.Remove(full); err != nil {
+			if os.IsNotExist(err) {
+				c.Status(204)
+				return
+			}
+			c.JSON(500, gin.H{"error": "delete_failed"})
+			return
+		}
+		c.Status(204)
+	})
+
+	resourceAPI.POST("/delete-batch", func(c *gin.Context) {
+		var body struct {
+			Refs []string `json:"refs"`
+		}
+		if err := c.ShouldBindJSON(&body); err != nil || len(body.Refs) == 0 {
+			c.JSON(400, gin.H{"error": "invalid_payload"})
+			return
+		}
+		failed := make([]string, 0)
+		for _, raw := range body.Refs {
+			ref, ok := normalizeResourceRef(raw)
+			if !ok {
+				failed = append(failed, raw)
+				continue
+			}
+			full := filepath.Join(filepath.Dir(cfg.DBPath), ref)
+			if !strings.HasPrefix(filepath.Clean(full), filepath.Clean(filepath.Dir(cfg.DBPath))) {
+				failed = append(failed, raw)
+				continue
+			}
+			if err := os.Remove(full); err != nil && !os.IsNotExist(err) {
+				failed = append(failed, raw)
+			}
+		}
+		if len(failed) > 0 {
+			c.JSON(207, gin.H{"failed": failed})
+			return
+		}
+		c.Status(204)
+	})
+
+	resourceAPI.GET("/file/*filepath", func(c *gin.Context) {
+		raw := strings.TrimPrefix(c.Param("filepath"), "/")
+		p, ok := normalizeResourceRef(raw)
+		if !ok {
+			c.Status(404)
+			return
+		}
+		full := filepath.Join(filepath.Dir(cfg.DBPath), p)
+		if !strings.HasPrefix(filepath.Clean(full), filepath.Clean(filepath.Dir(cfg.DBPath))) {
+			c.Status(403)
+			return
+		}
+		if _, err := os.Stat(full); err != nil {
+			c.Status(404)
+			return
+		}
+		c.Header("Cache-Control", "public, max-age=31536000")
+		c.File(full)
+	})
+
+	serveWeb := func(c *gin.Context, p string) {
 		if p == "" || p == "/" {
 			p = "/index.html"
 		}
 		data, err := webFS.ReadFile("resource" + p)
 		if err != nil {
+			ext := filepath.Ext(p)
+			if ext == "" || ext == ".html" {
+				indexData, indexErr := webFS.ReadFile("resource/index.html")
+				if indexErr != nil {
+					c.Status(404)
+					return
+				}
+				c.Data(200, "text/html; charset=utf-8", indexData)
+				return
+			}
 			c.Status(404)
 			return
 		}
@@ -239,6 +468,23 @@ func main() {
 			ctype = "text/plain; charset=utf-8"
 		}
 		c.Data(200, ctype, data)
+	}
+
+	webRouter.GET("/*filepath", func(c *gin.Context) {
+		serveWeb(c, c.Param("filepath"))
+	})
+
+	router.NoRoute(func(c *gin.Context) {
+		p := c.Request.URL.Path
+		if strings.HasPrefix(p, "/api/") {
+			c.Status(404)
+			return
+		}
+		if strings.HasPrefix(p, "/web/") {
+			serveWeb(c, strings.TrimPrefix(p, "/web"))
+			return
+		}
+		serveWeb(c, p)
 	})
 	// enforce single instance and console visibility on Windows
 	if runtime.GOOS == "windows" {

@@ -52,24 +52,29 @@ const CharacterDetail: React.FC<CharacterDetailProps> = ({ entityId }) => {
   const getSectionItems = (key: string) => character.sectionSubItems?.[key] || [];
 
   const setSectionItems = (key: string, items: any[]) => {
-    handleChange('sectionSubItems' as keyof Character, {
-      ...(character.sectionSubItems || {}),
-      [key]: items,
-    });
-  };
-
-  const updateLegacyFieldFromFirstItem = (key: string, items: any[]) => {
-    if (key === 'basic') {
-      handleChange('details', items[0]?.content || '');
-    }
-    if (key === 'goals') {
-      handleChange('desireOrGoal', items[0]?.content || '');
-    }
+    const updatedCharacter = {
+      ...character,
+      sectionSubItems: {
+        ...(character.sectionSubItems || {}),
+        [key]: items,
+      },
+    };
+    setCharacter(updatedCharacter);
+    updateEntity('characters', updatedCharacter);
   };
 
   const setSectionItemsWithDefault = (key: string, items: any[]) => {
-    setSectionItems(key, items);
-    updateLegacyFieldFromFirstItem(key, items);
+    const updatedCharacter = {
+      ...character,
+      sectionSubItems: {
+        ...(character.sectionSubItems || {}),
+        [key]: items,
+      },
+      details: key === 'basic' ? (items[0]?.content || '') : character.details,
+      desireOrGoal: key === 'goals' ? (items[0]?.content || '') : character.desireOrGoal,
+    };
+    setCharacter(updatedCharacter);
+    updateEntity('characters', updatedCharacter);
   };
 
   const getSectionTitle = (key: string, fallback: string) => character.sectionTitles?.[key] || fallback;
