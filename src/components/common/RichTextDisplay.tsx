@@ -47,6 +47,17 @@ const DEFAULT_SECTION_KEYS: Record<string, Array<{ key: string; title: string }>
   ],
 };
 
+const markdownToPreviewText = (input: string) => {
+  const raw = marked.parse(input || '', {
+    async: false,
+    gfm: true,
+    breaks: true,
+  }) as string;
+  const clean = DOMPurify.sanitize(raw, { ALLOWED_TAGS: [] });
+  const doc = new DOMParser().parseFromString(clean, 'text/html');
+  return (doc.body.textContent || '').replace(/\s+/g, ' ').trim();
+};
+
 const RichTextDisplay: React.FC<RichTextDisplayProps> = ({ content, className = '' }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const { campaignData, openInTab } = useCampaign();
@@ -221,7 +232,11 @@ const RichTextDisplay: React.FC<RichTextDisplayProps> = ({ content, className = 
 
   useEffect(() => {
     if (!containerRef.current) return;
-    const rawHtml = marked.parse(content || '', { async: false }) as string;
+    const rawHtml = marked.parse(content || '', {
+      async: false,
+      gfm: true,
+      breaks: true,
+    }) as string;
     const cleanHtml = DOMPurify.sanitize(rawHtml);
     containerRef.current.innerHTML = cleanHtml;
     if (allKeywords.length === 0) return;
@@ -447,7 +462,7 @@ const RichTextDisplay: React.FC<RichTextDisplayProps> = ({ content, className = 
       <div className="max-w-xs">
         <h4 className="font-bold text-sm mb-1 theme-text-primary">{entity.name}</h4>
         <p className="text-xs theme-text-secondary line-clamp-3">
-          {entity.details || entity.description || '暂无描述'}
+          {markdownToPreviewText(entity.details || entity.description || '') || '暂无描述'}
         </p>
         <div className="mt-1 text-xs theme-text-secondary opacity-70">
           双击在右侧打开
@@ -460,7 +475,7 @@ const RichTextDisplay: React.FC<RichTextDisplayProps> = ({ content, className = 
     <>
       <div 
         ref={containerRef} 
-        className={`prose prose-sm max-w-none theme-text-primary ${className}`} // Add prose class for markdown styles
+        className={`prose prose-sm max-w-none theme-text-primary whitespace-pre-wrap ${className}`}
         style={{ minHeight: '1em' }}
       />
       

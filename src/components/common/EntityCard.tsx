@@ -3,6 +3,8 @@ import { BaseEntity } from '../../types';
 import { useNavigate } from 'react-router-dom';
 import { ExternalLink } from 'lucide-react';
 import { useCampaign } from '../../context/CampaignContext';
+import { marked } from 'marked';
+import DOMPurify from 'dompurify';
 
 interface EntityCardProps {
   entity: BaseEntity;
@@ -13,6 +15,18 @@ interface EntityCardProps {
 const EntityCard: React.FC<EntityCardProps> = ({ entity, type }) => {
   const navigate = useNavigate();
   const { openInTab } = useCampaign();
+
+  const previewText = React.useMemo(() => {
+    const raw = marked.parse(entity.details || '', {
+      async: false,
+      gfm: true,
+      breaks: true,
+    }) as string;
+    const clean = DOMPurify.sanitize(raw, { ALLOWED_TAGS: [] });
+    const doc = new DOMParser().parseFromString(clean, 'text/html');
+    const text = (doc.body.textContent || '').replace(/\s+/g, ' ').trim();
+    return text || '暂无描述...';
+  }, [entity.details]);
 
   const handleOpenInTab = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -35,7 +49,7 @@ const EntityCard: React.FC<EntityCardProps> = ({ entity, type }) => {
         </button>
       </div>
       <p className="mt-2 text-sm theme-text-secondary line-clamp-3 h-10">
-        {entity.details || '暂无描述...'}
+        {previewText}
       </p>
       
       <div className="mt-4 pt-2 border-t border-theme flex justify-between items-center text-xs theme-text-secondary">
