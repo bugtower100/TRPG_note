@@ -3,8 +3,7 @@ import { BaseEntity } from '../../types';
 import { useNavigate } from 'react-router-dom';
 import { ExternalLink } from 'lucide-react';
 import { useCampaign } from '../../context/CampaignContext';
-import { marked } from 'marked';
-import DOMPurify from 'dompurify';
+import { getEntityPrimaryMarkdown, markdownToPreviewText } from './richTextReference';
 
 interface EntityCardProps {
   entity: BaseEntity;
@@ -17,23 +16,9 @@ const EntityCard: React.FC<EntityCardProps> = ({ entity, type }) => {
   const { openInTab } = useCampaign();
 
   const previewText = React.useMemo(() => {
-    const raw = marked.parse(entity.details || '', {
-      async: false,
-      gfm: true,
-      breaks: true,
-    }) as string;
-    const clean = DOMPurify.sanitize(raw);
-    const withLineBreaks = clean
-      .replace(/<br\s*\/?>/gi, '\n')
-      .replace(/<\/(p|div|li|h1|h2|h3|h4|h5|h6|blockquote|pre)>/gi, '\n')
-      .replace(/<li>/gi, '• ');
-    const doc = new DOMParser().parseFromString(withLineBreaks, 'text/html');
-    const text = (doc.body.textContent || '')
-      .replace(/\r/g, '')
-      .replace(/\n{3,}/g, '\n\n')
-      .trim();
-    return text || '暂无描述...';
-  }, [entity.details]);
+    const markdown = getEntityPrimaryMarkdown(entity, type);
+    return markdownToPreviewText(markdown) || '暂无描述...';
+  }, [entity, type]);
 
   const handleOpenInTab = (e: React.MouseEvent) => {
     e.stopPropagation();

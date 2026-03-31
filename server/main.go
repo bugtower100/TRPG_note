@@ -229,12 +229,16 @@ func main() {
 			c.JSON(400, gin.H{"error": "invalid payload"})
 			return
 		}
+	retryLoad:
 		var item KV
 		err := db.First(&item, "key = ?", key).Error
 		if err != nil {
 			if err == gorm.ErrRecordNotFound {
 				item = KV{Key: key, Value: body.Value, Version: 1}
 				if err := db.Create(&item).Error; err != nil {
+					if strings.Contains(strings.ToLower(err.Error()), "unique constraint failed") {
+						goto retryLoad
+					}
 					c.JSON(500, gin.H{"error": "database error"})
 					return
 				}

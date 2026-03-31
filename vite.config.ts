@@ -7,6 +7,29 @@ export default defineConfig({
   base: './',
   build: {
     sourcemap: false,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (!id.includes('node_modules')) {
+            return undefined
+          }
+
+          if (id.includes('@milkdown') || id.includes('prosemirror')) {
+            return 'editor'
+          }
+
+          if (id.includes('react') || id.includes('scheduler')) {
+            return 'react-vendor'
+          }
+
+          if (id.includes('marked') || id.includes('dompurify')) {
+            return 'markdown'
+          }
+
+          return 'vendor'
+        },
+      },
+    },
   },
   plugins: [
     react(),

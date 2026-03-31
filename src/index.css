@@ -46,7 +46,7 @@
     --text-primary: #4c312e; /* 薄巧棕色文字 */
     --text-secondary: #967160; /* 薄巧 textSecondary */
     --border-color: #614540; /* 薄巧棕色边框 */
-    --primary-color: #8ab0a8; /* 薄巧绿色主色 */
+    --primary-color: #4c312e; /* 薄巧绿色主色 */
     --primary-light: #f2eddf; /* 薄巧 chatIcBg */
     --font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   }
@@ -104,5 +104,99 @@
     border-color: var(--border-color) !important;
     color: var(--text-secondary) !important;
     background-color: color-mix(in srgb, var(--bg-card) 78%, var(--primary-light) 22%);
+  }
+
+  .milkdown-theme-bridge .milkdown-editor-shell {
+    min-height: 100%;
+    background-color: var(--bg-card);
+    color: var(--text-primary);
+  }
+
+  .milkdown-theme-bridge .ProseMirror {
+    min-height: inherit;
+    padding: 0.75rem;
+    outline: none;
+    color: var(--text-primary);
+    background-color: transparent;
+    font-family: var(--font-family);
+    line-height: 1.7;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
+  .milkdown-theme-bridge .ProseMirror p,
+  .milkdown-theme-bridge .ProseMirror ul,
+  .milkdown-theme-bridge .ProseMirror ol,
+  .milkdown-theme-bridge .ProseMirror blockquote,
+  .milkdown-theme-bridge .ProseMirror pre,
+  .milkdown-theme-bridge .ProseMirror h1,
+  .milkdown-theme-bridge .ProseMirror h2,
+  .milkdown-theme-bridge .ProseMirror h3,
+  .milkdown-theme-bridge .ProseMirror h4,
+  .milkdown-theme-bridge .ProseMirror h5,
+  .milkdown-theme-bridge .ProseMirror h6 {
+    margin: 0 0 0.75rem;
+  }
+
+  .milkdown-theme-bridge .ProseMirror ul,
+  .milkdown-theme-bridge .ProseMirror ol {
+    padding-left: 1.5rem;
+    margin: 0 0 0.75rem;
+  }
+
+  .milkdown-theme-bridge .ProseMirror ul {
+    list-style: disc;
+  }
+
+  .milkdown-theme-bridge .ProseMirror ol {
+    list-style: decimal;
+  }
+
+  .milkdown-theme-bridge .ProseMirror li {
+    display: list-item;
+  }
+
+  .milkdown-theme-bridge .ProseMirror ul ul {
+    list-style: circle;
+  }
+
+  .milkdown-theme-bridge .ProseMirror ol ol {
+    list-style: lower-alpha;
+  }
+
+  .rich-text-content ul,
+  .rich-text-content ol {
+    padding-left: 1.5rem;
+    margin: 0 0 0.75rem;
+  }
+
+  .rich-text-content ul {
+    list-style: disc;
+  }
+
+  .rich-text-content ol {
+    list-style: decimal;
+  }
+
+  .rich-text-content li {
+    display: list-item;
+  }
+
+  .milkdown-theme-bridge .ProseMirror a {
+    color: var(--primary-color);
+    text-decoration: underline;
+    text-decoration-style: dotted;
+  }
+
+  .milkdown-theme-bridge .ProseMirror code {
+    background-color: color-mix(in srgb, var(--bg-card) 70%, var(--primary-light) 30%);
+    padding: 0.1rem 0.3rem;
+    border-radius: 0.25rem;
+  }
+
+  .milkdown-theme-bridge .ProseMirror blockquote {
+    border-left: 3px solid var(--border-color);
+    padding-left: 0.75rem;
+    color: var(--text-secondary);
   }
 }
