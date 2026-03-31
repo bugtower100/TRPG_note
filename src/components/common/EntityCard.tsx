@@ -22,9 +22,16 @@ const EntityCard: React.FC<EntityCardProps> = ({ entity, type }) => {
       gfm: true,
       breaks: true,
     }) as string;
-    const clean = DOMPurify.sanitize(raw, { ALLOWED_TAGS: [] });
-    const doc = new DOMParser().parseFromString(clean, 'text/html');
-    const text = (doc.body.textContent || '').replace(/\s+/g, ' ').trim();
+    const clean = DOMPurify.sanitize(raw);
+    const withLineBreaks = clean
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<\/(p|div|li|h1|h2|h3|h4|h5|h6|blockquote|pre)>/gi, '\n')
+      .replace(/<li>/gi, '• ');
+    const doc = new DOMParser().parseFromString(withLineBreaks, 'text/html');
+    const text = (doc.body.textContent || '')
+      .replace(/\r/g, '')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
     return text || '暂无描述...';
   }, [entity.details]);
 
@@ -48,7 +55,7 @@ const EntityCard: React.FC<EntityCardProps> = ({ entity, type }) => {
           <ExternalLink size={16} />
         </button>
       </div>
-      <p className="mt-2 text-sm theme-text-secondary line-clamp-3 h-10">
+      <p className="mt-2 text-sm theme-text-secondary whitespace-pre-line max-h-16 overflow-hidden">
         {previewText}
       </p>
       

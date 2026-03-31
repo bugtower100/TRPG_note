@@ -53,9 +53,16 @@ const markdownToPreviewText = (input: string) => {
     gfm: true,
     breaks: true,
   }) as string;
-  const clean = DOMPurify.sanitize(raw, { ALLOWED_TAGS: [] });
-  const doc = new DOMParser().parseFromString(clean, 'text/html');
-  return (doc.body.textContent || '').replace(/\s+/g, ' ').trim();
+  const clean = DOMPurify.sanitize(raw);
+  const withLineBreaks = clean
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/(p|div|li|h1|h2|h3|h4|h5|h6|blockquote|pre)>/gi, '\n')
+    .replace(/<li>/gi, '• ');
+  const doc = new DOMParser().parseFromString(withLineBreaks, 'text/html');
+  return (doc.body.textContent || '')
+    .replace(/\r/g, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
 };
 
 const RichTextDisplay: React.FC<RichTextDisplayProps> = ({ content, className = '' }) => {
@@ -461,7 +468,7 @@ const RichTextDisplay: React.FC<RichTextDisplayProps> = ({ content, className = 
     return (
       <div className="max-w-xs">
         <h4 className="font-bold text-sm mb-1 theme-text-primary">{entity.name}</h4>
-        <p className="text-xs theme-text-secondary line-clamp-3">
+        <p className="text-xs theme-text-secondary whitespace-pre-line max-h-16 overflow-hidden">
           {markdownToPreviewText(entity.details || entity.description || '') || '暂无描述'}
         </p>
         <div className="mt-1 text-xs theme-text-secondary opacity-70">
