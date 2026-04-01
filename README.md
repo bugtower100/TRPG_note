@@ -140,7 +140,5 @@ cd server && go build -o release/TRPG模组笔记.exe
 - 使用项目维护命令进行清理修复
 
 ## 反馈与支持
-
-- 反馈群 QQ：945988830
 - 欢迎提交 Issue 与功能建议
 - 如果项目对你有帮助，欢迎点个 Star 支持
