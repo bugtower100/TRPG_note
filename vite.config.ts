@@ -17,16 +17,7 @@ export default defineConfig({
           if (id.includes('@milkdown') || id.includes('prosemirror')) {
             return 'editor'
           }
-
-          if (id.includes('react') || id.includes('scheduler')) {
-            return 'react-vendor'
-          }
-
-          if (id.includes('marked') || id.includes('dompurify')) {
-            return 'markdown'
-          }
-
-          return 'vendor'
+          return undefined
         },
       },
     },

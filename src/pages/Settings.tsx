@@ -84,7 +84,7 @@ const Settings: React.FC = () => {
       <h2 className="text-2xl font-bold">数据与设置</h2>
 
       {/* Theme Selection */}
-      <section className="bg-theme-card p-6 rounded-lg shadow-sm border border-theme">
+      <section data-tour="settings-theme-section" className="bg-theme-card p-6 rounded-lg shadow-sm border border-theme">
         <h3 className="text-lg font-medium mb-4">界面风格</h3>
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             {themes.map((t) => (
@@ -180,6 +180,7 @@ const Settings: React.FC = () => {
             onChange={handleBatchUpload}
           />
           <button
+            data-tour="settings-resource-upload"
             onClick={() => resourceInputRef.current?.click()}
             className="px-4 py-2 bg-theme-card border border-theme rounded hover:bg-gray-50 flex items-center gap-2"
             disabled={resourceBusy}
@@ -188,7 +189,7 @@ const Settings: React.FC = () => {
             批量上传图片
           </button>
         </div>
-        <div className="border border-theme rounded max-h-72 overflow-auto">
+        <div data-tour="settings-resource-list" className="border border-theme rounded max-h-72 overflow-auto">
           {resources.length === 0 ? (
             <div className="p-4 text-sm theme-text-secondary">暂无资源</div>
           ) : (

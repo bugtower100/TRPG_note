@@ -117,6 +117,7 @@ const ClueDetail: React.FC<ClueDetailProps> = ({ entityId }) => {
             &larr; 返回
           </button>
           <input
+            data-tour="entity-detail-name"
             type="text"
             value={clue.name}
             onChange={(e) => handleChange('name', e.target.value)}

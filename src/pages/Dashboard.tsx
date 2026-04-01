@@ -1,27 +1,25 @@
 import React, { useState, useEffect } from 'react';
 import { useCampaign } from '../context/CampaignContext';
-import GuideModal from '../components/common/GuideModal';
+import { useGuide } from '../components/common/InteractiveGuide';
 
 const Dashboard: React.FC = () => {
   const { campaignData, setCampaignData } = useCampaign();
+  const { startGuide } = useGuide();
   const [notes, setNotes] = useState(campaignData.notes || '');
-  const [showGuide, setShowGuide] = useState(false);
 
   useEffect(() => {
     setNotes(campaignData.notes || '');
   }, [campaignData.notes]);
 
   useEffect(() => {
-      const hasSeen = localStorage.getItem('trpg_has_seen_guide');
-      if (!hasSeen) {
-        setShowGuide(true);
-      }
-  }, []);
-
-  const handleCloseGuide = () => {
-    setShowGuide(false);
-    localStorage.setItem('trpg_has_seen_guide', 'true');
-  };
+    const hasSeen = localStorage.getItem('trpg_has_seen_guide');
+    if (hasSeen) return;
+    const timer = window.setTimeout(() => {
+      startGuide('dashboard');
+      localStorage.setItem('trpg_has_seen_guide', 'true');
+    }, 180);
+    return () => window.clearTimeout(timer);
+  }, [startGuide]);
 
   const handleNotesChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const newNotes = e.target.value;
@@ -40,7 +38,7 @@ const Dashboard: React.FC = () => {
             {campaignData.meta.projectName} <span className="text-gray-400 text-sm font-normal">概览</span>
         </h2>
         <button 
-            onClick={() => setShowGuide(true)}
+            onClick={() => startGuide('dashboard')}
             className="text-primary text-sm hover:underline"
         >
             新手引导
@@ -82,8 +80,6 @@ const Dashboard: React.FC = () => {
             placeholder="在这里记录模组的大纲、待办事项或灵感..."
         />
       </div>
-
-      {showGuide && <GuideModal onClose={handleCloseGuide} />}
     </div>
   );
 };

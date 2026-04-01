@@ -118,6 +118,7 @@ const LocationDetail: React.FC<LocationDetailProps> = ({ entityId }) => {
             &larr; 返回
           </button>
           <input
+            data-tour="entity-detail-name"
             type="text"
             value={location.name}
             onChange={(e) => handleChange('name', e.target.value)}

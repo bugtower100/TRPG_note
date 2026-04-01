@@ -143,6 +143,7 @@ const CharacterDetail: React.FC<CharacterDetailProps> = ({ entityId }) => {
             &larr; 返回
           </button>
           <input
+            data-tour="entity-detail-name"
             type="text"
             value={character.name}
             onChange={(e) => handleChange('name', e.target.value)}

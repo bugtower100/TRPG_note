@@ -117,6 +117,7 @@ const EventDetail: React.FC<EventDetailProps> = ({ entityId }) => {
             &larr; 返回
           </button>
           <input
+            data-tour="entity-detail-name"
             type="text"
             value={event.name}
             onChange={(e) => handleChange('name', e.target.value)}

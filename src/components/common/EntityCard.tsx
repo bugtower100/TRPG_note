@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { ExternalLink } from 'lucide-react';
 import { useCampaign } from '../../context/CampaignContext';
 import { getEntityPrimaryMarkdown, markdownToPreviewText } from './richTextReference';
+import { useGuide } from './InteractiveGuide';
 
 interface EntityCardProps {
   entity: BaseEntity;
@@ -14,6 +15,7 @@ interface EntityCardProps {
 const EntityCard: React.FC<EntityCardProps> = ({ entity, type }) => {
   const navigate = useNavigate();
   const { openInTab } = useCampaign();
+  const { currentGuideId, isGuideRunning } = useGuide();
 
   const previewText = React.useMemo(() => {
     const markdown = getEntityPrimaryMarkdown(entity, type);
@@ -26,15 +28,19 @@ const EntityCard: React.FC<EntityCardProps> = ({ entity, type }) => {
   };
 
   return (
-    <div 
+    <div
+      data-tour="entity-card"
       onClick={() => navigate(`/${type}/${entity.id}`)}
       className="p-4 rounded-lg shadow-sm border theme-card hover:shadow-md transition-shadow cursor-pointer relative group"
     >
       <div className="flex justify-between items-start">
         <h3 className="text-lg font-bold truncate pr-6">{entity.name}</h3>
         <button
+          data-tour="entity-card-split"
           onClick={handleOpenInTab}
-          className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-primary transition-opacity absolute top-4 right-4"
+          className={`text-gray-400 hover:text-primary transition-opacity absolute top-4 right-4 ${
+            currentGuideId === 'entity-list' && isGuideRunning ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+          }`}
           title="在侧边栏打开"
         >
           <ExternalLink size={16} />

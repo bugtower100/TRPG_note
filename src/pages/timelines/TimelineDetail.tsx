@@ -181,6 +181,7 @@ const TimelineDetail: React.FC<TimelineDetailProps> = ({ entityId }) => {
             &larr; 返回
           </button>
           <input
+            data-tour="entity-detail-name"
             type="text"
             value={timeline.name}
             onChange={(e) => handleChange('name', e.target.value)}

@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useCampaign } from '../context/CampaignContext';
 import { Trash2, Download, Upload, FolderOpen, Plus, ChevronDown } from 'lucide-react';
 import { dataService } from '../services/dataService';
+import { GuideHelpButton } from '../components/common/InteractiveGuide';
 
 const LandingPage: React.FC = () => {
   const { 
@@ -175,6 +176,7 @@ const LandingPage: React.FC = () => {
             </p>
           </div>
           <div className="flex flex-wrap gap-3 items-center">
+             <GuideHelpButton guideId="landing" />
              {/* Open Local File */}
              <button 
                 onClick={openFromFileSystem}
@@ -231,9 +233,11 @@ const LandingPage: React.FC = () => {
         </div>
 
         {/* Campaign List */}
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3" data-tour="landing-campaign-list">
           {/* Create New Card */}
-          <div className="rounded-lg border-2 border-dashed border-theme p-6 flex flex-col items-center justify-center text-center hover:border-primary bg-theme-card transition-colors cursor-pointer min-h-[220px]"
+          <div
+               data-tour="landing-create-campaign"
+               className="rounded-lg border-2 border-dashed border-theme p-6 flex flex-col items-center justify-center text-center hover:border-primary bg-theme-card transition-colors cursor-pointer min-h-[220px]"
                onClick={() => setIsCreating(true)}
           >
             <div className="flex justify-center items-center mb-4 w-12 h-12 bg-blue-100 rounded-full text-primary">

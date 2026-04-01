@@ -1,5 +1,6 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { CampaignProvider, useCampaign } from './context/CampaignContext';
+import { GuideProvider } from './components/common/InteractiveGuide';
 import Layout from './components/Layout';
 import ErrorBoundary from './components/ErrorBoundary';
 import LandingPage from './pages/LandingPage';
@@ -62,7 +63,9 @@ function AppContent() {
 function App() {
   return (
     <CampaignProvider>
-      <AppContent />
+      <GuideProvider>
+        <AppContent />
+      </GuideProvider>
     </CampaignProvider>
   );
 }

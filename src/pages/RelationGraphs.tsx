@@ -493,6 +493,7 @@ const RelationGraphs: React.FC = () => {
         </div>
 
         <div
+          data-tour="relation-graph-board"
           ref={boardRef}
           className="relative border border-dashed border-theme rounded bg-theme-card flex-1 min-h-0 overflow-hidden"
           onWheel={(e) => {

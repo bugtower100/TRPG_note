@@ -119,6 +119,7 @@ const MonsterDetail: React.FC<MonsterDetailProps> = ({ entityId }) => {
             &larr; 返回
           </button>
           <input
+            data-tour="entity-detail-name"
             type="text"
             value={monster.name}
             onChange={(e) => handleChange('name', e.target.value)}

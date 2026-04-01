@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from 'react';
-import { Outlet } from 'react-router-dom';
+import { Outlet, useLocation } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import TabPanel from './TabPanel';
 import { useCampaign } from '../context/CampaignContext';
+import { GuideHelpButton, GuideId } from './common/InteractiveGuide';
 
 const Layout: React.FC = () => {
   const { tabs, exportData, importData } = useCampaign();
+  const location = useLocation();
   const [isTabPanelMaximized, setIsTabPanelMaximized] = useState(false);
   const [backendStatus, setBackendStatus] = useState<{ online: boolean; offlineSince?: number; syncedAt?: number; conflicts?: Array<{ key: string; localTime?: number; remoteTime?: number }>; unsyncedCount?: number; latencyMs?: number } | null>(null);
   const [showConflicts, setShowConflicts] = useState(false);
@@ -40,6 +42,20 @@ const Layout: React.FC = () => {
       window.removeEventListener('storage-backend-status', handler as any);
     };
   }, []);
+
+  const currentGuideId = React.useMemo<GuideId | null>(() => {
+    const { pathname } = location;
+    if (pathname === '/') return null;
+    if (pathname === '/settings') return 'settings';
+    if (pathname === '/relation-graphs') return 'relation-graphs';
+    if (/^\/(characters|monsters|locations|organizations|events|clues|timelines)\/[^/]+$/.test(pathname)) {
+      return 'entity-detail';
+    }
+    if (/^\/(characters|monsters|locations|organizations|events|clues|timelines)$/.test(pathname)) {
+      return 'entity-list';
+    }
+    return null;
+  }, [location]);
 
   return (
     <div className="flex h-screen overflow-hidden theme-page">
@@ -87,6 +103,11 @@ const Layout: React.FC = () => {
             {backendStatus?.online ? '' : (typeof backendStatus?.unsyncedCount === 'number' ? `（未同步${backendStatus.unsyncedCount}）` : '')}
           </span>
         </div>
+        {currentGuideId && (
+          <div className="absolute right-4 top-2 z-50">
+            <GuideHelpButton guideId={currentGuideId} />
+          </div>
+        )}
         {showConflicts && backendStatus?.conflicts && backendStatus.conflicts.length > 0 && (
           <div className="absolute left-56 right-0 top-10 z-40 bg-white border border-yellow-500 rounded shadow p-3 text-xs">
             {backendStatus.conflicts.map((c) => (

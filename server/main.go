@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/sha256"
 	"flag"
 	"fmt"
 	"io"
@@ -17,7 +18,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/glebarez/sqlite"
-	"github.com/google/uuid"
 	"github.com/spf13/viper"
 	"gorm.io/gorm"
 )
@@ -134,6 +134,29 @@ func parseDisplayNameFromStored(filename string) string {
 		}
 	}
 	return stem
+}
+
+func findExistingResourceRefByHash(assetDir string, hash string) (string, bool) {
+	entries, err := os.ReadDir(assetDir)
+	if err != nil {
+		return "", false
+	}
+	prefix := hash + "__"
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		name := entry.Name()
+		if !strings.HasPrefix(name, prefix) {
+			continue
+		}
+		ext := strings.ToLower(filepath.Ext(name))
+		switch ext {
+		case ".png", ".jpg", ".jpeg", ".webp":
+			return "graph_assets/" + name, true
+		}
+	}
+	return "", false
 }
 
 func main() {
@@ -315,9 +338,22 @@ func main() {
 			c.JSON(400, gin.H{"error": "unsupported_file_type"})
 			return
 		}
-		id := uuid.New().String()
+		content, err := io.ReadAll(file)
+		if err != nil {
+			c.JSON(500, gin.H{"error": "read_file_failed"})
+			return
+		}
+		sum := sha256.Sum256(content)
+		hash := fmt.Sprintf("%x", sum[:])
+		if ref, ok := findExistingResourceRefByHash(assetDir, hash); ok {
+			c.JSON(200, gin.H{
+				"ref": ref,
+				"url": "/api/resources/file/" + ref,
+			})
+			return
+		}
 		displayBase := sanitizeFilenameBase(header.Filename)
-		filename := id + "__" + displayBase + ext
+		filename := hash + "__" + displayBase + ext
 		dstPath := filepath.Join(assetDir, filename)
 		dst, err := os.Create(dstPath)
 		if err != nil {
@@ -325,7 +361,7 @@ func main() {
 			return
 		}
 		defer dst.Close()
-		if _, err := io.Copy(dst, file); err != nil {
+		if _, err := dst.Write(content); err != nil {
 			c.JSON(500, gin.H{"error": "write_file_failed"})
 			return
 		}

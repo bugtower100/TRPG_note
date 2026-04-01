@@ -31,11 +31,20 @@ const Sidebar: React.FC = () => {
         <p className="text-xs theme-text-secondary mt-1">TRPG 备团工具</p>
       </div>
       
-      <nav className="flex-1 p-3 space-y-1 overflow-hidden">
+      <nav className="flex-1 p-3 space-y-1 overflow-hidden" data-tour="sidebar-nav">
         {navItems.map((item) => (
           <NavLink
             key={item.to}
             to={item.to}
+            data-tour={
+              item.to === '/characters'
+                ? 'sidebar-characters'
+                : item.to === '/relation-graphs'
+                  ? 'sidebar-relation-graphs'
+                  : item.to === '/settings'
+                    ? 'sidebar-settings'
+                    : undefined
+            }
             className={({ isActive }) =>
               `flex items-center gap-2.5 px-3 py-2 rounded-md transition-colors text-sm ${
                 isActive

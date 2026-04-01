@@ -28,6 +28,7 @@ const EntityListLayout = <T extends BaseEntity>({
         <h2 className="text-2xl font-bold">{title}</h2>
         <div className="flex items-center gap-3 w-full sm:w-auto">
           <input
+            data-tour="entity-list-search"
             type="text"
             placeholder="搜索..."
             value={searchTerm}
@@ -36,6 +37,7 @@ const EntityListLayout = <T extends BaseEntity>({
           />
           {onAdd && (
             <button
+              data-tour="entity-list-add"
               onClick={onAdd}
               className="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary-dark transition-colors whitespace-nowrap"
             >
