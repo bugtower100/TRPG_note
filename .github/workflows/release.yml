@@ -9,11 +9,11 @@ on:
       release_tag:
         description: "Release Tag"
         required: true
-        default: "v1.2.1"
+        default: "v1.2.2"
       release_name:
         description: "Release Name"
         required: true
-        default: "V1.2.1"
+        default: "V1.2.2"
       prerelease:
         description: "Mark as prerelease"
         required: true
@@ -92,14 +92,10 @@ jobs:
           make_latest: true
           body: |
             ## ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || inputs.release_name }} 更新内容
-            - 新增交互式新手引导系统：以高亮定位、分步提示的方式引导核心功能上手
-            - 各主要页面右上角新增可重复打开的问号入口，随时查看当前页面的功能说明
-            - 新手引导覆盖创建模组、进入模组后的核心功能导航、卡片右上角分栏打开、详情页名称修改、设置页主题与资源管理
-            - 修复资源重复上传问题：新增文件内容哈希判断，相同图片会直接复用已有资源
-            - 优化富文本图片工作流：资源库选择、上传插入、粘贴图片、拖拽图片现在共用统一资源链路
-            - 收敛富文本自动匹配范围：取消子项目自动匹配，仅保留实体与区块匹配，减少误命中
-            - 优化富文本列表渲染与展示一致性，修复编辑态和展示态列表样式异常
-            - 统一角色、怪物、地点、组织等实体卡片的简介提取逻辑，提升列表与悬浮信息稳定性
+            - 富文本新增下划线、文字颜色、文字底色能力，支持预设色与自定义取色
+            - 新增富文本图片右键菜单，可直接调整图片尺寸（预设比例与自定义比例）
+            - 新增富文本图片对齐控制，支持左对齐、居中、右对齐，并可恢复默认对齐
+            - 图片尺寸与对齐信息已持久化到内容元数据，预览态与编辑态均保持一致
           files: TRPG模组笔记-windows-amd64.zip
           generate_release_notes: true
         env:

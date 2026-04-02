@@ -124,6 +124,20 @@
     word-break: break-word;
   }
 
+  .milkdown-theme-bridge .ProseMirror .rte-hidden-html-marker {
+    display: none;
+  }
+
+  .milkdown-theme-bridge .ProseMirror .rte-underline {
+    text-decoration: underline;
+    text-underline-offset: 0.16em;
+    text-decoration-thickness: 1.5px;
+  }
+
+  .milkdown-theme-bridge .ProseMirror [style*='background-color'] {
+    border-radius: 0.2em;
+  }
+
   .milkdown-theme-bridge .ProseMirror p,
   .milkdown-theme-bridge .ProseMirror ul,
   .milkdown-theme-bridge .ProseMirror ol,
@@ -180,6 +194,38 @@
 
   .rich-text-content li {
     display: list-item;
+  }
+
+  .rich-text-content u {
+    text-decoration-thickness: 1.5px;
+    text-underline-offset: 0.16em;
+  }
+
+  .rich-text-content .rich-text-image,
+  .milkdown-theme-bridge .ProseMirror .rich-text-image {
+    display: block;
+    max-width: 100%;
+    height: auto;
+    border-radius: 0.375rem;
+    margin: 0.5rem 0;
+  }
+
+  .rich-text-content .rich-text-image-left,
+  .milkdown-theme-bridge .ProseMirror .rich-text-image-left {
+    margin-left: 0;
+    margin-right: auto;
+  }
+
+  .rich-text-content .rich-text-image-center,
+  .milkdown-theme-bridge .ProseMirror .rich-text-image-center {
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .rich-text-content .rich-text-image-right,
+  .milkdown-theme-bridge .ProseMirror .rich-text-image-right {
+    margin-left: auto;
+    margin-right: 0;
   }
 
   .milkdown-theme-bridge .ProseMirror a {

@@ -41,7 +41,9 @@ const RichTextDisplay: React.FC<RichTextDisplayProps> = ({ content, className = 
       gfm: true,
       breaks: true,
     }) as string;
-    const cleanHtml = DOMPurify.sanitize(rawHtml);
+    const cleanHtml = DOMPurify.sanitize(rawHtml, {
+      ADD_ATTR: ['data-rte-color', 'data-rte-bg'],
+    });
     return decorateRichHtml(cleanHtml, keywordData);
   }, [content, keywordData]);
 

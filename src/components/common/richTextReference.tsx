@@ -85,6 +85,63 @@ export const normalizeHref = (href: string) => {
   return `https://${raw}`;
 };
 
+const IMAGE_SIZE_META_REGEX = /\{\{trpg-width:((?:100|\d{1,2})%|(?:[1-9]\d{1,3})px)\}\}/ig;
+const IMAGE_ALIGN_META_REGEX = /\{\{trpg-align:(left|center|right)\}\}/ig;
+
+export const parseImageTitleMetadata = (rawTitle: string | null | undefined) => {
+  const source = (rawTitle || '').trim();
+  if (!source) {
+    return { title: '', width: null as string | null, align: null as 'left' | 'center' | 'right' | null };
+  }
+
+  let width: string | null = null;
+  let align: 'left' | 'center' | 'right' | null = null;
+
+  source.replace(IMAGE_SIZE_META_REGEX, (_, value: string) => {
+    width = value.toLowerCase();
+    return '';
+  });
+
+  source.replace(IMAGE_ALIGN_META_REGEX, (_, value: 'left' | 'center' | 'right') => {
+    align = value;
+    return '';
+  });
+
+  return {
+    title: source
+      .replace(IMAGE_SIZE_META_REGEX, '')
+      .replace(IMAGE_ALIGN_META_REGEX, '')
+      .replace(/\s{2,}/g, ' ')
+      .trim(),
+    width,
+    align,
+  };
+};
+
+export const buildImageTitleMetadata = (
+  title: string,
+  width: string | null,
+  align: 'left' | 'center' | 'right' | null
+) => {
+  const cleanTitle = title.trim();
+  const parts = [cleanTitle];
+  if (width) parts.push(`{{trpg-width:${width}}}`);
+  if (align) parts.push(`{{trpg-align:${align}}}`);
+  return parts.filter(Boolean).join(' ').trim();
+};
+
+export const normalizeImageWidthValue = (value: string) => {
+  const normalized = value.trim().toLowerCase();
+  if (/^(100|\d{1,2})%$/.test(normalized)) return normalized;
+  if (/^[1-9]\d{1,3}px$/.test(normalized)) return normalized;
+  return null;
+};
+
+export const normalizeImageAlignValue = (value: string | null | undefined) => {
+  if (value === 'left' || value === 'center' || value === 'right') return value;
+  return null;
+};
+
 export const markdownToPreviewText = (input: string) => {
   const raw = marked.parse(input || '', {
     async: false,
@@ -223,6 +280,29 @@ export const buildRichKeywordData = (campaignData: CampaignData): RichKeywordDat
 export const decorateRichHtml = (cleanHtml: string, keywordData: RichKeywordData) => {
   const temp = document.createElement('div');
   temp.innerHTML = cleanHtml;
+
+  const coloredTextElements = temp.querySelectorAll<HTMLElement>('[data-rte-color]');
+  coloredTextElements.forEach((element) => {
+    const color = (element.dataset.rteColor || '').trim().toLowerCase();
+    if (/^#[0-9a-f]{6}$/.test(color)) {
+      element.style.color = color;
+    } else {
+      element.removeAttribute('data-rte-color');
+    }
+  });
+
+  const highlightedTextElements = temp.querySelectorAll<HTMLElement>('[data-rte-bg]');
+  highlightedTextElements.forEach((element) => {
+    const color = (element.dataset.rteBg || '').trim().toLowerCase();
+    if (/^#[0-9a-f]{6}$/.test(color)) {
+      element.style.backgroundColor = color;
+      element.style.padding = '0 0.1em';
+      element.style.borderRadius = '0.2em';
+    } else {
+      element.removeAttribute('data-rte-bg');
+    }
+  });
+
   const links = temp.querySelectorAll('a[href]');
   links.forEach((a) => {
     const href = a.getAttribute('href') || '';
@@ -231,6 +311,28 @@ export const decorateRichHtml = (cleanHtml: string, keywordData: RichKeywordData
     if (!normalized.startsWith('#') && !normalized.startsWith('/')) {
       a.setAttribute('target', '_blank');
       a.setAttribute('rel', 'noopener noreferrer');
+    }
+  });
+
+  const images = temp.querySelectorAll<HTMLImageElement>('img');
+  images.forEach((img) => {
+    const { title, width, align } = parseImageTitleMetadata(img.getAttribute('title'));
+    if (title) {
+      img.setAttribute('title', title);
+    } else {
+      img.removeAttribute('title');
+    }
+    img.classList.add('rich-text-image');
+    img.classList.remove('rich-text-image-left', 'rich-text-image-center', 'rich-text-image-right');
+    img.style.maxWidth = '100%';
+    img.style.height = 'auto';
+    if (width) {
+      img.style.width = width;
+    } else {
+      img.style.removeProperty('width');
+    }
+    if (align) {
+      img.classList.add(`rich-text-image-${align}`);
     }
   });
 
