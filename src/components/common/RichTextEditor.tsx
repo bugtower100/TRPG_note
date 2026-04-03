@@ -13,6 +13,7 @@ import { createPortal } from 'react-dom';
 import { useCampaign } from '../../context/CampaignContext';
 import { resourceService, ResourceItem } from '../../services/resourceService';
 import RichTextDisplay from './RichTextDisplay';
+import KeywordPreviewSheet from './KeywordPreviewSheet';
 import {
   RichTextTooltipContent,
   TooltipState,
@@ -326,6 +327,8 @@ const MilkdownEditorInner: React.FC<MilkdownEditorInnerProps> = ({
     sectionTitleLower: null,
     subItemTitleLower: null,
   });
+  const [isMobile, setIsMobile] = useState(false);
+  const [mobileSheetTooltip, setMobileSheetTooltip] = useState<TooltipState | null>(null);
 
   keywordDataRef.current = keywordData;
   onChangeRef.current = onChange;
@@ -398,10 +401,19 @@ const MilkdownEditorInner: React.FC<MilkdownEditorInnerProps> = ({
   }, [value, applyEditorImagePresentation]);
 
   useEffect(() => {
+    const mediaQuery = window.matchMedia('(max-width: 767px)');
+    const apply = () => setIsMobile(mediaQuery.matches);
+    apply();
+    mediaQuery.addEventListener('change', apply);
+    return () => mediaQuery.removeEventListener('change', apply);
+  }, []);
+
+  useEffect(() => {
     const host = editorHostRef.current;
     if (!host) return;
 
     const handleMouseOver = (e: MouseEvent) => {
+      if (isMobile) return;
       const target = (e.target as HTMLElement).closest('.entity-link, .section-link') as HTMLElement | null;
       if (!target) return;
       const rect = target.getBoundingClientRect();
@@ -421,12 +433,14 @@ const MilkdownEditorInner: React.FC<MilkdownEditorInnerProps> = ({
     };
 
     const handleMouseOut = (e: MouseEvent) => {
+      if (isMobile) return;
       const next = e.relatedTarget as HTMLElement | null;
       if (next?.closest('.entity-link, .section-link')) return;
       setTooltip((prev) => ({ ...prev, visible: false }));
     };
 
     const handleDblClick = (e: MouseEvent) => {
+      if (isMobile) return;
       const target = (e.target as HTMLElement).closest('.entity-link, .section-link') as HTMLElement | null;
       if (!target) return;
       const kind = target.dataset.kind;
@@ -451,6 +465,23 @@ const MilkdownEditorInner: React.FC<MilkdownEditorInnerProps> = ({
         setTooltip((prev) => ({ ...prev, visible: false }));
         return;
       }
+    };
+
+    const handleClick = (e: MouseEvent) => {
+      if (!isMobile) return;
+      const target = (e.target as HTMLElement).closest('.entity-link, .section-link') as HTMLElement | null;
+      if (!target) return;
+      const rect = target.getBoundingClientRect();
+      setMobileSheetTooltip({
+        visible: true,
+        x: rect.left + window.scrollX,
+        y: rect.bottom + window.scrollY + 5,
+        kind: target.dataset.kind === 'section' ? 'section' : 'entity',
+        entityId: target.dataset.id || null,
+        entityType: target.dataset.type || null,
+        sectionTitleLower: target.dataset.sectiontitle || null,
+        subItemTitleLower: target.dataset.subitemtitle || null,
+      });
     };
 
     const handleFocusIn = () => setIsFocused(true);
@@ -482,6 +513,7 @@ const MilkdownEditorInner: React.FC<MilkdownEditorInnerProps> = ({
     host.addEventListener('mouseover', handleMouseOver);
     host.addEventListener('mouseout', handleMouseOut);
     host.addEventListener('dblclick', handleDblClick);
+    host.addEventListener('click', handleClick);
     host.addEventListener('focusin', handleFocusIn);
     host.addEventListener('focusout', handleFocusOut);
     host.addEventListener('contextmenu', handleImageContextMenu);
@@ -490,11 +522,12 @@ const MilkdownEditorInner: React.FC<MilkdownEditorInnerProps> = ({
       host.removeEventListener('mouseover', handleMouseOver);
       host.removeEventListener('mouseout', handleMouseOut);
       host.removeEventListener('dblclick', handleDblClick);
+      host.removeEventListener('click', handleClick);
       host.removeEventListener('focusin', handleFocusIn);
       host.removeEventListener('focusout', handleFocusOut);
       host.removeEventListener('contextmenu', handleImageContextMenu);
     };
-  }, [applyEditorImagePresentation, campaignData, onOpenImageContextMenu, openInTab]);
+  }, [applyEditorImagePresentation, campaignData, isMobile, onOpenImageContextMenu, openInTab]);
 
   const runCommand = useCallback(
     <T,>(command: { key: T }, payload?: unknown) => {
@@ -758,7 +791,7 @@ const MilkdownEditorInner: React.FC<MilkdownEditorInnerProps> = ({
 
   return (
     <div className="space-y-0">
-      <div className="flex items-center gap-1 p-2 border-b border-theme bg-theme-card/50">
+      <div className="flex items-center gap-1 p-2 border-b border-theme bg-theme-card/50 overflow-x-auto overflow-y-visible">
         <button type="button" onClick={() => runCommand(toggleStrongCommand)} className="p-1.5 theme-text-secondary hover:bg-primary-light hover:text-primary rounded" title="加粗">
           <Bold size={16} />
         </button>
@@ -772,7 +805,7 @@ const MilkdownEditorInner: React.FC<MilkdownEditorInnerProps> = ({
           <List size={16} />
         </button>
         <div className="w-px h-4 bg-[var(--border-color)] mx-1" />
-        <div className="relative" ref={colorPanelRef}>
+        <div className="relative shrink-0" ref={colorPanelRef}>
           <button
             type="button"
             onClick={() => {
@@ -824,7 +857,7 @@ const MilkdownEditorInner: React.FC<MilkdownEditorInnerProps> = ({
             </div>
           )}
         </div>
-        <div className="relative" ref={bgColorPanelRef}>
+        <div className="relative shrink-0" ref={bgColorPanelRef}>
           <button
             type="button"
             onClick={() => {
@@ -908,7 +941,7 @@ const MilkdownEditorInner: React.FC<MilkdownEditorInnerProps> = ({
 
       {tooltip.visible && createPortal(
         <div
-          className="fixed z-50 bg-theme-card p-3 rounded shadow-lg border border-theme pointer-events-none text-left animate-in fade-in zoom-in-95 duration-100"
+          className="fixed z-[120] bg-theme-card p-3 rounded shadow-lg border border-theme pointer-events-none text-left animate-in fade-in zoom-in-95 duration-100"
           style={{
             left: tooltip.x,
             top: tooltip.y,
@@ -917,6 +950,15 @@ const MilkdownEditorInner: React.FC<MilkdownEditorInnerProps> = ({
         >
           <RichTextTooltipContent tooltip={tooltip} campaignData={campaignData} keywordData={keywordData} />
         </div>,
+        document.body
+      )}
+      {isMobile && mobileSheetTooltip?.visible && createPortal(
+        <KeywordPreviewSheet
+          tooltip={mobileSheetTooltip}
+          campaignData={campaignData}
+          keywordData={keywordData}
+          onClose={() => setMobileSheetTooltip(null)}
+        />,
         document.body
       )}
 

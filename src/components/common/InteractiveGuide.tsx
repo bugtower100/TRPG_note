@@ -181,7 +181,10 @@ export const GuideProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         }}
         styles={{
           floater: {
-            zIndex: 1200,
+            zIndex: 1400,
+          },
+          overlay: {
+            zIndex: 1390,
           },
           tooltip: {
             backgroundColor: 'var(--bg-card)',
@@ -189,12 +192,15 @@ export const GuideProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             padding: 12,
             boxShadow: '0 12px 30px rgba(0, 0, 0, 0.18)',
             border: '1px solid var(--border-color)',
+            maxWidth: 360,
           },
           buttonBack: {
             color: 'var(--text-secondary)',
+            whiteSpace: 'nowrap',
           },
           buttonSkip: {
             color: 'var(--text-secondary)',
+            whiteSpace: 'nowrap',
           },
         }}
         locale={{

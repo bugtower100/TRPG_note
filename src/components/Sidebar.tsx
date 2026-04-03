@@ -6,7 +6,12 @@ import {
   Search, Clock, Settings, LogOut, Skull, Home, Share2
 } from 'lucide-react';
 
-const Sidebar: React.FC = () => {
+interface SidebarProps {
+  className?: string;
+  onNavigate?: () => void;
+}
+
+const Sidebar: React.FC<SidebarProps> = ({ className = '', onNavigate }) => {
   const { campaignData, logout, exitCampaign } = useCampaign();
 
   const navItems = [
@@ -23,7 +28,7 @@ const Sidebar: React.FC = () => {
   ];
 
   return (
-    <div className="w-56 bg-theme-card border-r border-theme h-screen fixed left-0 top-0 flex flex-col z-10">
+    <div className={`w-56 bg-theme-card border-r border-theme h-screen flex flex-col z-10 ${className}`}>
       <div className="p-4 border-b border-theme">
         <h1 className="text-lg font-bold truncate" title={campaignData.meta.projectName}>
             {campaignData.meta.projectName}
@@ -36,6 +41,7 @@ const Sidebar: React.FC = () => {
           <NavLink
             key={item.to}
             to={item.to}
+            onClick={onNavigate}
             data-tour={
               item.to === '/characters'
                 ? 'sidebar-characters'
@@ -61,14 +67,20 @@ const Sidebar: React.FC = () => {
 
       <div className="p-3 border-t border-theme">
         <button
-          onClick={exitCampaign}
+          onClick={() => {
+            onNavigate?.();
+            exitCampaign();
+          }}
           className="flex items-center gap-2.5 px-3 py-2 w-full text-left theme-text-secondary hover:bg-gray-100/50 hover:text-primary rounded-md transition-colors text-sm"
         >
           <Home size={20} />
           <span>返回主页</span>
         </button>
         <button
-          onClick={logout}
+          onClick={() => {
+            onNavigate?.();
+            logout();
+          }}
           className="flex items-center gap-2.5 px-3 py-2 w-full text-left text-red-500 hover:bg-red-50 rounded-md transition-colors text-sm"
         >
           <LogOut size={20} />

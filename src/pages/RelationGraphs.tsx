@@ -167,6 +167,122 @@ const RelationGraphs: React.FC = () => {
     };
   }, [offset.x, offset.y, scale]);
 
+  const touchStateRef = useRef<{
+    mode: 'pan' | 'pinch' | null;
+    startOffset: { x: number; y: number };
+    startScale: number;
+    startCenter?: { x: number; y: number }; // screen coords
+    startDistance?: number;
+    panStart?: { x: number; y: number };
+    tapCandidate?: boolean;
+    moved?: boolean;
+  } | null>(null);
+
+  useEffect(() => {
+    const el = boardRef.current;
+    if (!el) return;
+
+    const getDistance = (t0: Touch, t1: Touch) => {
+      const dx = t1.clientX - t0.clientX;
+      const dy = t1.clientY - t0.clientY;
+      return Math.sqrt(dx * dx + dy * dy);
+    };
+    const getCenter = (t0: Touch, t1: Touch) => ({
+      x: (t0.clientX + t1.clientX) / 2,
+      y: (t0.clientY + t1.clientY) / 2,
+    });
+
+    const handleTouchStart = (e: TouchEvent) => {
+      if (!boardRef.current) return;
+      const touchTarget = e.target as HTMLElement | null;
+      const touchingNode = Boolean(touchTarget?.closest('[data-graph-node="true"]'));
+      if (e.touches.length === 1) {
+        if (touchingNode) {
+          touchStateRef.current = null;
+          return;
+        }
+        const t = e.touches[0];
+        touchStateRef.current = {
+          mode: 'pan',
+          startOffset: { ...offset },
+          startScale: scale,
+          panStart: { x: t.clientX, y: t.clientY },
+          tapCandidate: true,
+          moved: false,
+        };
+      } else if (e.touches.length >= 2) {
+        const c = getCenter(e.touches[0], e.touches[1]);
+        const d = getDistance(e.touches[0], e.touches[1]);
+        touchStateRef.current = {
+          mode: 'pinch',
+          startOffset: { ...offset },
+          startScale: scale,
+          startCenter: c,
+          startDistance: d,
+          tapCandidate: false,
+          moved: true,
+        };
+      }
+      e.preventDefault();
+    };
+
+    const handleTouchMove = (e: TouchEvent) => {
+      if (!touchStateRef.current || !boardRef.current) return;
+      const st = touchStateRef.current;
+      if (st.mode === 'pan' && e.touches.length === 1 && st.panStart) {
+        const t = e.touches[0];
+        const dx = t.clientX - st.panStart.x;
+        const dy = t.clientY - st.panStart.y;
+        if (Math.abs(dx) > 6 || Math.abs(dy) > 6) {
+          st.moved = true;
+          st.tapCandidate = false;
+        }
+        setOffset({ x: st.startOffset.x + dx, y: st.startOffset.y + dy });
+        e.preventDefault();
+        return;
+      }
+      if (st.mode === 'pinch' && e.touches.length >= 2 && st.startCenter && st.startDistance) {
+        const c = getCenter(e.touches[0], e.touches[1]);
+        const d = getDistance(e.touches[0], e.touches[1]);
+        const nextScale = clamp(Number((st.startScale * (d / st.startDistance)).toFixed(3)), 0.3, 3);
+        const rect = boardRef.current.getBoundingClientRect();
+        // World point at start center before zoom
+        const worldX = (st.startCenter.x - rect.left - st.startOffset.x) / st.startScale;
+        const worldY = (st.startCenter.y - rect.top - st.startOffset.y) / st.startScale;
+        // Keep same world point under current center
+        const nextOffsetX = c.x - rect.left - worldX * nextScale;
+        const nextOffsetY = c.y - rect.top - worldY * nextScale;
+        setScale(nextScale);
+        setOffset({ x: nextOffsetX, y: nextOffsetY });
+        e.preventDefault();
+        return;
+      }
+    };
+
+    const handleTouchEnd = () => {
+      const st = touchStateRef.current;
+      if (st?.mode === 'pan' && st.tapCandidate && !st.moved) {
+        setSelectedNodeIds([]);
+        setSelectedEdgeId(null);
+        setEdgeEditorId(null);
+        setLinkingFromNodeId(null);
+      }
+      touchStateRef.current = null;
+    };
+
+    el.addEventListener('touchstart', handleTouchStart, { passive: false });
+    el.addEventListener('touchmove', handleTouchMove, { passive: false });
+    el.addEventListener('touchend', handleTouchEnd, { passive: true });
+    el.addEventListener('touchcancel', handleTouchEnd, { passive: true });
+
+    return () => {
+      el.removeEventListener('touchstart', handleTouchStart as any);
+      el.removeEventListener('touchmove', handleTouchMove as any);
+      el.removeEventListener('touchend', handleTouchEnd as any);
+      el.removeEventListener('touchcancel', handleTouchEnd as any);
+    };
+  }, [offset, scale]);
+
   useEffect(() => {
     if (!dragNode) return;
     const onMove = (e: MouseEvent) => {
@@ -412,10 +528,10 @@ const RelationGraphs: React.FC = () => {
   };
 
   return (
-    <div className="h-[calc(100vh-3.75rem)] -mt-6 flex flex-col gap-2 overflow-hidden">
-      <div className="flex items-center justify-between shrink-0">
-        <h2 className="text-2xl font-bold">关系图</h2>
-        <div className="flex items-center gap-2">
+    <div className="min-h-[60vh] md:h-[calc(100vh-3.75rem)] md:-mt-6 flex flex-col gap-2 overflow-hidden px-2 md:px-0">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 shrink-0">
+        <h2 className="text-xl md:text-2xl font-bold">关系图</h2>
+        <div className="flex flex-wrap items-center gap-2">
           <select
             value={activeGraphId || ''}
             onChange={(e) => {
@@ -495,7 +611,7 @@ const RelationGraphs: React.FC = () => {
         <div
           data-tour="relation-graph-board"
           ref={boardRef}
-          className="relative border border-dashed border-theme rounded bg-theme-card flex-1 min-h-0 overflow-hidden"
+          className="relative border border-dashed border-theme rounded bg-theme-card flex-1 min-h-[50vh] md:min-h-0 overflow-hidden"
           onWheel={(e) => {
             e.preventDefault();
             const next = clamp(Number((scale * (e.deltaY < 0 ? 1.08 : 0.92)).toFixed(2)), 0.3, 3);
@@ -516,6 +632,7 @@ const RelationGraphs: React.FC = () => {
             setSelectedNodeIds([]);
             setSelectedEdgeId(null);
           }}
+          style={{ touchAction: 'none' }}
           onMouseMove={(e) => {
             if (!marquee) return;
             const world = toWorldPoint(e.clientX, e.clientY);
@@ -611,6 +728,7 @@ const RelationGraphs: React.FC = () => {
               return (
                 <div
                   key={node.id}
+                  data-graph-node="true"
                   className={`absolute -translate-x-1/2 -translate-y-1/2 w-[60px] h-[60px] rounded-full border-2 flex items-center justify-center cursor-move shadow ${selected ? 'border-primary ring-4 ring-primary/20' : 'border-theme'}`}
                   style={{ left: node.x, top: node.y, background: bgImage ? `url(${bgImage}) center/cover no-repeat` : 'var(--bg-card)' }}
                   onMouseDown={(e) => {
@@ -655,7 +773,7 @@ const RelationGraphs: React.FC = () => {
       </div>
 
       {selectedPrimaryNode && (
-        <div className="fixed right-6 bottom-6 w-[360px] bg-theme-card border border-theme rounded-lg shadow-xl p-3 z-50">
+        <div className="fixed inset-x-0 bottom-0 w-full md:inset-auto md:right-6 md:bottom-6 md:w-[360px] bg-theme-card border border-theme rounded-t-xl md:rounded-lg shadow-xl p-3 z-50">
           <div className="font-semibold mb-2">节点备注</div>
           <RichTextEditor value={selectedPrimaryNode.note || ''} onChange={(val) => updateNode(selectedPrimaryNode.id, { note: val })} minHeight="130px" />
           <div className="mt-2 flex items-center gap-2">
@@ -732,7 +850,7 @@ const RelationGraphs: React.FC = () => {
       )}
 
       {selectedEdge && (
-        <div className="fixed right-6 top-24 w-80 bg-theme-card border border-theme rounded-lg shadow-xl p-3 z-50">
+        <div className="fixed inset-x-0 bottom-0 md:right-6 md:top-24 md:inset-auto md:bottom-auto w-full md:w-80 bg-theme-card border border-theme rounded-t-xl md:rounded-lg shadow-xl p-3 z-50">
           <div className="font-semibold mb-2">关系线编辑</div>
           <div className="space-y-3">
             <div>

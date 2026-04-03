@@ -9,6 +9,7 @@ import {
   buildRichKeywordData,
   decorateRichHtml,
 } from './richTextReference';
+import KeywordPreviewSheet from './KeywordPreviewSheet';
 
 const getEntityCollection = (campaignData: ReturnType<typeof useCampaign>['campaignData'], entityType: string) =>
   (campaignData as unknown as Record<string, any[]>)[entityType];
@@ -21,6 +22,7 @@ interface RichTextDisplayProps {
 const RichTextDisplay: React.FC<RichTextDisplayProps> = ({ content, className = '' }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const { campaignData, openInTab } = useCampaign();
+  const [isMobile, setIsMobile] = useState(false);
   
   const [tooltip, setTooltip] = useState<TooltipState>({
     visible: false,
@@ -32,8 +34,17 @@ const RichTextDisplay: React.FC<RichTextDisplayProps> = ({ content, className = 
     sectionTitleLower: null,
     subItemTitleLower: null,
   });
+  const [mobileSheetTooltip, setMobileSheetTooltip] = useState<TooltipState | null>(null);
 
   const keywordData = React.useMemo(() => buildRichKeywordData(campaignData), [campaignData]);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(max-width: 767px)');
+    const apply = () => setIsMobile(mediaQuery.matches);
+    apply();
+    mediaQuery.addEventListener('change', apply);
+    return () => mediaQuery.removeEventListener('change', apply);
+  }, []);
 
   const renderedHtml = React.useMemo(() => {
     const rawHtml = marked.parse(content || '', {
@@ -52,6 +63,7 @@ const RichTextDisplay: React.FC<RichTextDisplayProps> = ({ content, className = 
     if (!container) return;
 
     const handleMouseOver = (e: MouseEvent) => {
+      if (isMobile) return;
       const target = (e.target as HTMLElement).closest('.entity-link, .section-link') as HTMLElement | null;
       if (!target) return;
       const rect = target.getBoundingClientRect();
@@ -71,12 +83,14 @@ const RichTextDisplay: React.FC<RichTextDisplayProps> = ({ content, className = 
     };
 
     const handleMouseOut = (e: MouseEvent) => {
+      if (isMobile) return;
       const next = e.relatedTarget as HTMLElement | null;
       if (next?.closest('.entity-link, .section-link')) return;
       setTooltip((prev) => ({ ...prev, visible: false }));
     };
 
     const handleDblClick = (e: MouseEvent) => {
+      if (isMobile) return;
       const target = (e.target as HTMLElement).closest('.entity-link, .section-link') as HTMLElement | null;
       if (!target) return;
       const kind = target.dataset.kind;
@@ -101,16 +115,35 @@ const RichTextDisplay: React.FC<RichTextDisplayProps> = ({ content, className = 
       }
     };
 
+    const handleClick = (e: MouseEvent) => {
+      if (!isMobile) return;
+      const target = (e.target as HTMLElement).closest('.entity-link, .section-link') as HTMLElement | null;
+      if (!target) return;
+      const rect = target.getBoundingClientRect();
+      setMobileSheetTooltip({
+        visible: true,
+        x: rect.left + window.scrollX,
+        y: rect.bottom + window.scrollY + 5,
+        kind: target.dataset.kind === 'section' ? 'section' : 'entity',
+        entityId: target.dataset.id || null,
+        entityType: target.dataset.type || null,
+        sectionTitleLower: target.dataset.sectiontitle || null,
+        subItemTitleLower: target.dataset.subitemtitle || null,
+      });
+    };
+
     container.addEventListener('mouseover', handleMouseOver);
     container.addEventListener('mouseout', handleMouseOut);
     container.addEventListener('dblclick', handleDblClick);
+    container.addEventListener('click', handleClick);
 
     return () => {
       container.removeEventListener('mouseover', handleMouseOver);
       container.removeEventListener('mouseout', handleMouseOut);
       container.removeEventListener('dblclick', handleDblClick);
+      container.removeEventListener('click', handleClick);
     };
-  }, [campaignData, keywordData, openInTab]);
+  }, [campaignData, isMobile, keywordData, openInTab]);
 
   return (
     <>
@@ -123,7 +156,7 @@ const RichTextDisplay: React.FC<RichTextDisplayProps> = ({ content, className = 
       
       {tooltip.visible && createPortal(
         <div 
-          className="fixed z-50 bg-theme-card p-3 rounded shadow-lg border border-theme pointer-events-none text-left animate-in fade-in zoom-in-95 duration-100"
+          className="fixed z-[120] bg-theme-card p-3 rounded shadow-lg border border-theme pointer-events-none text-left animate-in fade-in zoom-in-95 duration-100"
           style={{ 
             left: tooltip.x, 
             top: tooltip.y,
@@ -132,6 +165,15 @@ const RichTextDisplay: React.FC<RichTextDisplayProps> = ({ content, className = 
         >
           <RichTextTooltipContent tooltip={tooltip} campaignData={campaignData} keywordData={keywordData} />
         </div>,
+        document.body
+      )}
+      {isMobile && mobileSheetTooltip?.visible && createPortal(
+        <KeywordPreviewSheet
+          tooltip={mobileSheetTooltip}
+          campaignData={campaignData}
+          keywordData={keywordData}
+          onClose={() => setMobileSheetTooltip(null)}
+        />,
         document.body
       )}
     </>

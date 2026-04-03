@@ -46,6 +46,14 @@ export interface RichKeywordData {
   allKeywords: string[];
 }
 
+export interface TooltipTargetPayload {
+  entityType: string;
+  entityId: string;
+  title: string;
+  targetSectionTitleLower?: string;
+  targetSubItemId?: string;
+}
+
 const getEntityCollection = (campaignData: CampaignData, entityType: string) =>
   (campaignData as unknown as Record<string, any[]>)[entityType];
 
@@ -185,6 +193,49 @@ export const getEntityPrimaryMarkdown = (
     : '';
 
   return firstSectionContent || entity.details || entity.description || '';
+};
+
+export const resolveTooltipTarget = (
+  tooltip: TooltipState,
+  campaignData: CampaignData,
+  keywordData: RichKeywordData
+): TooltipTargetPayload | null => {
+  if (tooltip.kind === 'entity' && tooltip.entityId && tooltip.entityType) {
+    const list = getEntityCollection(campaignData, tooltip.entityType);
+    const entity = Array.isArray(list) ? list.find((item) => item.id === tooltip.entityId) : null;
+    return {
+      entityType: tooltip.entityType,
+      entityId: tooltip.entityId,
+      title: entity?.name || '未命名',
+    };
+  }
+
+  if (tooltip.kind === 'section' && tooltip.sectionTitleLower) {
+    const candidates = keywordData.sectionTitleMap.get(tooltip.sectionTitleLower) || [];
+    if (candidates.length === 0) return null;
+    const first = candidates[0];
+    return {
+      entityType: first.entityType,
+      entityId: first.entityId,
+      title: first.entityName,
+      targetSectionTitleLower: first.sectionTitle.toLowerCase(),
+    };
+  }
+
+  if (tooltip.kind === 'subitem' && tooltip.subItemTitleLower) {
+    const candidates = keywordData.subItemTitleMap.get(tooltip.subItemTitleLower) || [];
+    if (candidates.length === 0) return null;
+    const first = candidates[0];
+    return {
+      entityType: first.entityType,
+      entityId: first.entityId,
+      title: first.entityName,
+      targetSectionTitleLower: first.sectionTitle.toLowerCase(),
+      targetSubItemId: first.subItemId,
+    };
+  }
+
+  return null;
 };
 
 export const buildRichKeywordData = (campaignData: CampaignData): RichKeywordData => {
@@ -422,13 +473,24 @@ interface TooltipContentProps {
   tooltip: TooltipState;
   campaignData: CampaignData;
   keywordData: RichKeywordData;
+  mode?: 'tooltip' | 'sheet';
+  onOpenTarget?: (target: {
+    entityType: string;
+    entityId: string;
+    title: string;
+    targetSectionTitleLower?: string;
+    targetSubItemId?: string;
+  }) => void;
 }
 
 export const RichTextTooltipContent: React.FC<TooltipContentProps> = ({
   tooltip,
   campaignData,
   keywordData,
+  mode = 'tooltip',
+  onOpenTarget,
 }) => {
+  const interactive = mode === 'sheet' && typeof onOpenTarget === 'function';
   if (tooltip.kind === 'section' && tooltip.sectionTitleLower) {
     const matches = keywordData.sectionTitleMap.get(tooltip.sectionTitleLower) || [];
     if (matches.length === 0) return null;
@@ -438,14 +500,36 @@ export const RichTextTooltipContent: React.FC<TooltipContentProps> = ({
         <div className="space-y-1">
           {matches.slice(0, 6).map((item, idx) => (
             <div key={`${item.entityId}_${item.sectionKey}_${idx}`} className="text-sm leading-5 theme-text-secondary">
-              <span className="inline-block mr-1 px-1.5 py-0.5 rounded border border-theme section-link">
-                区块
-              </span>
-              {item.entityName} · {item.sectionTitle}
+              {interactive ? (
+                <button
+                  type="button"
+                  className="w-full text-left px-2 py-1 rounded hover:bg-primary-light"
+                  onClick={() =>
+                    onOpenTarget({
+                      entityType: item.entityType,
+                      entityId: item.entityId,
+                      title: item.entityName,
+                      targetSectionTitleLower: item.sectionTitle.toLowerCase(),
+                    })
+                  }
+                >
+                  <span className="inline-block mr-1 px-1.5 py-0.5 rounded border border-theme section-link">
+                    区块
+                  </span>
+                  {item.entityName} · {item.sectionTitle}
+                </button>
+              ) : (
+                <>
+                  <span className="inline-block mr-1 px-1.5 py-0.5 rounded border border-theme section-link">
+                    区块
+                  </span>
+                  {item.entityName} · {item.sectionTitle}
+                </>
+              )}
             </div>
           ))}
         </div>
-        <div className="mt-1 text-xs theme-text-secondary opacity-70">双击在右侧打开并定位到该区块</div>
+        <div className="mt-1 text-xs theme-text-secondary opacity-70">{interactive ? '点击打开并定位到该区块' : '双击在右侧打开并定位到该区块'}</div>
       </div>
     );
   }
@@ -483,7 +567,23 @@ export const RichTextTooltipContent: React.FC<TooltipContentProps> = ({
         {markdownToPreviewText(getEntityPrimaryMarkdown(entity, tooltip.entityType)) || '暂无描述'}
       </p>
       <div className="mt-1 text-xs theme-text-secondary opacity-70">
-        双击在右侧打开
+        {interactive ? (
+          <button
+            type="button"
+            className="px-2 py-1 rounded border border-theme hover:bg-primary-light"
+            onClick={() =>
+              onOpenTarget({
+                entityType: tooltip.entityType!,
+                entityId: tooltip.entityId!,
+                title: entity.name,
+              })
+            }
+          >
+            在右侧打开
+          </button>
+        ) : (
+          '双击在右侧打开'
+        )}
       </div>
     </div>
   );

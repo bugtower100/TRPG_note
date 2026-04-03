@@ -39,8 +39,8 @@ const CollapsibleSection: React.FC<CollapsibleSectionProps> = ({
       data-collapsed={collapsed ? 'true' : 'false'}
       className={`p-3 rounded-lg shadow-sm border theme-card ${className}`}
     >
-      <div className="flex items-center justify-between mb-2">
-        <div className="flex items-center gap-2">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <h3 className="text-base font-medium">{title}</h3>
           {editableTitle && (
             <button
@@ -52,7 +52,7 @@ const CollapsibleSection: React.FC<CollapsibleSectionProps> = ({
             </button>
           )}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           {removable && onRemove && (
             <button
               type="button"

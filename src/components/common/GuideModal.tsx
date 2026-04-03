@@ -52,7 +52,7 @@ const GuideModal: React.FC<GuideModalProps> = ({ onClose }) => {
   const isLast = step === steps.length - 1;
 
   return (
-    <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 bg-black/60 z-[1400] flex items-center justify-center p-4">
       <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full p-8 relative animate-fade-in theme-card">
         <button 
           onClick={onClose}

@@ -240,6 +240,94 @@
     border-radius: 0.25rem;
   }
 
+  /* Mobile Topbar */
+  @media (max-width: 767px) {
+    .topbar-mobile {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 48px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 0 8px;
+      background: var(--bg-card);
+      border-bottom: 1px solid var(--border-color);
+      z-index: 60;
+    }
+    .topbar-mobile .hamburger {
+      width: 36px;
+      height: 36px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      background: var(--bg-page);
+    }
+    .drawer-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.35);
+      z-index: 70;
+    }
+    .drawer {
+      position: fixed;
+      top: 0;
+      left: 0;
+      bottom: 0;
+      width: 80vw;
+      max-width: 320px;
+      background: var(--bg-card);
+      border-right: 1px solid var(--border-color);
+      transform: translateX(-100%);
+      transition: transform 180ms ease;
+      z-index: 80;
+    }
+    .drawer-right {
+      left: auto;
+      right: 0;
+      border-right: 0;
+      border-left: 1px solid var(--border-color);
+      transform: translateX(100%);
+    }
+    .drawer-open {
+      transform: translateX(0);
+    }
+    .mobile-keyword-sheet {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      height: 55vh;
+      min-height: 260px;
+      max-height: 60vh;
+      background: var(--bg-card);
+      border-top: 1px solid var(--border-color);
+      border-top-left-radius: 16px;
+      border-top-right-radius: 16px;
+      box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.18);
+      z-index: 85;
+      display: flex;
+      flex-direction: column;
+      transition: height 180ms ease, max-height 180ms ease;
+    }
+    .mobile-keyword-sheet--expanded {
+      height: 75vh;
+      max-height: 75vh;
+    }
+    .mobile-keyword-sheet__handle {
+      width: 48px;
+      height: 5px;
+      border-radius: 999px;
+      background: color-mix(in srgb, var(--border-color) 70%, transparent 30%);
+      margin: 10px auto 0;
+      flex-shrink: 0;
+      touch-action: none;
+    }
+  }
+
   .milkdown-theme-bridge .ProseMirror blockquote {
     border-left: 3px solid var(--border-color);
     padding-left: 0.75rem;

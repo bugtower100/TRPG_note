@@ -1,36 +1,30 @@
 import React, { useEffect, useRef } from 'react';
 import { useCampaign, Tab } from '../context/CampaignContext';
 import { Maximize2, Minimize2, X } from 'lucide-react';
-import CharacterDetail from '../pages/characters/CharacterDetail';
-import MonsterDetail from '../pages/monsters/MonsterDetail';
-import LocationDetail from '../pages/locations/LocationDetail';
-import OrganizationDetail from '../pages/organizations/OrganizationDetail';
-import EventDetail from '../pages/events/EventDetail';
-import ClueDetail from '../pages/clues/ClueDetail';
-import TimelineDetail from '../pages/timelines/TimelineDetail';
+import EntityDetailView from './common/EntityDetailView';
 
 interface TabPanelProps {
   maximized: boolean;
   onToggleMaximize: () => void;
+  mobileMode?: boolean;
+  mobileOpen?: boolean;
+  onCloseMobile?: () => void;
 }
 
-const TabPanel: React.FC<TabPanelProps> = ({ maximized, onToggleMaximize }) => {
+const TabPanel: React.FC<TabPanelProps> = ({
+  maximized,
+  onToggleMaximize,
+  mobileMode = false,
+  mobileOpen = false,
+  onCloseMobile,
+}) => {
   const { tabs, activeTabId, setActiveTabId, closeTab } = useCampaign();
   const contentRef = useRef<HTMLDivElement>(null);
 
   const activeTab = tabs.find(t => t.id === activeTabId);
 
   const renderContent = (tab: Tab) => {
-    switch (tab.type) {
-      case 'characters': return <CharacterDetail entityId={tab.entityId} />;
-      case 'monsters': return <MonsterDetail entityId={tab.entityId} />;
-      case 'locations': return <LocationDetail entityId={tab.entityId} />;
-      case 'organizations': return <OrganizationDetail entityId={tab.entityId} />;
-      case 'events': return <EventDetail entityId={tab.entityId} />;
-      case 'clues': return <ClueDetail entityId={tab.entityId} />;
-      case 'timelines': return <TimelineDetail entityId={tab.entityId} />;
-      default: return <div>未知类型</div>;
-    }
+    return <EntityDetailView type={tab.type} entityId={tab.entityId} />;
   };
 
   useEffect(() => {
@@ -70,12 +64,26 @@ const TabPanel: React.FC<TabPanelProps> = ({ maximized, onToggleMaximize }) => {
   }, [activeTab]);
 
   if (tabs.length === 0) return null;
+  if (mobileMode && !mobileOpen) return null;
 
   return (
-    <div className={`${maximized ? 'w-full' : 'w-1/2'} border-l border-theme bg-theme-card flex flex-col h-screen shadow-xl z-20`}>
+    <div
+      className={`border-l border-theme bg-theme-card flex flex-col h-screen shadow-xl z-20 ${
+        mobileMode ? 'fixed top-0 right-0 w-full max-w-full' : `${maximized ? 'w-full' : 'w-1/2'}`
+      }`}
+    >
       {/* Tab Headers */}
       <div className="flex overflow-x-auto border-b border-theme bg-transparent">
         <div className="flex items-center px-3 border-r border-theme">
+          {mobileMode && (
+            <button
+              onClick={onCloseMobile}
+              className="flex items-center gap-1 text-xs px-2 py-1 rounded border border-theme theme-text-secondary hover:text-primary hover:border-primary mr-2"
+            >
+              <X size={14} />
+              关闭
+            </button>
+          )}
           <button
             onClick={onToggleMaximize}
             className="flex items-center gap-1 text-xs px-2 py-1 rounded border border-theme theme-text-secondary hover:text-primary hover:border-primary"

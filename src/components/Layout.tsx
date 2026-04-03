@@ -9,15 +9,92 @@ const Layout: React.FC = () => {
   const { tabs, exportData, importData } = useCampaign();
   const location = useLocation();
   const [isTabPanelMaximized, setIsTabPanelMaximized] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [mobileTabsOpen, setMobileTabsOpen] = useState(false);
   const [backendStatus, setBackendStatus] = useState<{ online: boolean; offlineSince?: number; syncedAt?: number; conflicts?: Array<{ key: string; localTime?: number; remoteTime?: number }>; unsyncedCount?: number; latencyMs?: number } | null>(null);
   const [showConflicts, setShowConflicts] = useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const mobileSidebarRef = React.useRef<HTMLDivElement>(null);
+  const mobileTabsRef = React.useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(max-width: 767px)');
+    const apply = () => setIsMobile(mediaQuery.matches);
+    apply();
+    mediaQuery.addEventListener('change', apply);
+    return () => mediaQuery.removeEventListener('change', apply);
+  }, []);
 
   useEffect(() => {
     if (tabs.length === 0) {
       setIsTabPanelMaximized(false);
+      setMobileTabsOpen(false);
     }
   }, [tabs.length]);
+
+  useEffect(() => {
+    if (!isMobile) return;
+    setMobileSidebarOpen(false);
+    setMobileTabsOpen(false);
+  }, [isMobile, location.pathname]);
+
+  useEffect(() => {
+    if (!isMobile) return;
+    const previousOverflow = document.body.style.overflow;
+    if (mobileSidebarOpen || mobileTabsOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = previousOverflow || '';
+    }
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [isMobile, mobileSidebarOpen, mobileTabsOpen]);
+
+  useEffect(() => {
+    if (!isMobile) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        if (mobileTabsOpen) {
+          setMobileTabsOpen(false);
+          return;
+        }
+        if (mobileSidebarOpen) {
+          setMobileSidebarOpen(false);
+        }
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isMobile, mobileSidebarOpen, mobileTabsOpen]);
+
+
+  useEffect(() => {
+    const activeDrawer = mobileTabsOpen ? mobileTabsRef.current : mobileSidebarOpen ? mobileSidebarRef.current : null;
+    if (!isMobile || !activeDrawer) return;
+    const focusable = activeDrawer.querySelector<HTMLElement>('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+    focusable?.focus();
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Tab') return;
+      const focusables = Array.from(activeDrawer.querySelectorAll<HTMLElement>('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'))
+        .filter((element) => !element.hasAttribute('disabled'));
+      if (focusables.length === 0) return;
+      const first = focusables[0];
+      const last = focusables[focusables.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    activeDrawer.addEventListener('keydown', handleKeyDown);
+    return () => activeDrawer.removeEventListener('keydown', handleKeyDown);
+  }, [isMobile, mobileSidebarOpen, mobileTabsOpen]);
 
   useEffect(() => {
     const handler = (e: Event) => {
@@ -59,9 +136,20 @@ const Layout: React.FC = () => {
 
   return (
     <div className="flex h-screen overflow-hidden theme-page">
-      <Sidebar />
-      <main className="flex-1 ml-56 flex overflow-hidden">
-        <div className="absolute left-56 right-0 top-0 z-50">
+      {!isMobile && <Sidebar className="fixed left-0 top-0 h-screen" />}
+      {isMobile && (
+        <>
+          {mobileSidebarOpen && <div className="drawer-overlay" onClick={() => setMobileSidebarOpen(false)} aria-hidden="true" />}
+          <div ref={mobileSidebarRef} className={`drawer ${mobileSidebarOpen ? 'drawer-open' : ''}`} role="dialog" aria-label="侧边导航" aria-modal="true">
+            <Sidebar
+              className="h-full"
+              onNavigate={() => setMobileSidebarOpen(false)}
+            />
+          </div>
+        </>
+      )}
+      <main className={`flex-1 flex overflow-hidden ${!isMobile ? 'ml-56' : ''}`}>
+        <div className={`absolute ${!isMobile ? 'left-56' : 'left-0'} right-0 top-0 z-50`}>
           {backendStatus?.online === false ? (
             <div className="bg-red-600 text-white px-4 py-2 text-sm flex items-center justify-between">
               <span>
@@ -97,19 +185,19 @@ const Layout: React.FC = () => {
             </div>
           ) : null}
         </div>
-        <div className="absolute right-4 bottom-2 z-50">
-          <span className={`px-2 py-1 rounded text-xs ${backendStatus?.online ? 'bg-green-600 text-white' : 'bg-gray-700 text-white'}`}>
+        <div className={`fixed z-40 ${isMobile ? 'right-3 bottom-4' : 'right-4 bottom-3'}`}>
+          <span className={`px-2 py-1 rounded text-xs shadow-sm ${backendStatus?.online ? 'bg-green-600 text-white' : 'bg-gray-700 text-white'}`}>
             {backendStatus?.online ? '在线' : '离线'}{backendStatus?.online && typeof backendStatus?.latencyMs === 'number' ? ` ${backendStatus.latencyMs}ms` : ''}
             {backendStatus?.online ? '' : (typeof backendStatus?.unsyncedCount === 'number' ? `（未同步${backendStatus.unsyncedCount}）` : '')}
           </span>
         </div>
         {currentGuideId && (
-          <div className="absolute right-4 top-2 z-50">
+          <div className={`absolute z-50 ${isMobile ? 'right-3 top-14' : 'right-4 top-2'}`}>
             <GuideHelpButton guideId={currentGuideId} />
           </div>
         )}
         {showConflicts && backendStatus?.conflicts && backendStatus.conflicts.length > 0 && (
-          <div className="absolute left-56 right-0 top-10 z-40 bg-white border border-yellow-500 rounded shadow p-3 text-xs">
+          <div className={`absolute ${!isMobile ? 'left-56' : 'left-0'} right-0 top-10 z-40 bg-white border border-yellow-500 rounded shadow p-3 text-xs`}>
             {backendStatus.conflicts.map((c) => (
               <div key={c.key} className="py-1 flex items-center justify-between">
                 <span className="font-medium break-all">{c.key}</span>
@@ -119,13 +207,41 @@ const Layout: React.FC = () => {
             ))}
           </div>
         )}
-        <div className={`flex-1 overflow-y-auto p-8 pt-16 ${tabs.length > 0 && !isTabPanelMaximized ? 'border-r border-theme' : ''} ${isTabPanelMaximized ? 'hidden' : ''}`}>
+        {isMobile && (
+          <div className="topbar-mobile">
+            <button className="hamburger" onClick={() => setMobileSidebarOpen(true)} aria-label="打开侧边栏">≡</button>
+            <div className="flex-1 text-center text-sm font-medium">TRPG 模组</div>
+            {tabs.length > 0 ? (
+              <button className="hamburger" onClick={() => setMobileTabsOpen(true)} aria-label="打开右侧面板">
+                {tabs.length}
+              </button>
+            ) : (
+              <div style={{ width: 36 }} />
+            )}
+          </div>
+        )}
+        <div className={`flex-1 overflow-y-auto p-8 ${isMobile ? 'pt-14' : 'pt-16'} ${tabs.length > 0 && !isTabPanelMaximized && !isMobile ? 'border-r border-theme' : ''} ${isTabPanelMaximized && !isMobile ? 'hidden' : ''}`}>
           <Outlet />
         </div>
-        <TabPanel
-          maximized={isTabPanelMaximized}
-          onToggleMaximize={() => setIsTabPanelMaximized((prev) => !prev)}
-        />
+        {!isMobile ? (
+          <TabPanel
+            maximized={isTabPanelMaximized}
+            onToggleMaximize={() => setIsTabPanelMaximized((prev) => !prev)}
+          />
+        ) : (
+          <>
+            {mobileTabsOpen && <div className="drawer-overlay" onClick={() => setMobileTabsOpen(false)} aria-hidden="true" />}
+            <div ref={mobileTabsRef} className={`drawer drawer-right ${mobileTabsOpen ? 'drawer-open' : ''}`} role="dialog" aria-label="右侧面板" aria-modal="true">
+              <TabPanel
+                maximized
+                onToggleMaximize={() => {}}
+                mobileMode
+                mobileOpen={mobileTabsOpen}
+                onCloseMobile={() => setMobileTabsOpen(false)}
+              />
+            </div>
+          </>
+        )}
       </main>
     </div>
   );

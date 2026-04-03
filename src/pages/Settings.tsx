@@ -80,13 +80,13 @@ const Settings: React.FC = () => {
   };
 
   return (
-    <div className="space-y-8 max-w-4xl mx-auto">
-      <h2 className="text-2xl font-bold">数据与设置</h2>
+    <div className="space-y-8 max-w-4xl mx-auto px-2 sm:px-0">
+      <h2 className="text-xl sm:text-2xl font-bold">数据与设置</h2>
 
       {/* Theme Selection */}
-      <section data-tour="settings-theme-section" className="bg-theme-card p-6 rounded-lg shadow-sm border border-theme">
+      <section data-tour="settings-theme-section" className="bg-theme-card p-4 sm:p-6 rounded-lg shadow-sm border border-theme">
         <h3 className="text-lg font-medium mb-4">界面风格</h3>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
             {themes.map((t) => (
                 <button
                     key={t.id}
@@ -106,10 +106,10 @@ const Settings: React.FC = () => {
       </section>
 
       {/* Data Management */}
-      <section className="bg-theme-card p-6 rounded-lg shadow-sm border border-theme">
+      <section className="bg-theme-card p-4 sm:p-6 rounded-lg shadow-sm border border-theme">
         <h3 className="text-lg font-medium mb-4">数据管理</h3>
         <div className="space-y-4">
-          <div className="flex items-center justify-between p-4 border border-theme rounded">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 border border-theme rounded">
             <div>
               <h4 className="font-medium">导出 JSON 副本</h4>
               <p className="text-sm theme-text-secondary">下载当前模组的快照文件。</p>
@@ -123,7 +123,7 @@ const Settings: React.FC = () => {
             </button>
           </div>
 
-          <div className="flex items-center justify-between p-4 border border-theme rounded">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 border border-theme rounded">
             <div>
               <h4 className="font-medium">导入 JSON</h4>
               <p className="text-sm theme-text-secondary">从 JSON 文件恢复模组数据 (覆盖当前)。</p>
@@ -148,10 +148,10 @@ const Settings: React.FC = () => {
         </div>
       </section>
 
-      <section className="bg-theme-card p-6 rounded-lg shadow-sm border border-theme">
-        <div className="flex items-center justify-between mb-4">
+      <section className="bg-theme-card p-4 sm:p-6 rounded-lg shadow-sm border border-theme">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
           <h3 className="text-lg font-medium">资源管理</h3>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <button
               onClick={loadResources}
               className="px-3 py-2 border border-theme rounded hover:bg-gray-50 flex items-center gap-2"
@@ -182,14 +182,14 @@ const Settings: React.FC = () => {
           <button
             data-tour="settings-resource-upload"
             onClick={() => resourceInputRef.current?.click()}
-            className="px-4 py-2 bg-theme-card border border-theme rounded hover:bg-gray-50 flex items-center gap-2"
+            className="w-full sm:w-auto px-4 py-2 bg-theme-card border border-theme rounded hover:bg-gray-50 flex items-center justify-center gap-2"
             disabled={resourceBusy}
           >
             <Upload size={16} />
             批量上传图片
           </button>
         </div>
-        <div data-tour="settings-resource-list" className="border border-theme rounded max-h-72 overflow-auto">
+        <div data-tour="settings-resource-list" className="border border-theme rounded max-h-[60vh] md:max-h-72 overflow-auto">
           {resources.length === 0 ? (
             <div className="p-4 text-sm theme-text-secondary">暂无资源</div>
           ) : (

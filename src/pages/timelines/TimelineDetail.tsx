@@ -173,11 +173,11 @@ const TimelineDetail: React.FC<TimelineDetailProps> = ({ entityId }) => {
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6 pb-12">
+    <div className="max-w-4xl mx-auto space-y-6 pb-12 px-2 sm:px-0">
       {/* Header */}
-      <div className="flex justify-between items-center border-b pb-4">
-        <div className="flex items-center gap-4">
-          <button onClick={() => navigate('/timelines')} className="text-gray-500 hover:text-gray-700">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 border-b pb-3">
+        <div className="flex items-center gap-3 sm:gap-4 min-w-0 flex-1">
+          <button onClick={() => navigate('/timelines')} className="inline-flex items-center whitespace-nowrap shrink-0 text-gray-500 hover:text-gray-700">
             &larr; 返回
           </button>
           <input
@@ -185,24 +185,23 @@ const TimelineDetail: React.FC<TimelineDetailProps> = ({ entityId }) => {
             type="text"
             value={timeline.name}
             onChange={(e) => handleChange('name', e.target.value)}
-            className="text-2xl font-bold text-gray-800 border-b border-transparent hover:border-gray-300 focus:border-primary focus:outline-none bg-transparent"
+            className="flex-1 min-w-0 text-xl sm:text-2xl font-bold text-gray-800 border-b border-transparent hover:border-gray-300 focus:border-primary focus:outline-none bg-transparent"
           />
         </div>
-        
-        <div className="flex items-center gap-3">
-            <button
-                onClick={saveCampaign}
-                className="px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700 text-sm flex items-center gap-1"
-            >
-                保存
-            </button>
-            <div className="w-px h-6 bg-gray-300 mx-1"></div>
-            <button 
-              onClick={handleDelete}
-              className="text-red-500 hover:text-red-700 text-sm px-3 py-1 rounded hover:bg-red-50"
-            >
-              删除时间线
-            </button>
+        <div className="flex items-center gap-2 sm:gap-3">
+          <button
+            onClick={saveCampaign}
+            className="px-3 py-1.5 bg-green-600 text-white rounded hover:bg-green-700 text-sm flex items-center gap-1"
+          >
+            保存
+          </button>
+          <div className="w-px h-6 bg-gray-300 mx-1"></div>
+          <button 
+            onClick={handleDelete}
+            className="text-red-500 hover:text-red-700 text-sm px-3 py-1.5 rounded hover:bg-red-50"
+          >
+            删除时间线
+          </button>
         </div>
       </div>
 

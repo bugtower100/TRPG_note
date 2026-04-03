@@ -75,18 +75,18 @@ const CustomSubItemsEditor: React.FC<CustomSubItemsEditorProps> = ({
           <h3 className="text-base font-medium">{title}</h3>
           <span className="text-xs theme-text-secondary">共 {items.length} 项</span>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="搜索子项目..."
-            className="px-2 py-1 text-sm border border-theme rounded bg-transparent min-w-[140px]"
+            className="px-2 py-1.5 text-sm border border-theme rounded bg-transparent min-w-[140px] flex-1 md:flex-none"
           />
           <button
             type="button"
             onClick={addItem}
-            className="px-3 py-1 bg-primary text-white rounded hover:bg-primary-dark text-sm"
+            className="px-3 py-1.5 bg-primary text-white rounded hover:bg-primary-dark text-sm w-full md:w-auto justify-center"
           >
             + 添加子项目
           </button>
@@ -111,7 +111,7 @@ const CustomSubItemsEditor: React.FC<CustomSubItemsEditorProps> = ({
             data-subitem-title={item.title.toLowerCase()}
             className="border border-theme rounded-lg p-3 bg-theme-card"
           >
-            <div className="flex items-center gap-2 mb-2">
+            <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 mb-2">
               <button
                 type="button"
                 onClick={() => toggleCollapse(item.id)}
@@ -123,7 +123,7 @@ const CustomSubItemsEditor: React.FC<CustomSubItemsEditorProps> = ({
                 type="text"
                 value={item.title}
                 onChange={(e) => updateItem(item.id, { title: e.target.value })}
-                className="flex-1 p-2 border border-theme rounded focus:outline-none focus:border-primary bg-transparent"
+                className="flex-1 min-w-[180px] p-2 border border-theme rounded focus:outline-none focus:border-primary bg-transparent"
                 placeholder="子项目标题"
               />
               <button
