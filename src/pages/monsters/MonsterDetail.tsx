@@ -123,7 +123,7 @@ const MonsterDetail: React.FC<MonsterDetailProps> = ({ entityId }) => {
             type="text"
             value={monster.name}
             onChange={(e) => handleChange('name', e.target.value)}
-            className="flex-1 min-w-0 text-xl sm:text-2xl font-bold text-gray-800 border-b border-transparent hover:border-gray-300 focus:border-primary focus:outline-none bg-transparent"
+            className="flex-1 min-w-0 text-xl sm:text-2xl font-bold border-b border-transparent hover:border-gray-300 focus:border-primary focus:outline-none bg-transparent"
           />
         </div>
         

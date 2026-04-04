@@ -9,11 +9,11 @@ on:
       release_tag:
         description: "Release Tag"
         required: true
-        default: "v1.2.2"
+        default: "v1.2.3"
       release_name:
         description: "Release Name"
         required: true
-        default: "V1.2.2"
+        default: "V1.2.3"
       prerelease:
         description: "Mark as prerelease"
         required: true
@@ -92,10 +92,8 @@ jobs:
           make_latest: true
           body: |
             ## ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || inputs.release_name }} 更新内容
-            - 富文本新增下划线、文字颜色、文字底色能力，支持预设色与自定义取色
-            - 新增富文本图片右键菜单，可直接调整图片尺寸（预设比例与自定义比例）
-            - 新增富文本图片对齐控制，支持左对齐、居中、右对齐，并可恢复默认对齐
-            - 图片尺寸与对齐信息已持久化到内容元数据，预览态与编辑态均保持一致
+            - 适配了移动端网页
+            - 修复了科技模式标题和关系图节点字体颜色问题
           files: TRPG模组笔记-windows-amd64.zip
           generate_release_notes: true
         env:

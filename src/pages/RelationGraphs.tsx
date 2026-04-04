@@ -752,7 +752,7 @@ const RelationGraphs: React.FC = () => {
             })}
 
             {(activeGraph?.nodes || []).map((node) => (
-              <div key={`${node.id}_label`} className="absolute -translate-x-1/2 text-xs font-medium px-2 py-0.5 rounded bg-white/85 border border-theme pointer-events-none" style={{ left: node.x, top: node.y + 40 }}>
+              <div key={`${node.id}_label`} className="absolute -translate-x-1/2 text-xs font-medium px-2 py-0.5 rounded bg-white/90 text-slate-900 border border-theme pointer-events-none" style={{ left: node.x, top: node.y + 40 }}>
                 {node.label}
               </div>
             ))}
