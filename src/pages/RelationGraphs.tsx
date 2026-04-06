@@ -5,11 +5,14 @@ import { relationGraphService } from '../services/relationGraphService';
 import { CampaignData, RelationEdgeDirection, RelationGraph, RelationGraphEdge, RelationGraphNode } from '../types';
 import RichTextEditor from '../components/common/RichTextEditor';
 import { resourceService, ResourceItem } from '../services/resourceService';
+import { useReceivedShares } from '../hooks/useReceivedShares';
 
 type GraphEntity = {
   id: string;
+  openEntityId: string;
   type: 'characters' | 'monsters';
   name: string;
+  isShared?: boolean;
 };
 
 const NODE_RADIUS = 30;
@@ -32,6 +35,8 @@ const clamp = (value: number, min: number, max: number) => Math.max(min, Math.mi
 
 const RelationGraphs: React.FC = () => {
   const { campaignData, setCampaignData, openInTab } = useCampaign();
+  const sharedCharacters = useReceivedShares('characters');
+  const sharedMonsters = useReceivedShares('monsters');
   const boardRef = useRef<HTMLDivElement>(null);
   const [activeGraphId, setActiveGraphId] = useState<string | null>(null);
   const [selectedNodeIds, setSelectedNodeIds] = useState<string[]>([]);
@@ -78,13 +83,31 @@ const RelationGraphs: React.FC = () => {
   const entities = useMemo<GraphEntity[]>(() => {
     const res: GraphEntity[] = [];
     campaignData.characters.forEach((item) => {
-      res.push({ id: item.id, type: 'characters', name: item.name || '未命名' });
+      res.push({ id: item.id, openEntityId: item.id, type: 'characters', name: item.name || '未命名' });
     });
     campaignData.monsters.forEach((item) => {
-      res.push({ id: item.id, type: 'monsters', name: item.name || '未命名' });
+      res.push({ id: item.id, openEntityId: item.id, type: 'monsters', name: item.name || '未命名' });
+    });
+    sharedCharacters.forEach((item) => {
+      res.push({
+        id: `shared:${item.id}`,
+        openEntityId: `shared:${item.id}`,
+        type: 'characters',
+        name: `${item.entityName}（${item.sourceOwnerUsername}分享）`,
+        isShared: true,
+      });
+    });
+    sharedMonsters.forEach((item) => {
+      res.push({
+        id: `shared:${item.id}`,
+        openEntityId: `shared:${item.id}`,
+        type: 'monsters',
+        name: `${item.entityName}（${item.sourceOwnerUsername}分享）`,
+        isShared: true,
+      });
     });
     return res;
-  }, [campaignData.characters, campaignData.monsters]);
+  }, [campaignData.characters, campaignData.monsters, sharedCharacters, sharedMonsters]);
 
   const filteredEntities = useMemo(
     () => entities.filter((e) => e.type === entityTypeFilter),
@@ -351,8 +374,7 @@ const RelationGraphs: React.FC = () => {
 
   const findEntity = (node: RelationGraphNode | undefined) => {
     if (!node) return null;
-    const list = node.entityType === 'characters' ? campaignData.characters : campaignData.monsters;
-    return list.find((e) => e.id === node.entityId) || null;
+    return entities.find((entity) => entity.id === node.entityId) || null;
   };
 
   const addNodeBySelect = () => {
@@ -444,7 +466,7 @@ const RelationGraphs: React.FC = () => {
     const entity = findEntity(node);
     if (!entity) return;
     const type = node.entityType;
-    openInTab(type, entity.id, entity.name || '未命名');
+    openInTab(type, entity.openEntityId, entity.name || '未命名');
   };
 
   const selectedPrimaryNode = activeGraph?.nodes.find((n) => n.id === selectedNodeIds[0]);

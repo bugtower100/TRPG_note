@@ -77,6 +77,63 @@ export type GraphEntityType =
   | 'clues'
   | 'timelines';
 
+export type ShareScope = 'entity' | 'section' | 'subItem';
+
+export interface SharedEntitySnapshot {
+  entityName: string;
+  entityType: GraphEntityType;
+  scope: ShareScope;
+  sectionKey?: string;
+  sectionTitle?: string;
+  subItemId?: string;
+  subItemTitle?: string;
+  details?: string;
+  sectionItems?: CustomSubItem[];
+  subItem?: CustomSubItem | null;
+  timelineEvents?: TimelineEvent[];
+  allSections?: Array<{
+    key: string;
+    title: string;
+    items: CustomSubItem[];
+  }>;
+}
+
+export interface SharedEntityRecord {
+  id: string;
+  campaignId: string;
+  entityType: GraphEntityType;
+  entityId: string;
+  entityName: string;
+  scope: ShareScope;
+  scopeId?: string;
+  permission: SharedPermission;
+  sourceOwnerUserId: string;
+  sourceOwnerUsername: string;
+  targetUserId: string;
+  targetUsername: string;
+  sharedByUserId: string;
+  sharedByUsername: string;
+  createdAt: number;
+  updatedAt: number;
+  version: number;
+  activeLease?: TeamNoteLease | null;
+  snapshot: SharedEntitySnapshot;
+}
+
+export interface VersionRecord {
+  id: string;
+  campaignId: string;
+  documentType: 'team_note' | 'shared_entity' | 'campaign_config';
+  documentId: string;
+  action: 'create' | 'update' | 'delete' | 'restore_copy';
+  summary: string;
+  operatorUserId: string;
+  operatorUsername: string;
+  createdAt: number;
+  snapshot: Record<string, unknown>;
+  previousSnapshot?: Record<string, unknown> | null;
+}
+
 export interface RelationGraphNode {
   id: string;
   entityId: string;
@@ -117,6 +174,7 @@ export interface CampaignData {
   id?: string; // Add optional ID for multi-campaign support
   meta: {
     formatVersion: string;
+    schemaVersion?: number;
     projectName: string;
     lastModified: number;
     description?: string; // Brief description
@@ -150,12 +208,74 @@ export interface UserProfile {
   lastActive: number;
 }
 
+export type CampaignVisibility = 'public' | 'private';
+export type CampaignMemberRole = 'GM' | 'PL';
+export type SharedPermission = 'read' | 'edit';
+
 export interface CampaignSummary {
   id: string;
   name: string;
   description: string;
   lastModified: number;
   ownerId: string; // GM User ID
+  visibility?: CampaignVisibility;
+  schemaVersion?: number;
+}
+
+export interface CampaignMember {
+  userId: string;
+  username: string;
+  role: CampaignMemberRole;
+  joinedAt: number;
+  lastActiveAt: number;
+}
+
+export interface CampaignConfig {
+  campaignId: string;
+  name?: string;
+  description?: string;
+  lastModified?: number;
+  visibility: CampaignVisibility;
+  ownerUserId: string;
+  schemaVersion: number;
+  members: CampaignMember[];
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface PublicCampaignSummary {
+  id: string;
+  name: string;
+  description: string;
+  lastModified: number;
+  ownerId: string;
+  ownerUsername: string;
+  visibility: CampaignVisibility;
+  memberCount: number;
+  onlineMemberCount: number;
+}
+
+export interface TeamNoteLease {
+  userId: string;
+  username: string;
+  role: CampaignMemberRole;
+  startedAt: number;
+  expiresAt?: number | null;
+}
+
+export interface TeamNoteDocument {
+  id: string;
+  campaignId: string;
+  title: string;
+  content: string;
+  createdBy: string;
+  createdByName: string;
+  updatedBy: string;
+  updatedByName: string;
+  createdAt: number;
+  updatedAt: number;
+  version: number;
+  activeLease?: TeamNoteLease | null;
 }
 
 export type CampaignTheme = 'default' | 'scroll' | 'archive' | 'nature';

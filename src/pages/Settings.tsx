@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useCampaign } from '../context/CampaignContext';
 import { CampaignTheme } from '../types';
-import { FileJson, Upload, Monitor, Scroll, Archive, Trash2, RefreshCw } from 'lucide-react';
+import { FileJson, Upload, Monitor, Scroll, Archive, Trash2, RefreshCw, ChevronDown, ChevronRight } from 'lucide-react';
 import { resourceService, ResourceItem } from '../services/resourceService';
 
 const Settings: React.FC = () => {
@@ -15,6 +15,7 @@ const Settings: React.FC = () => {
   const [resources, setResources] = useState<ResourceItem[]>([]);
   const [selectedRefs, setSelectedRefs] = useState<string[]>([]);
   const [resourceBusy, setResourceBusy] = useState(false);
+  const [resourceCollapsed, setResourceCollapsed] = useState(false);
 
   const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -150,7 +151,14 @@ const Settings: React.FC = () => {
 
       <section className="bg-theme-card p-4 sm:p-6 rounded-lg shadow-sm border border-theme">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
-          <h3 className="text-lg font-medium">资源管理</h3>
+          <button
+            type="button"
+            onClick={() => setResourceCollapsed((prev) => !prev)}
+            className="text-lg font-medium flex items-center gap-2 text-left"
+          >
+            {resourceCollapsed ? <ChevronRight size={18} /> : <ChevronDown size={18} />}
+            资源管理
+          </button>
           <div className="flex flex-wrap items-center gap-2">
             <button
               onClick={loadResources}
@@ -170,6 +178,8 @@ const Settings: React.FC = () => {
             </button>
           </div>
         </div>
+        {!resourceCollapsed && (
+          <>
         <div className="mb-3">
           <input
             type="file"
@@ -218,6 +228,8 @@ const Settings: React.FC = () => {
             </div>
           )}
         </div>
+          </>
+        )}
       </section>
     </div>
   );

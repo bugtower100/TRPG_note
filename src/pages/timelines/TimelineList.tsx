@@ -4,10 +4,12 @@ import EntityListLayout from '../../components/common/EntityListLayout';
 import { dataService } from '../../services/dataService';
 import { useNavigate } from 'react-router-dom';
 import { Timeline } from '../../types';
+import { useReceivedShares } from '../../hooks/useReceivedShares';
 
 const TimelineList: React.FC = () => {
   const { campaignData, setCampaignData } = useCampaign();
   const navigate = useNavigate();
+  const sharedEntries = useReceivedShares('timelines');
 
   const handleAdd = () => {
     const newTimeline = dataService.createEntity<Timeline>({
@@ -31,6 +33,7 @@ const TimelineList: React.FC = () => {
       entities={campaignData.timelines}
       entityType="timelines"
       onAdd={handleAdd}
+      sharedEntries={sharedEntries}
     />
   );
 };

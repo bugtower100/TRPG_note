@@ -13,6 +13,7 @@ const STORAGE_KEYS = {
 export const DEFAULT_CAMPAIGN_DATA: CampaignData = {
   meta: {
     formatVersion: '1.0',
+    schemaVersion: 2,
     projectName: '新模组',
     lastModified: Date.now(),
     description: '这是一个新的模组。',
@@ -103,6 +104,7 @@ class DataService {
     const meta = {
       ...DEFAULT_CAMPAIGN_DATA.meta,
       ...(typeof raw?.meta === 'object' && raw.meta ? raw.meta : {}),
+      schemaVersion: typeof raw?.meta?.schemaVersion === 'number' ? raw.meta.schemaVersion : 2,
       lastModified: typeof raw?.meta?.lastModified === 'number' ? raw.meta.lastModified : Date.now(),
     };
 
@@ -333,6 +335,17 @@ class DataService {
     return scoped.filter(c => c.ownerId === userId);
   }
 
+  ensureCampaignSummary(summary: CampaignSummary): void {
+    const index = this.getCampaigns();
+    const summaryIdx = index.findIndex((campaign) => campaign.id === summary.id);
+    if (summaryIdx >= 0) {
+      index[summaryIdx] = { ...index[summaryIdx], ...summary };
+    } else {
+      index.push(summary);
+    }
+    this.saveDataToStorage(this.indexKey(), index);
+  }
+
   createCampaign(name: string, description: string, ownerId: string): CampaignData {
     const newId = uuidv4();
     const newCampaign: CampaignData = {
@@ -340,6 +353,7 @@ class DataService {
       id: newId,
       meta: {
         ...DEFAULT_CAMPAIGN_DATA.meta,
+        schemaVersion: 2,
         projectName: name,
         description,
         lastModified: Date.now(),
@@ -356,7 +370,9 @@ class DataService {
       name,
       description,
       lastModified: Date.now(),
-      ownerId
+      ownerId,
+      visibility: 'private',
+      schemaVersion: 2,
     });
     this.saveDataToStorage(this.indexKey(), index);
 

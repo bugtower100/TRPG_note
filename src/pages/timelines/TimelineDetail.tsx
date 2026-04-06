@@ -7,6 +7,7 @@ import RichTextEditor from '../../components/common/RichTextEditor';
 import CustomSubItemsEditor from '../../components/common/CustomSubItemsEditor';
 import CollapsibleSection from '../../components/common/CollapsibleSection';
 import SectionAddBar from '../../components/common/SectionAddBar';
+import EntityShareActions, { ShareSectionAction, ShareSubItemAction } from '../../components/common/EntityShareActions';
 
 interface TimelineDetailProps {
   entityId?: string;
@@ -189,6 +190,7 @@ const TimelineDetail: React.FC<TimelineDetailProps> = ({ entityId }) => {
           />
         </div>
         <div className="flex items-center gap-2 sm:gap-3">
+          <EntityShareActions entityType="timelines" entity={timeline} scope="entity" label="分享整张卡片" />
           <button
             onClick={saveCampaign}
             className="px-3 py-1.5 bg-green-600 text-white rounded hover:bg-green-700 text-sm flex items-center gap-1"
@@ -221,6 +223,7 @@ const TimelineDetail: React.FC<TimelineDetailProps> = ({ entityId }) => {
         onRemove={() => setSectionVisible('intro', false)}
         editableTitle
         onRenameTitle={(title) => setSectionTitle('intro', title)}
+        headerActions={<ShareSectionAction entityType="timelines" entity={timeline} sectionKey="intro" />}
       >
         <RichTextEditor
           value={timeline.details}
@@ -317,6 +320,7 @@ const TimelineDetail: React.FC<TimelineDetailProps> = ({ entityId }) => {
           onRemove={() => removeCustomSection(sectionKey)}
           editableTitle
           onRenameTitle={(title) => setSectionTitle(sectionKey, title)}
+          headerActions={<ShareSectionAction entityType="timelines" entity={timeline} sectionKey={sectionKey} />}
         >
           <CustomSubItemsEditor
             title={getSectionTitle(sectionKey, '自定义区块') + ' / 子项目'}
@@ -324,6 +328,7 @@ const TimelineDetail: React.FC<TimelineDetailProps> = ({ entityId }) => {
             onChange={(items) => setSectionItems(sectionKey, items)}
             ensureOneItem
             defaultFirstItemTitle="详细情况"
+            renderItemActions={(item) => <ShareSubItemAction entityType="timelines" entity={timeline} item={item} />}
           />
         </CollapsibleSection>
       ))}

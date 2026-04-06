@@ -4,10 +4,12 @@ import EntityListLayout from '../../components/common/EntityListLayout';
 import { dataService } from '../../services/dataService';
 import { useNavigate } from 'react-router-dom';
 import { Monster } from '../../types';
+import { useReceivedShares } from '../../hooks/useReceivedShares';
 
 const MonsterList: React.FC = () => {
   const { campaignData, setCampaignData } = useCampaign();
   const navigate = useNavigate();
+  const sharedEntries = useReceivedShares('monsters');
 
   const handleAdd = () => {
     const newMonster = dataService.createEntity<Monster>({
@@ -35,6 +37,7 @@ const MonsterList: React.FC = () => {
       entities={campaignData.monsters}
       entityType="monsters"
       onAdd={handleAdd}
+      sharedEntries={sharedEntries}
     />
   );
 };

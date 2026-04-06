@@ -1,4 +1,5 @@
 import React from 'react';
+import ConfirmDialog from './ConfirmDialog';
 
 interface CollapsibleSectionProps {
   title: string;
@@ -11,6 +12,7 @@ interface CollapsibleSectionProps {
   editableTitle?: boolean;
   onRenameTitle?: (title: string) => void;
   sectionTitleLower?: string;
+  headerActions?: React.ReactNode;
 }
 
 const CollapsibleSection: React.FC<CollapsibleSectionProps> = ({
@@ -24,13 +26,21 @@ const CollapsibleSection: React.FC<CollapsibleSectionProps> = ({
   editableTitle = false,
   onRenameTitle,
   sectionTitleLower,
+  headerActions,
 }) => {
+  const [showDeleteConfirm, setShowDeleteConfirm] = React.useState(false);
+
   const handleRename = () => {
     if (!onRenameTitle) return;
     const next = window.prompt('输入新的区块名称', title);
     if (next && next.trim()) {
       onRenameTitle(next.trim());
     }
+  };
+
+  const handleRemove = () => {
+    if (!onRemove) return;
+    setShowDeleteConfirm(true);
   };
 
   return (
@@ -51,17 +61,6 @@ const CollapsibleSection: React.FC<CollapsibleSectionProps> = ({
               改名
             </button>
           )}
-        </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          {removable && onRemove && (
-            <button
-              type="button"
-              onClick={onRemove}
-              className="text-xs font-semibold text-red-600 hover:text-red-700 px-2 py-1 border border-red-200 rounded hover:bg-red-50"
-            >
-              删除区块
-            </button>
-          )}
           <button
             type="button"
             onClick={onToggle}
@@ -71,8 +70,32 @@ const CollapsibleSection: React.FC<CollapsibleSectionProps> = ({
             {collapsed ? '展开内容 ▼' : '收起内容 ▲'}
           </button>
         </div>
+        <div className="flex items-center gap-3 flex-wrap">
+          {headerActions}
+          {removable && onRemove && (
+            <button
+              type="button"
+              onClick={handleRemove}
+              className="text-xs font-semibold text-red-600 hover:text-red-700 px-2 py-1 border border-red-200 rounded hover:bg-red-50 ml-3 sm:ml-5"
+            >
+              删除区块
+            </button>
+          )}
+        </div>
       </div>
       {!collapsed && children}
+      <ConfirmDialog
+        open={showDeleteConfirm}
+        title="确认删除区块"
+        description={`确定要删除区块「${title}」吗？`}
+        confirmText="删除"
+        cancelText="取消"
+        onCancel={() => setShowDeleteConfirm(false)}
+        onConfirm={() => {
+          setShowDeleteConfirm(false);
+          onRemove?.();
+        }}
+      />
     </section>
   );
 };

@@ -8,7 +8,8 @@ export type GuideId =
   | 'entity-list'
   | 'entity-detail'
   | 'settings'
-  | 'relation-graphs';
+  | 'relation-graphs'
+  | 'team-notes';
 
 interface GuideContextValue {
   currentGuideId: GuideId | null;
@@ -21,40 +22,64 @@ const GUIDE_STEPS: Record<GuideId, Step[]> = {
     {
       target: '[data-tour="landing-create-campaign"]',
       skipBeacon: true,
-      placement: 'bottom',
-      content: '从这里新建模组。填好模组名称后即可开始整理角色、怪物、地点、组织与关系图等内容。',
+      placement: 'right',
+      content: '从这里创建新模组。现在创建卡片更紧凑，创建后会直接进入模组内部继续整理内容。',
     },
     {
-      target: '[data-tour="landing-campaign-list"]',
+      target: '[data-tour="landing-campaign-card"]',
       skipBeacon: true,
-      placement: 'top',
-      content: '这里会显示已有模组。创建完成后，直接点击卡片上的“进入模组”即可进入内部功能页面。',
+      placement: 'left',
+      content: '这里是模组卡片。卡片会显示简介、公开/私密状态，以及当前在线成员概览。',
+    },
+    {
+      target: '[data-tour="landing-campaign-members"]',
+      skipBeacon: true,
+      placement: 'bottom',
+      content: '这里是成员列表占位区。现阶段会显示成员与在线人数，后续会继续扩展成完整的团队协作入口。',
+    },
+    {
+      target: '[data-tour="landing-campaign-access"]',
+      skipBeacon: true,
+      placement: 'left',
+      content: '模组公开/私密已经移到主页卡片上管理。以后多人协作时，会优先从这里配置访问控制。',
     },
   ],
   dashboard: [
     {
+      target: '[data-tour="dashboard-header"]',
+      skipBeacon: true,
+      placement: 'bottom',
+      content: '这里是模组概览页头部。你可以快速确认当前所在模组，并从这里重新打开概览页引导。',
+    },
+    {
       target: '[data-tour="sidebar-nav"]',
       skipBeacon: true,
       placement: 'right',
-      content: '进入模组后，左侧导航就是核心功能入口，你可以在这里切换角色、怪物、地点、组织、事件、线索、时间线、关系图和设置页。',
+      content: '左侧导航依然是主工作区入口。现在除了原有栏目，还新增了团队笔记入口，后续多人协作会主要围绕这里展开。',
     },
     {
-      target: '[data-tour="sidebar-characters"]',
+      target: '[data-tour="dashboard-stat-grid"]',
       skipBeacon: true,
-      placement: 'right',
-      content: '角色与怪物等信息都通过对应栏目管理。点击后可以查看卡片列表、创建条目并进入详情编辑。',
+      placement: 'bottom',
+      content: '这里是模组统计概览。可以快速看到角色、怪物、地点、组织和最后更新时间，适合作为开工前的总览入口。',
     },
     {
-      target: '[data-tour="sidebar-relation-graphs"]',
+      target: '[data-tour="dashboard-notes"]',
       skipBeacon: true,
-      placement: 'right',
-      content: '关系图页用于组织角色和怪物之间的结构关系，适合快速梳理阵营、敌对与合作关系。',
+      placement: 'top',
+      content: '这里是模组概览笔记，适合记录总提纲、主持人备忘、待办事项。它和团队笔记不同，更偏向当前模组的总体摘要。',
     },
     {
       target: '[data-tour="sidebar-settings"]',
       skipBeacon: true,
       placement: 'right',
-      content: '设置页可以调整主题风格、导入导出数据，并统一管理图片资源。',
+      content: '设置页依然负责主题风格、导入导出和资源管理；主页则负责模组卡片、访问控制和成员概览。',
+    },
+    {
+      target: '[data-tour="sidebar-team-notes"]',
+      skipBeacon: true,
+      placement: 'right',
+      content: '团队笔记页是多人协作入口。当前已经支持共享团队笔记、编辑状态提示、删除确认和基础编辑时间。',
     },
   ],
   'entity-list': [
@@ -111,6 +136,26 @@ const GUIDE_STEPS: Record<GuideId, Step[]> = {
       skipBeacon: true,
       placement: 'top',
       content: '这里是关系图主画布。你可以在当前图中添加节点、拖动位置、创建关系线，并继续编辑备注与资源图片。',
+    },
+  ],
+  'team-notes': [
+    {
+      target: '[data-tour="team-notes-list"]',
+      skipBeacon: true,
+      placement: 'right',
+      content: '左侧是团队笔记列表。你可以在这里新建、切换和查看当前模组中的共享团队笔记。',
+    },
+    {
+      target: '[data-tour="team-notes-editor-actions"]',
+      skipBeacon: true,
+      placement: 'bottom',
+      content: '这里是团队笔记的操作区，可以进入编辑、结束编辑，也能删除当前笔记。删除会弹出自定义确认框。',
+    },
+    {
+      target: '[data-tour="team-notes-editor-body"]',
+      skipBeacon: true,
+      placement: 'top',
+      content: '这里是团队笔记正文区域。当前版本支持团队共享、限定编辑时间和自动保存，后续会继续接入实时协作。',
     },
   ],
 };
@@ -178,6 +223,7 @@ export const GuideProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           showProgress: true,
           skipBeacon: true,
           textColor: 'var(--text-primary)',
+          zIndex: 1400,
         }}
         styles={{
           floater: {
@@ -189,18 +235,46 @@ export const GuideProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           tooltip: {
             backgroundColor: 'var(--bg-card)',
             borderRadius: 12,
-            padding: 12,
             boxShadow: '0 12px 30px rgba(0, 0, 0, 0.18)',
             border: '1px solid var(--border-color)',
             maxWidth: 360,
           },
+          tooltipContainer: {
+            padding: 12,
+          },
+          tooltipFooter: {
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 8,
+            paddingTop: 12,
+            marginTop: 12,
+            borderTop: '1px solid var(--border-color)',
+          },
+          buttonPrimary: {
+            backgroundColor: 'var(--primary-color)',
+            color: '#ffffff',
+            borderRadius: 8,
+            padding: '8px 14px',
+          },
           buttonBack: {
             color: 'var(--text-secondary)',
+            border: '1px solid var(--border-color)',
+            borderRadius: 8,
+            padding: '8px 14px',
+            backgroundColor: 'transparent',
             whiteSpace: 'nowrap',
           },
           buttonSkip: {
             color: 'var(--text-secondary)',
+            border: '1px solid var(--border-color)',
+            borderRadius: 8,
+            padding: '8px 14px',
+            backgroundColor: 'transparent',
             whiteSpace: 'nowrap',
+          },
+          buttonClose: {
+            color: 'var(--text-secondary)',
           },
         }}
         locale={{

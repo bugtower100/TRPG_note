@@ -5,6 +5,7 @@ import { Character } from '../../types';
 import CustomSubItemsEditor from '../../components/common/CustomSubItemsEditor';
 import CollapsibleSection from '../../components/common/CollapsibleSection';
 import SectionAddBar from '../../components/common/SectionAddBar';
+import EntityShareActions, { ShareSectionAction, ShareSubItemAction } from '../../components/common/EntityShareActions';
 
 interface CharacterDetailProps {
   entityId?: string;
@@ -152,6 +153,7 @@ const CharacterDetail: React.FC<CharacterDetailProps> = ({ entityId }) => {
         </div>
         
         <div className="flex items-center gap-2 sm:gap-3">
+            <EntityShareActions entityType="characters" entity={character} scope="entity" label="分享整张卡片" />
             <button
                 onClick={saveCampaign}
                 className="px-3 py-1.5 bg-green-600 text-white rounded hover:bg-green-700 text-sm flex items-center gap-1"
@@ -184,6 +186,7 @@ const CharacterDetail: React.FC<CharacterDetailProps> = ({ entityId }) => {
           onRemove={() => setSectionVisible('basic', false)}
           editableTitle
           onRenameTitle={(title) => setSectionTitle('basic', title)}
+          headerActions={<ShareSectionAction entityType="characters" entity={character} sectionKey="basic" />}
         >
           <CustomSubItemsEditor
             title={getSectionTitle('basic', '基本信息') + ' / 子项目'}
@@ -191,6 +194,7 @@ const CharacterDetail: React.FC<CharacterDetailProps> = ({ entityId }) => {
             onChange={(items) => setSectionItemsWithDefault('basic', items)}
             ensureOneItem
             defaultFirstItemTitle="详细情况"
+            renderItemActions={(item) => <ShareSubItemAction entityType="characters" entity={character} item={item} />}
           />
         </CollapsibleSection>
         )}
@@ -204,6 +208,7 @@ const CharacterDetail: React.FC<CharacterDetailProps> = ({ entityId }) => {
           onRemove={() => setSectionVisible('goals', false)}
           editableTitle
           onRenameTitle={(title) => setSectionTitle('goals', title)}
+          headerActions={<ShareSectionAction entityType="characters" entity={character} sectionKey="goals" />}
         >
           <CustomSubItemsEditor
             title={getSectionTitle('goals', '属性与目标') + ' / 子项目'}
@@ -211,6 +216,7 @@ const CharacterDetail: React.FC<CharacterDetailProps> = ({ entityId }) => {
             onChange={(items) => setSectionItemsWithDefault('goals', items)}
             ensureOneItem
             defaultFirstItemTitle="详细情况"
+            renderItemActions={(item) => <ShareSubItemAction entityType="characters" entity={character} item={item} />}
           />
         </CollapsibleSection>
         )}
@@ -225,6 +231,7 @@ const CharacterDetail: React.FC<CharacterDetailProps> = ({ entityId }) => {
             onRemove={() => removeCustomSection(sectionKey)}
             editableTitle
             onRenameTitle={(title) => setSectionTitle(sectionKey, title)}
+            headerActions={<ShareSectionAction entityType="characters" entity={character} sectionKey={sectionKey} />}
           >
             <CustomSubItemsEditor
               title={getSectionTitle(sectionKey, '自定义区块') + ' / 子项目'}
@@ -232,6 +239,7 @@ const CharacterDetail: React.FC<CharacterDetailProps> = ({ entityId }) => {
               onChange={(items) => setSectionItems(sectionKey, items)}
               ensureOneItem
               defaultFirstItemTitle="详细情况"
+              renderItemActions={(item) => <ShareSubItemAction entityType="characters" entity={character} item={item} />}
             />
           </CollapsibleSection>
         ))}

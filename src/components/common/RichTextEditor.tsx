@@ -34,6 +34,7 @@ interface RichTextEditorProps {
   placeholder?: string;
   className?: string;
   minHeight?: string;
+  mode?: 'toggle' | 'edit' | 'preview';
 }
 
 interface ImageContextMenuState {
@@ -1046,13 +1047,19 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
   onChange, 
   placeholder = '支持 Markdown 格式...', 
   className = '',
-  minHeight = '150px'
+  minHeight = '150px',
+  mode = 'toggle',
 }) => {
-  const [isPreview, setIsPreview] = useState(true);
+  const [isPreview, setIsPreview] = useState(mode === 'preview');
   const [imageContextMenu, setImageContextMenu] = useState<ImageContextMenuState | null>(null);
   const [customImageWidth, setCustomImageWidth] = useState('50');
   const { campaignData } = useCampaign();
   const keywordData = useMemo(() => buildRichKeywordData(campaignData), [campaignData]);
+
+  useEffect(() => {
+    if (mode === 'toggle') return;
+    setIsPreview(mode === 'preview');
+  }, [mode]);
 
   const updateMarkdownImageMeta = useCallback((imageIndex: number, nextMeta: {
     width?: string | null;
@@ -1115,25 +1122,27 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
     <div className={`border border-theme rounded-md overflow-hidden bg-theme-card focus-within:ring-2 focus-within:ring-primary focus-within:border-transparent ${className}`}>
       <div className="flex items-center justify-between p-2 border-b border-theme bg-theme-card/50">
         <div className="text-xs theme-text-secondary">{isPreview ? '预览模式' : '编辑模式'}</div>
-        <button
-          type="button"
-          onClick={() => setIsPreview(!isPreview)}
-          className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-medium transition-colors ${
-            isPreview
-              ? 'bg-primary text-white'
-              : 'theme-text-secondary hover:bg-primary-light hover:text-primary'
-          }`}
-        >
-          {isPreview ? (
-            <>
-              <Edit size={14} /> 进入编辑
-            </>
-          ) : (
-            <>
-              <Eye size={14} /> 完成编辑
-            </>
-          )}
-        </button>
+        {mode === 'toggle' && (
+          <button
+            type="button"
+            onClick={() => setIsPreview(!isPreview)}
+            className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-medium transition-colors ${
+              isPreview
+                ? 'bg-primary text-white'
+                : 'theme-text-secondary hover:bg-primary-light hover:text-primary'
+            }`}
+          >
+            {isPreview ? (
+              <>
+                <Edit size={14} /> 进入编辑
+              </>
+            ) : (
+              <>
+                <Eye size={14} /> 完成编辑
+              </>
+            )}
+          </button>
+        )}
       </div>
 
       {isPreview ? (

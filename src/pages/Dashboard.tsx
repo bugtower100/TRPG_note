@@ -1,11 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { useCampaign } from '../context/CampaignContext';
 import { useGuide } from '../components/common/InteractiveGuide';
+import { useReceivedShares } from '../hooks/useReceivedShares';
 
 const Dashboard: React.FC = () => {
   const { campaignData, setCampaignData } = useCampaign();
   const { startGuide } = useGuide();
   const [notes, setNotes] = useState(campaignData.notes || '');
+  const sharedCharacters = useReceivedShares('characters');
+  const sharedMonsters = useReceivedShares('monsters');
+  const sharedLocations = useReceivedShares('locations');
+  const sharedOrganizations = useReceivedShares('organizations');
 
   useEffect(() => {
     setNotes(campaignData.notes || '');
@@ -33,7 +38,7 @@ const Dashboard: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      <div data-tour="dashboard-header" className="flex justify-between items-center">
         <h2 className="text-2xl font-bold text-gray-800">
             {campaignData.meta.projectName} <span className="text-gray-400 text-sm font-normal">概览</span>
         </h2>
@@ -45,22 +50,22 @@ const Dashboard: React.FC = () => {
         </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+      <div data-tour="dashboard-stat-grid" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
         <div className="bg-theme-card p-6 rounded-lg shadow-sm border border-theme">
           <h3 className="theme-text-secondary text-sm font-medium uppercase">角色</h3>
-          <p className="text-3xl font-bold mt-2">{campaignData.characters.length}</p>
+          <p className="text-3xl font-bold mt-2">{campaignData.characters.length + sharedCharacters.length}</p>
         </div>
         <div className="bg-theme-card p-6 rounded-lg shadow-sm border border-theme">
           <h3 className="theme-text-secondary text-sm font-medium uppercase">怪物</h3>
-          <p className="text-3xl font-bold mt-2">{campaignData.monsters.length}</p>
+          <p className="text-3xl font-bold mt-2">{campaignData.monsters.length + sharedMonsters.length}</p>
         </div>
         <div className="bg-theme-card p-6 rounded-lg shadow-sm border border-theme">
           <h3 className="theme-text-secondary text-sm font-medium uppercase">地点</h3>
-          <p className="text-3xl font-bold mt-2">{campaignData.locations.length}</p>
+          <p className="text-3xl font-bold mt-2">{campaignData.locations.length + sharedLocations.length}</p>
         </div>
         <div className="bg-theme-card p-6 rounded-lg shadow-sm border border-theme">
           <h3 className="theme-text-secondary text-sm font-medium uppercase">组织</h3>
-          <p className="text-3xl font-bold mt-2">{campaignData.organizations.length}</p>
+          <p className="text-3xl font-bold mt-2">{campaignData.organizations.length + sharedOrganizations.length}</p>
         </div>
         <div className="bg-theme-card p-6 rounded-lg shadow-sm border border-theme">
             <h3 className="theme-text-secondary text-sm font-medium uppercase">最后更新</h3>
@@ -71,7 +76,7 @@ const Dashboard: React.FC = () => {
       </div>
 
       {/* Campaign Notes Section */}
-      <div className="bg-theme-card p-6 rounded-lg shadow-sm border border-theme">
+      <div data-tour="dashboard-notes" className="bg-theme-card p-6 rounded-lg shadow-sm border border-theme">
         <h3 className="text-lg font-bold mb-4">模组笔记 / 备忘录</h3>
         <textarea
             value={notes}

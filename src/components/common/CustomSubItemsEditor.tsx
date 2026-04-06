@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import RichTextEditor from './RichTextEditor';
+import ConfirmDialog from './ConfirmDialog';
 import { CustomSubItem } from '../../types';
 
 interface CustomSubItemsEditorProps {
@@ -9,6 +10,8 @@ interface CustomSubItemsEditorProps {
   title?: string;
   defaultFirstItemTitle?: string;
   ensureOneItem?: boolean;
+  renderItemActions?: (item: CustomSubItem) => React.ReactNode;
+  useNativeDeleteConfirm?: boolean;
 }
 
 const CustomSubItemsEditor: React.FC<CustomSubItemsEditorProps> = ({
@@ -17,8 +20,11 @@ const CustomSubItemsEditor: React.FC<CustomSubItemsEditorProps> = ({
   title = '子项目',
   defaultFirstItemTitle = '详细情况',
   ensureOneItem = false,
+  renderItemActions,
+  useNativeDeleteConfirm = false,
 }) => {
   const [search, setSearch] = useState('');
+  const [removingItem, setRemovingItem] = useState<CustomSubItem | null>(null);
 
   useEffect(() => {
     if (ensureOneItem && items.length === 0) {
@@ -31,6 +37,12 @@ const CustomSubItemsEditor: React.FC<CustomSubItemsEditorProps> = ({
       ]);
     }
   }, [ensureOneItem, items.length, onChange, defaultFirstItemTitle]);
+
+  useEffect(() => {
+    if (!removingItem) return;
+    const stillExists = items.some((item) => item.id === removingItem.id);
+    if (!stillExists) setRemovingItem(null);
+  }, [items, removingItem]);
 
   const toggleCollapse = (id: string) => {
     const next = items.map((item) =>
@@ -55,7 +67,15 @@ const CustomSubItemsEditor: React.FC<CustomSubItemsEditorProps> = ({
   };
 
   const removeItem = (id: string) => {
-    onChange(items.filter((item) => item.id !== id));
+    const target = items.find((item) => item.id === id);
+    if (!target) return;
+    if (useNativeDeleteConfirm) {
+      if (window.confirm(`确定要删除子项目「${target.title || '未命名子项目'}」吗？`)) {
+        onChange(items.filter((item) => item.id !== target.id));
+      }
+      return;
+    }
+    setRemovingItem(target);
   };
 
   const filteredItems = useMemo(() => {
@@ -126,10 +146,11 @@ const CustomSubItemsEditor: React.FC<CustomSubItemsEditorProps> = ({
                 className="flex-1 min-w-[180px] p-2 border border-theme rounded focus:outline-none focus:border-primary bg-transparent"
                 placeholder="子项目标题"
               />
+              {renderItemActions?.(item)}
               <button
                 type="button"
                 onClick={() => removeItem(item.id)}
-                className="text-xs text-red-500 hover:text-red-700 px-2 py-1"
+                className="text-xs text-red-500 hover:text-red-700 px-2 py-1 border border-red-200 rounded hover:bg-red-50 ml-3 sm:ml-5"
               >
                 删除
               </button>
@@ -145,6 +166,21 @@ const CustomSubItemsEditor: React.FC<CustomSubItemsEditorProps> = ({
           </div>
         );
       })}
+      {!useNativeDeleteConfirm && (
+        <ConfirmDialog
+          open={Boolean(removingItem)}
+          title="确认删除子项目"
+          description={`确定要删除子项目「${removingItem?.title || '未命名子项目'}」吗？`}
+          confirmText="删除"
+          cancelText="取消"
+          onCancel={() => setRemovingItem(null)}
+          onConfirm={() => {
+            if (!removingItem) return;
+            onChange(items.filter((item) => item.id !== removingItem.id));
+            setRemovingItem(null);
+          }}
+        />
+      )}
     </div>
   );
 };

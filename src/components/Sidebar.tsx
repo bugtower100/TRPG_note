@@ -3,7 +3,7 @@ import { NavLink } from 'react-router-dom';
 import { useCampaign } from '../context/CampaignContext';
 import { 
   LayoutDashboard, Users, MapPin, Building, Calendar, 
-  Search, Clock, Settings, LogOut, Skull, Home, Share2
+  Search, Clock, Settings, LogOut, Skull, Home, Share2, NotebookPen
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -19,6 +19,7 @@ const Sidebar: React.FC<SidebarProps> = ({ className = '', onNavigate }) => {
     { to: '/characters', icon: <Users size={20} />, label: '角色' },
     { to: '/monsters', icon: <Skull size={20} />, label: '怪物' },
     { to: '/relation-graphs', icon: <Share2 size={20} />, label: '关系图' },
+    { to: '/team-notes', icon: <NotebookPen size={20} />, label: '团队笔记' },
     { to: '/locations', icon: <MapPin size={20} />, label: '地点' },
     { to: '/organizations', icon: <Building size={20} />, label: '组织' },
     { to: '/events', icon: <Calendar size={20} />, label: '事件' },
@@ -47,6 +48,8 @@ const Sidebar: React.FC<SidebarProps> = ({ className = '', onNavigate }) => {
                 ? 'sidebar-characters'
                 : item.to === '/relation-graphs'
                   ? 'sidebar-relation-graphs'
+                  : item.to === '/team-notes'
+                    ? 'sidebar-team-notes'
                   : item.to === '/settings'
                     ? 'sidebar-settings'
                     : undefined

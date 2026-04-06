@@ -5,6 +5,7 @@ import { Location } from '../../types';
 import CustomSubItemsEditor from '../../components/common/CustomSubItemsEditor';
 import CollapsibleSection from '../../components/common/CollapsibleSection';
 import SectionAddBar from '../../components/common/SectionAddBar';
+import EntityShareActions, { ShareSectionAction, ShareSubItemAction } from '../../components/common/EntityShareActions';
 
 interface LocationDetailProps {
   entityId?: string;
@@ -127,6 +128,7 @@ const LocationDetail: React.FC<LocationDetailProps> = ({ entityId }) => {
         </div>
         
         <div className="flex items-center gap-2 sm:gap-3">
+            <EntityShareActions entityType="locations" entity={location} scope="entity" label="分享整张卡片" />
             <button
                 onClick={saveCampaign}
                 className="px-3 py-1.5 bg-green-600 text-white rounded hover:bg-green-700 text-sm flex items-center gap-1"
@@ -159,6 +161,7 @@ const LocationDetail: React.FC<LocationDetailProps> = ({ entityId }) => {
           onRemove={() => setSectionVisible('detail', false)}
           editableTitle
           onRenameTitle={(title) => setSectionTitle('detail', title)}
+          headerActions={<ShareSectionAction entityType="locations" entity={location} sectionKey="detail" />}
         >
           <CustomSubItemsEditor
             title={getSectionTitle('detail', '地点详情') + ' / 子项目'}
@@ -166,6 +169,7 @@ const LocationDetail: React.FC<LocationDetailProps> = ({ entityId }) => {
             onChange={(items) => setSectionItems('detail', items)}
             ensureOneItem
             defaultFirstItemTitle="详细情况"
+            renderItemActions={(item) => <ShareSubItemAction entityType="locations" entity={location} item={item} />}
           />
         </CollapsibleSection>
         )}
@@ -180,6 +184,7 @@ const LocationDetail: React.FC<LocationDetailProps> = ({ entityId }) => {
             onRemove={() => removeCustomSection(sectionKey)}
             editableTitle
             onRenameTitle={(title) => setSectionTitle(sectionKey, title)}
+            headerActions={<ShareSectionAction entityType="locations" entity={location} sectionKey={sectionKey} />}
           >
             <CustomSubItemsEditor
               title={getSectionTitle(sectionKey, '自定义区块') + ' / 子项目'}
@@ -187,6 +192,7 @@ const LocationDetail: React.FC<LocationDetailProps> = ({ entityId }) => {
               onChange={(items) => setSectionItems(sectionKey, items)}
               ensureOneItem
               defaultFirstItemTitle="详细情况"
+              renderItemActions={(item) => <ShareSubItemAction entityType="locations" entity={location} item={item} />}
             />
           </CollapsibleSection>
         ))}

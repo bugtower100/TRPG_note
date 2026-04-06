@@ -3,6 +3,8 @@ import { useCampaign } from '../context/CampaignContext';
 import { Trash2, Download, Upload, FolderOpen, Plus, ChevronDown } from 'lucide-react';
 import { dataService } from '../services/dataService';
 import { GuideHelpButton } from '../components/common/InteractiveGuide';
+import { CampaignConfig, PublicCampaignSummary } from '../types';
+import { teamNotesService } from '../services/teamNotesService';
 
 const LandingPage: React.FC = () => {
   const { 
@@ -28,6 +30,9 @@ const LandingPage: React.FC = () => {
   const [isCreating, setIsCreating] = useState(false);
   const [newCampaignName, setNewCampaignName] = useState('');
   const [newCampaignDesc, setNewCampaignDesc] = useState('');
+  const [campaignConfigs, setCampaignConfigs] = useState<Record<string, CampaignConfig>>({});
+  const [savingConfigId, setSavingConfigId] = useState<string | null>(null);
+  const [publicCampaigns, setPublicCampaigns] = useState<PublicCampaignSummary[]>([]);
 
   // Import State
   const fileInputRef = React.useRef<HTMLInputElement>(null);
@@ -60,6 +65,37 @@ const LandingPage: React.FC = () => {
   useEffect(() => {
     testLatency();
   }, [testLatency]);
+
+  useEffect(() => {
+    if (!user || campaignList.length === 0) {
+      setCampaignConfigs({});
+    } else {
+      Promise.all(
+        campaignList.map(async (campaign) => {
+          const config = await teamNotesService.updateConfig(campaign.id, user, {
+            name: campaign.name,
+            description: campaign.description,
+            lastModified: campaign.lastModified,
+          });
+          return [campaign.id, config] as const;
+        })
+      ).then((entries) => {
+        setCampaignConfigs(Object.fromEntries(entries));
+      }).catch(() => void 0);
+    }
+  }, [campaignList, user]);
+
+  useEffect(() => {
+    if (!user) {
+      setPublicCampaigns([]);
+      return;
+    }
+    teamNotesService.listPublicCampaigns(user)
+      .then((items) => {
+        setPublicCampaigns(items.filter((item) => item.ownerId !== user.id));
+      })
+      .catch(() => void 0);
+  }, [campaignList, user]);
   
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -84,6 +120,49 @@ const LandingPage: React.FC = () => {
     if (file) {
        importData(file);
     }
+  };
+
+  const handleSaveCampaignConfig = async (campaignId: string) => {
+    if (!user) return;
+    const current = campaignConfigs[campaignId];
+    if (!current) return;
+    setSavingConfigId(campaignId);
+    try {
+      const next = await teamNotesService.updateConfig(campaignId, user, {
+        name: campaignList.find((campaign) => campaign.id === campaignId)?.name,
+        description: campaignList.find((campaign) => campaign.id === campaignId)?.description,
+        lastModified: campaignList.find((campaign) => campaign.id === campaignId)?.lastModified,
+        visibility: current.visibility,
+      });
+      setCampaignConfigs((prev) => ({ ...prev, [campaignId]: next }));
+    } finally {
+      setSavingConfigId(null);
+    }
+  };
+
+  const handleEnterCampaign = async (campaign: { id: string; name: string; description: string; lastModified: number; ownerId: string; visibility?: CampaignConfig['visibility'] }) => {
+    dataService.ensureCampaignSummary({
+      id: campaign.id,
+      name: campaign.name,
+      description: campaign.description,
+      lastModified: campaign.lastModified,
+      ownerId: campaign.ownerId,
+      visibility: campaign.visibility,
+      schemaVersion: 2,
+    });
+    switchCampaign(campaign.id);
+  };
+
+  const getMemberSummary = (config?: CampaignConfig) => {
+    const members = config?.members || [];
+    const now = Date.now();
+    const onlineMembers = members.filter((member) => now - member.lastActiveAt < 5 * 60 * 1000);
+    return {
+      members,
+      onlineMembers,
+      previewMembers: members.slice(0, 4),
+      extraCount: Math.max(0, members.length - 4),
+    };
   };
 
   if (!user) {
@@ -227,17 +306,17 @@ const LandingPage: React.FC = () => {
                             : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
                     }`}
                 >
-                    {t === 'default' ? '默认' : t === 'scroll' ? '羊皮纸' : t === 'archive' ? '未来' : '自然'}
+                    {t === 'default' ? '默认' : t === 'scroll' ? '羊皮纸' : t === 'archive' ? '未来' : '薄巧'}
                 </button>
             ))}
         </div>
 
         {/* Campaign List */}
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3" data-tour="landing-campaign-list">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3" data-tour="landing-campaign-list">
           {/* Create New Card */}
           <div
                data-tour="landing-create-campaign"
-               className="rounded-lg border-2 border-dashed border-theme p-6 flex flex-col items-center justify-center text-center hover:border-primary bg-theme-card transition-colors cursor-pointer min-h-[220px]"
+               className="rounded-lg border-2 border-dashed border-theme p-5 flex flex-col items-center justify-center text-center hover:border-primary bg-theme-card transition-colors cursor-pointer min-h-[180px]"
                onClick={() => setIsCreating(true)}
           >
             <div className="flex justify-center items-center mb-4 w-12 h-12 bg-blue-100 rounded-full text-primary">
@@ -249,23 +328,97 @@ const LandingPage: React.FC = () => {
 
           {/* Existing Campaigns */}
           {campaignList.map(campaign => (
-            <div key={campaign.id} className="flex flex-col p-6 rounded-lg border shadow-sm transition-shadow theme-card border-theme hover:shadow-md">
+            <div key={campaign.id} data-tour="landing-campaign-card" className="flex flex-col p-4 rounded-lg border shadow-sm transition-shadow theme-card border-theme hover:shadow-md">
+              {(() => {
+                const config = campaignConfigs[campaign.id];
+                const { members, onlineMembers, previewMembers, extraCount } = getMemberSummary(config);
+                return (
+                  <>
               <div className="flex-1">
-                <div className="flex justify-between items-start mb-2">
-                    <h3 className="pr-2 text-xl font-bold break-words">{campaign.name}</h3>
+                <div className="flex justify-between items-start mb-1">
+                    <h3 className="pr-2 text-lg font-bold break-words">{campaign.name}</h3>
                 </div>
-                <p className="theme-text-secondary text-sm line-clamp-3 mb-4 min-h-[3em]">
+                <p className="theme-text-secondary text-sm line-clamp-2 mb-3 min-h-[2.5em]">
                   {campaign.description || '暂无描述'}
                 </p>
-                <div className="text-xs text-gray-400">
-                  最后修改: {new Date(campaign.lastModified).toLocaleDateString()}
+                <div className="flex items-center gap-2 flex-wrap mb-2 text-xs">
+                  <span className={`px-2 py-1 rounded border ${config?.visibility === 'public' ? 'border-green-300 text-green-700 bg-green-50' : 'border-theme theme-text-secondary bg-theme-card'}`}>
+                    {config?.visibility === 'public' ? '公开模组' : '私密模组'}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between gap-2 text-xs text-gray-400">
+                  <span>最后修改: {new Date(campaign.lastModified).toLocaleDateString()}</span>
+                  <span>在线 {onlineMembers.length} / {members.length || 1}</span>
+                </div>
+                <div data-tour="landing-campaign-members" className="mt-3 border border-theme rounded p-2.5 bg-theme-card/60">
+                  <div className="flex items-center justify-between gap-2 mb-2">
+                    <div className="text-xs font-semibold theme-text-secondary">成员列表</div>
+                    <div className="text-[11px] theme-text-secondary">占位展示</div>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {previewMembers.length > 0 ? previewMembers.map((member) => {
+                      const online = onlineMembers.some((item) => item.userId === member.userId);
+                      return (
+                        <span
+                          key={member.userId}
+                          className={`px-2 py-1 rounded-full text-[11px] border ${
+                            online
+                              ? 'border-green-300 text-green-700 bg-green-50'
+                              : 'border-theme theme-text-secondary'
+                          }`}
+                        >
+                          {member.username} · {member.role}
+                        </span>
+                      );
+                    }) : (
+                      <span className="text-[11px] theme-text-secondary">暂无成员信息</span>
+                    )}
+                    {extraCount > 0 && (
+                      <span className="px-2 py-1 rounded-full text-[11px] border border-theme theme-text-secondary">
+                        +{extraCount} 人
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <div data-tour="landing-campaign-access" className="mt-3 space-y-2 border border-theme rounded p-2.5 bg-theme-card/60">
+                  <div className="text-xs font-semibold theme-text-secondary">访问控制</div>
+                  <select
+                    value={config?.visibility || 'private'}
+                    onChange={(e) => setCampaignConfigs((prev) => ({
+                      ...prev,
+                      [campaign.id]: {
+                        ...(prev[campaign.id] || {
+                          campaignId: campaign.id,
+                          visibility: 'private',
+                          ownerUserId: user.id,
+                          schemaVersion: 2,
+                          members: [],
+                          createdAt: Date.now(),
+                          updatedAt: Date.now(),
+                        }),
+                        visibility: e.target.value as CampaignConfig['visibility'],
+                      },
+                    }))}
+                    className="w-full px-3 py-1.5 border border-theme rounded bg-transparent text-sm"
+                  >
+                    <option value="private">私密模组</option>
+                    <option value="public">公开模组</option>
+                  </select>
+                  <button
+                    type="button"
+                    onClick={() => handleSaveCampaignConfig(campaign.id)}
+                    disabled={savingConfigId === campaign.id}
+                    className="w-full px-3 py-1.5 rounded bg-primary text-white hover:bg-primary-dark disabled:opacity-60 text-sm"
+                  >
+                    保存公开设置
+                  </button>
                 </div>
               </div>
               
-              <div className="grid grid-cols-2 gap-2 pt-4 mt-6 border-t border-theme">
+              <div className="grid grid-cols-2 gap-2 pt-3 mt-4 border-t border-theme">
                 <button
-                  onClick={() => switchCampaign(campaign.id)}
-                  className="col-span-2 py-2 mb-2 text-sm font-medium text-white rounded transition-colors bg-primary hover:bg-primary-dark"
+                  onClick={() => handleEnterCampaign(campaign)}
+                  className="col-span-2 py-2 mb-1 text-sm font-medium text-white rounded transition-colors bg-primary hover:bg-primary-dark"
                 >
                   进入模组
                 </button>
@@ -291,9 +444,49 @@ const LandingPage: React.FC = () => {
                   <Trash2 size={14} /> 删除
                 </button>
               </div>
+                  </>
+                );
+              })()}
             </div>
           ))}
         </div>
+
+        {publicCampaigns.length > 0 && (
+          <div className="mt-8">
+            <div className="mb-3">
+              <h3 className="text-lg font-semibold">公开模组</h3>
+              <p className="text-sm theme-text-secondary">这里显示其他用户公开出来的模组，你可以直接进入并加入协作。</p>
+            </div>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {publicCampaigns.map((campaign) => (
+                <div key={campaign.id} className="flex flex-col p-4 rounded-lg border shadow-sm transition-shadow theme-card border-theme hover:shadow-md">
+                  <div className="flex-1">
+                    <div className="flex justify-between items-start mb-1 gap-2">
+                      <h3 className="pr-2 text-lg font-bold break-words">{campaign.name || '未命名公开模组'}</h3>
+                      <span className="px-2 py-1 rounded border border-green-300 text-green-700 bg-green-50 text-xs">公开模组</span>
+                    </div>
+                    <p className="theme-text-secondary text-sm line-clamp-2 mb-3 min-h-[2.5em]">
+                      {campaign.description || '暂无描述'}
+                    </p>
+                    <div className="flex items-center justify-between gap-2 text-xs text-gray-400">
+                      <span>最后修改: {new Date(campaign.lastModified || Date.now()).toLocaleDateString()}</span>
+                      <span>在线 {campaign.onlineMemberCount} / {campaign.memberCount}</span>
+                    </div>
+                    <div className="mt-3 text-xs theme-text-secondary">拥有者：{campaign.ownerUsername || campaign.ownerId}</div>
+                  </div>
+                  <div className="pt-3 mt-4 border-t border-theme">
+                    <button
+                      onClick={() => handleEnterCampaign(campaign)}
+                      className="w-full py-2 text-sm font-medium text-white rounded transition-colors bg-primary hover:bg-primary-dark"
+                    >
+                      进入公开模组
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Create Modal */}
         {isCreating && (

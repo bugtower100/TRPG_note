@@ -4,10 +4,12 @@ import EntityListLayout from '../../components/common/EntityListLayout';
 import { dataService } from '../../services/dataService';
 import { useNavigate } from 'react-router-dom';
 import { Clue } from '../../types';
+import { useReceivedShares } from '../../hooks/useReceivedShares';
 
 const ClueList: React.FC = () => {
   const { campaignData, setCampaignData } = useCampaign();
   const navigate = useNavigate();
+  const sharedEntries = useReceivedShares('clues');
 
   const handleAdd = () => {
     const newClue = dataService.createEntity<Clue>({
@@ -32,6 +34,7 @@ const ClueList: React.FC = () => {
       entities={campaignData.clues}
       entityType="clues"
       onAdd={handleAdd}
+      sharedEntries={sharedEntries}
     />
   );
 };

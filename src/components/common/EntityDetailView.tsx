@@ -6,6 +6,7 @@ import OrganizationDetail from '../../pages/organizations/OrganizationDetail';
 import EventDetail from '../../pages/events/EventDetail';
 import ClueDetail from '../../pages/clues/ClueDetail';
 import TimelineDetail from '../../pages/timelines/TimelineDetail';
+import SharedContent from '../../pages/SharedContent';
 
 interface EntityDetailViewProps {
   type: string;
@@ -13,6 +14,10 @@ interface EntityDetailViewProps {
 }
 
 const EntityDetailView: React.FC<EntityDetailViewProps> = ({ type, entityId }) => {
+  if (entityId.startsWith('shared:')) {
+    const shareId = entityId.slice('shared:'.length);
+    return <SharedContent embedded shareId={shareId} entityType={type as never} />;
+  }
   switch (type) {
     case 'characters': return <CharacterDetail entityId={entityId} />;
     case 'monsters': return <MonsterDetail entityId={entityId} />;

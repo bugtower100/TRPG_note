@@ -5,6 +5,7 @@ import { Monster } from '../../types';
 import CustomSubItemsEditor from '../../components/common/CustomSubItemsEditor';
 import CollapsibleSection from '../../components/common/CollapsibleSection';
 import SectionAddBar from '../../components/common/SectionAddBar';
+import EntityShareActions, { ShareSectionAction, ShareSubItemAction } from '../../components/common/EntityShareActions';
 
 interface MonsterDetailProps {
   entityId?: string;
@@ -128,6 +129,7 @@ const MonsterDetail: React.FC<MonsterDetailProps> = ({ entityId }) => {
         </div>
         
         <div className="flex items-center gap-2 sm:gap-3">
+            <EntityShareActions entityType="monsters" entity={monster} scope="entity" label="分享整张卡片" />
             <button
                 onClick={saveCampaign}
                 className="px-3 py-1.5 bg-green-600 text-white rounded hover:bg-green-700 text-sm flex items-center gap-1"
@@ -160,6 +162,7 @@ const MonsterDetail: React.FC<MonsterDetailProps> = ({ entityId }) => {
           onRemove={() => setSectionVisible('basic', false)}
           editableTitle
           onRenameTitle={(title) => setSectionTitle('basic', title)}
+          headerActions={<ShareSectionAction entityType="monsters" entity={monster} sectionKey="basic" />}
         >
           <CustomSubItemsEditor
             title={getSectionTitle('basic', '基本信息') + ' / 子项目'}
@@ -167,6 +170,7 @@ const MonsterDetail: React.FC<MonsterDetailProps> = ({ entityId }) => {
             onChange={(items) => setSectionItems('basic', items)}
             ensureOneItem
             defaultFirstItemTitle="详细情况"
+            renderItemActions={(item) => <ShareSubItemAction entityType="monsters" entity={monster} item={item} />}
           />
         </CollapsibleSection>
         )}
@@ -180,6 +184,7 @@ const MonsterDetail: React.FC<MonsterDetailProps> = ({ entityId }) => {
           onRemove={() => setSectionVisible('combat', false)}
           editableTitle
           onRenameTitle={(title) => setSectionTitle('combat', title)}
+          headerActions={<ShareSectionAction entityType="monsters" entity={monster} sectionKey="combat" />}
         >
           <CustomSubItemsEditor
             title={getSectionTitle('combat', '数据与掉落') + ' / 子项目'}
@@ -187,6 +192,7 @@ const MonsterDetail: React.FC<MonsterDetailProps> = ({ entityId }) => {
             onChange={(items) => setSectionItems('combat', items)}
             ensureOneItem
             defaultFirstItemTitle="详细情况"
+            renderItemActions={(item) => <ShareSubItemAction entityType="monsters" entity={monster} item={item} />}
           />
         </CollapsibleSection>
         )}
@@ -201,6 +207,7 @@ const MonsterDetail: React.FC<MonsterDetailProps> = ({ entityId }) => {
             onRemove={() => removeCustomSection(sectionKey)}
             editableTitle
             onRenameTitle={(title) => setSectionTitle(sectionKey, title)}
+            headerActions={<ShareSectionAction entityType="monsters" entity={monster} sectionKey={sectionKey} />}
           >
             <CustomSubItemsEditor
               title={getSectionTitle(sectionKey, '自定义区块') + ' / 子项目'}
@@ -208,6 +215,7 @@ const MonsterDetail: React.FC<MonsterDetailProps> = ({ entityId }) => {
               onChange={(items) => setSectionItems(sectionKey, items)}
               ensureOneItem
               defaultFirstItemTitle="详细情况"
+              renderItemActions={(item) => <ShareSubItemAction entityType="monsters" entity={monster} item={item} />}
             />
           </CollapsibleSection>
         ))}
