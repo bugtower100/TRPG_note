@@ -8,6 +8,7 @@ import (
 	"io"
 	"log"
 	"mime"
+	"net/url"
 	"os"
 	"path/filepath"
 	"slices"
@@ -205,6 +206,11 @@ func versionIndexKey(campaignID string) string {
 func requestUser(c *gin.Context) (string, string) {
 	userID := strings.TrimSpace(c.GetHeader("X-TRPG-User-Id"))
 	username := strings.TrimSpace(c.GetHeader("X-TRPG-Username"))
+	if username != "" {
+		if decoded, err := url.PathUnescape(username); err == nil {
+			username = strings.TrimSpace(decoded)
+		}
+	}
 	return userID, username
 }
 
@@ -622,17 +628,10 @@ func main() {
 	campaignAPI := router.Group("/api/campaigns")
 
 	campaignAPI.GET("/public", func(c *gin.Context) {
-		result, err := loadPublicCampaignIndex(db)
+		result, err := rebuildPublicCampaignIndex(db)
 		if err != nil {
 			c.JSON(500, gin.H{"error": "database_error"})
 			return
-		}
-		if len(result) == 0 {
-			result, err = rebuildPublicCampaignIndex(db)
-			if err != nil {
-				c.JSON(500, gin.H{"error": "database_error"})
-				return
-			}
 		}
 		c.JSON(200, result)
 	})

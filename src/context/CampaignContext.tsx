@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, ReactNode, useCa
 import { CampaignData, UserProfile, CampaignSummary, CampaignTheme } from '../types';
 import { dataService, DEFAULT_CAMPAIGN_DATA } from '../services/dataService';
 import { initializeStorageAdapter } from '../services/storageAdapter';
+import { teamNotesService } from '../services/teamNotesService';
 import { v4 as uuidv4 } from 'uuid';
 
 export interface Tab {
@@ -214,11 +215,18 @@ export const CampaignProvider: React.FC<{ children: ReactNode }> = ({ children }
   
   const deleteCampaign = (id: string) => {
       if (window.confirm('确定要删除这个模组吗？此操作不可恢复。')) {
-          dataService.deleteCampaign(id);
-          refreshCampaignList(user?.id);
-          if (currentCampaignId === id) {
+          void (async () => {
+            try {
+              await teamNotesService.updateConfig(id, user, { visibility: 'private', lastModified: Date.now() });
+            } catch {
+              void 0;
+            }
+            dataService.deleteCampaign(id);
+            refreshCampaignList(user?.id);
+            if (currentCampaignId === id) {
               exitCampaign();
-          }
+            }
+          })();
       }
   };
 

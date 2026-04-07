@@ -3,7 +3,7 @@ import { CampaignConfig, GraphEntityType, SharedEntityRecord, SharedPermission, 
 const jsonHeaders = (user: UserProfile | null) => ({
   'Content-Type': 'application/json',
   'X-TRPG-User-Id': user?.id || '',
-  'X-TRPG-Username': user?.username || '',
+  'X-TRPG-Username': encodeURIComponent(user?.username || ''),
 });
 
 class SharingService {

@@ -9,11 +9,11 @@ on:
       release_tag:
         description: "Release Tag"
         required: true
-        default: "v1.3.0"
+        default: "v1.3.1"
       release_name:
         description: "Release Name"
         required: true
-        default: "V1.3.0"
+        default: "V1.3.1"
       prerelease:
         description: "Mark as prerelease"
         required: true
@@ -92,12 +92,8 @@ jobs:
           make_latest: true
           body: |
             ## ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || inputs.release_name }} 更新内容
-            - 调整了部分布局和按键逻辑，防止误触，同时使显示更加美观整洁
-            - 新增功能⭐：团队笔记
-            - 多成员共同编辑，使用更加便捷舒适，让你的PL好好做笔记×
-            - GM快速传递笔记给PL，让线索更快速舒适地流转
-            - 历史记录回退接口预备开放（尚未实现）
-
+            - 修复了用户名是中文时无法参与共享的问题
+            - 修复了删除模组共享列表依然存在的缓存问题
           files: TRPG模组笔记-windows-amd64.zip
           generate_release_notes: true
         env:
