@@ -3,30 +3,22 @@ import { useCampaign } from '../context/CampaignContext';
 import { CampaignTheme } from '../types';
 import { FileJson, Upload, Monitor, Scroll, Archive, Trash2, RefreshCw, ChevronDown, ChevronRight } from 'lucide-react';
 import { resourceService, ResourceItem } from '../services/resourceService';
+import ImportAssistant from './ImportAssistant';
+import VersionHistory from './VersionHistory';
 
 const Settings: React.FC = () => {
   const { 
-    exportData, importData,
+    exportData,
     theme, setTheme
   } = useCampaign();
   
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const resourceInputRef = useRef<HTMLInputElement>(null);
   const [resources, setResources] = useState<ResourceItem[]>([]);
   const [selectedRefs, setSelectedRefs] = useState<string[]>([]);
   const [resourceBusy, setResourceBusy] = useState(false);
   const [resourceCollapsed, setResourceCollapsed] = useState(false);
-
-  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      if (confirm('导入数据将覆盖当前模组。是否继续？')) {
-        await importData(file);
-      }
-      // Reset input
-      if (fileInputRef.current) fileInputRef.current.value = '';
-    }
-  };
+  const [importCollapsed, setImportCollapsed] = useState(true);
+  const [versionCollapsed, setVersionCollapsed] = useState(true);
 
   const themes: { id: CampaignTheme; label: string; icon: React.ReactNode; desc: string }[] = [
     { id: 'default', label: '默认风格', icon: <Monitor size={20} />, desc: '淡雅的紫色调，柔和且适合现代阅读。' },
@@ -107,7 +99,7 @@ const Settings: React.FC = () => {
       </section>
 
       {/* Data Management */}
-      <section className="bg-theme-card p-4 sm:p-6 rounded-lg shadow-sm border border-theme">
+      <section data-tour="settings-import-assistant" className="bg-theme-card p-4 sm:p-6 rounded-lg shadow-sm border border-theme">
         <h3 className="text-lg font-medium mb-4">数据管理</h3>
         <div className="space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 border border-theme rounded">
@@ -124,29 +116,23 @@ const Settings: React.FC = () => {
             </button>
           </div>
 
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 border border-theme rounded">
-            <div>
-              <h4 className="font-medium">导入 JSON</h4>
-              <p className="text-sm theme-text-secondary">从 JSON 文件恢复模组数据 (覆盖当前)。</p>
-            </div>
-            <div>
-              <input
-                type="file"
-                accept=".json"
-                ref={fileInputRef}
-                onChange={handleImport}
-                className="hidden"
-              />
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                className="px-4 py-2 bg-theme-card border border-theme rounded hover:bg-gray-50 flex items-center gap-2"
-              >
-                <Upload size={16} />
-                导入
-              </button>
-            </div>
-          </div>
         </div>
+      </section>
+
+      <section data-tour="settings-version-history" className="bg-theme-card p-4 sm:p-6 rounded-lg shadow-sm border border-theme">
+        <button
+          type="button"
+          onClick={() => setImportCollapsed((prev) => !prev)}
+          className="text-lg font-medium flex items-center gap-2 text-left"
+        >
+          {importCollapsed ? <ChevronRight size={18} /> : <ChevronDown size={18} />}
+          导入助手
+        </button>
+        {!importCollapsed && (
+          <div className="mt-4">
+            <ImportAssistant />
+          </div>
+        )}
       </section>
 
       <section className="bg-theme-card p-4 sm:p-6 rounded-lg shadow-sm border border-theme">
@@ -229,6 +215,22 @@ const Settings: React.FC = () => {
           )}
         </div>
           </>
+        )}
+      </section>
+
+      <section className="bg-theme-card p-4 sm:p-6 rounded-lg shadow-sm border border-theme">
+        <button
+          type="button"
+          onClick={() => setVersionCollapsed((prev) => !prev)}
+          className="text-lg font-medium flex items-center gap-2 text-left"
+        >
+          {versionCollapsed ? <ChevronRight size={18} /> : <ChevronDown size={18} />}
+          版本记录
+        </button>
+        {!versionCollapsed && (
+          <div className="mt-4">
+            <VersionHistory />
+          </div>
         )}
       </section>
     </div>

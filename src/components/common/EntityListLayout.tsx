@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import EntityCard from './EntityCard';
 import SharedEntityCard from './SharedEntityCard';
 import { BaseEntity, SharedEntityRecord } from '../../types';
@@ -19,14 +19,24 @@ const EntityListLayout = <T extends BaseEntity>({
   sharedEntries = [],
 }: EntityListLayoutProps<T>) => {
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedTag, setSelectedTag] = useState('');
   const normalizedSearchTerm = searchTerm.toLowerCase();
 
-  const filteredEntities = entities.filter(e => 
-    e.name.toLowerCase().includes(normalizedSearchTerm) || 
-    e.details.toLowerCase().includes(normalizedSearchTerm)
-  );
+  const availableTags = useMemo(() => {
+    const allTags = entities.flatMap((entity) => entity.tags || []);
+    return Array.from(new Set(allTags)).sort((a, b) => a.localeCompare(b, 'zh-Hans-CN'));
+  }, [entities]);
+
+  const filteredEntities = entities.filter((entity) => {
+    const matchesSearch =
+      entity.name.toLowerCase().includes(normalizedSearchTerm) ||
+      entity.details.toLowerCase().includes(normalizedSearchTerm);
+    const matchesTag = !selectedTag || (entity.tags || []).includes(selectedTag);
+    return matchesSearch && matchesTag;
+  });
 
   const filteredSharedEntries = sharedEntries.filter((entry) => {
+    if (selectedTag) return false;
     const sourceText = `${entry.entityName} ${entry.sourceOwnerUsername} ${entry.permission === 'edit' ? '可编辑' : '仅查看'}`.toLowerCase();
     const snapshotText = [
       entry.snapshot.details || '',
@@ -51,6 +61,19 @@ const EntityListLayout = <T extends BaseEntity>({
             onChange={(e) => setSearchTerm(e.target.value)}
             className="flex-1 sm:w-64 px-3 py-2 border border-theme rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent bg-transparent"
           />
+          <select
+            value={selectedTag}
+            onChange={(event) => setSelectedTag(event.target.value)}
+            className="px-3 py-2 border border-theme rounded-md bg-transparent text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+            title="按标签筛选"
+          >
+            <option value="">全部标签</option>
+            {availableTags.map((tag) => (
+              <option key={tag} value={tag}>
+                {tag}
+              </option>
+            ))}
+          </select>
           {onAdd && (
             <button
               data-tour="entity-list-add"

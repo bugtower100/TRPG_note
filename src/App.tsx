@@ -23,8 +23,8 @@ import OrganizationDetail from './pages/organizations/OrganizationDetail';
 import RelationGraphs from './pages/RelationGraphs';
 import TeamNotes from './pages/TeamNotes';
 import SharedContent from './pages/SharedContent';
-import VersionHistory from './pages/VersionHistory';
 import SharedEntityDetailRoute from './pages/SharedEntityDetailRoute';
+import SessionTaskBoard from './pages/SessionTaskBoard';
 
 function AppContent() {
   const { user, currentCampaignId } = useCampaign();
@@ -58,13 +58,15 @@ function AppContent() {
             <Route path="clues" element={<ClueList />} />
             <Route path="clues/:id" element={<ClueDetail />} />
             <Route path="clues/shared/:shareId" element={<SharedEntityDetailRoute entityType="clues" />} />
+            <Route path="clue-board" element={<Navigate to="/clues" replace />} />
+            <Route path="session-tasks" element={<SessionTaskBoard />} />
             <Route path="timelines" element={<TimelineList />} />
             <Route path="timelines/:id" element={<TimelineDetail />} />
             <Route path="timelines/shared/:shareId" element={<SharedEntityDetailRoute entityType="timelines" />} />
             <Route path="relation-graphs" element={<RelationGraphs />} />
             <Route path="team-notes" element={<TeamNotes />} />
             <Route path="shared-content" element={<SharedContent />} />
-            <Route path="versions" element={<VersionHistory />} />
+            <Route path="versions" element={<Navigate to="/settings" replace />} />
             <Route path="settings" element={<Settings />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>

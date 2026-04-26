@@ -122,10 +122,12 @@ const Layout: React.FC = () => {
 
   const currentGuideId = React.useMemo<GuideId | null>(() => {
     const { pathname } = location;
-    if (pathname === '/') return null;
+    if (pathname === '/') return 'dashboard';
     if (pathname === '/settings') return 'settings';
     if (pathname === '/relation-graphs') return 'relation-graphs';
     if (pathname === '/team-notes') return 'team-notes';
+    if (pathname === '/session-tasks') return 'session-tasks';
+    if (pathname === '/clues') return 'clues';
     if (/^\/(characters|monsters|locations|organizations|events|clues|timelines)\/(shared\/[^/]+|[^/]+)$/.test(pathname)) {
       return 'entity-detail';
     }

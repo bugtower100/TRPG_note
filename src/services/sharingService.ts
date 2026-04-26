@@ -1,4 +1,5 @@
 import { CampaignConfig, GraphEntityType, SharedEntityRecord, SharedPermission, ShareScope, UserProfile, VersionRecord } from '../types';
+import { VersionConflictError } from './conflictError';
 
 const jsonHeaders = (user: UserProfile | null) => ({
   'Content-Type': 'application/json',
@@ -7,39 +8,67 @@ const jsonHeaders = (user: UserProfile | null) => ({
 });
 
 class SharingService {
-  private async readErrorMessage(response: Response): Promise<string> {
-    const text = await response.text();
-    if (!text) return `HTTP ${response.status}`;
+  private parseErrorPayload(text: string): {
+    error?: string;
+    activeLease?: { username?: string };
+    version?: number;
+    remoteShare?: SharedEntityRecord;
+  } | null {
+    if (!text) return null;
     try {
-      const payload = JSON.parse(text) as {
+      return JSON.parse(text) as {
         error?: string;
         activeLease?: { username?: string };
         version?: number;
+        remoteShare?: SharedEntityRecord;
       };
-      if (payload.error === 'lease_conflict') {
-        return `${payload.activeLease?.username || '其他人'} 正在编辑这条共享内容，请稍后再试`;
-      }
-      if (payload.error === 'lease_missing') {
-        return '当前共享编辑状态已失效，请重新进入编辑';
-      }
-      if (payload.error === 'version_conflict') {
-        return `共享内容已更新，请刷新后重试（当前版本 ${payload.version ?? '未知'}）`;
-      }
-      if (payload.error === 'unsupported_scope') {
-        return '当前共享内容暂不支持协作编辑';
-      }
-      if (typeof payload.error === 'string' && payload.error.trim()) {
-        return payload.error;
-      }
     } catch {
-      return text;
+      return null;
     }
-    return text;
+  }
+
+  private messageFromPayload(payload: {
+    error?: string;
+    activeLease?: { username?: string };
+    version?: number;
+  } | null, fallbackText: string, status: number): string {
+    if (!payload) return fallbackText || `HTTP ${status}`;
+    if (payload.error === 'lease_conflict') {
+      return `${payload.activeLease?.username || '其他人'} 正在编辑这条共享内容，请稍后再试`;
+    }
+    if (payload.error === 'lease_missing') {
+      return '当前共享编辑状态已失效，请重新进入编辑';
+    }
+    if (payload.error === 'version_conflict') {
+      return `共享内容已更新，请刷新后重试（当前版本 ${payload.version ?? '未知'}）`;
+    }
+    if (payload.error === 'unsupported_scope') {
+      return '当前共享内容暂不支持协作编辑';
+    }
+    if (typeof payload.error === 'string' && payload.error.trim()) {
+      return payload.error;
+    }
+    return fallbackText || `HTTP ${status}`;
+  }
+
+  private async readErrorMessage(response: Response): Promise<string> {
+    const text = await response.text();
+    const payload = this.parseErrorPayload(text);
+    return this.messageFromPayload(payload, text, response.status);
   }
 
   private async parseResponse<T>(response: Response): Promise<T> {
     if (!response.ok) {
-      throw new Error(await this.readErrorMessage(response));
+      const text = await response.text();
+      const payload = this.parseErrorPayload(text);
+      const message = this.messageFromPayload(payload, text, response.status);
+      if (payload?.error === 'version_conflict') {
+        throw new VersionConflictError<SharedEntityRecord>(message, {
+          version: payload.version,
+          remote: payload.remoteShare ?? null,
+        });
+      }
+      throw new Error(message);
     }
     return response.json() as Promise<T>;
   }

@@ -5,11 +5,13 @@ import { HelpCircle } from 'lucide-react';
 export type GuideId =
   | 'landing'
   | 'dashboard'
+  | 'clues'
   | 'entity-list'
   | 'entity-detail'
   | 'settings'
   | 'relation-graphs'
-  | 'team-notes';
+  | 'team-notes'
+  | 'session-tasks';
 
 interface GuideContextValue {
   currentGuideId: GuideId | null;
@@ -52,16 +54,22 @@ const GUIDE_STEPS: Record<GuideId, Step[]> = {
       content: '这里是模组概览页头部。你可以快速确认当前所在模组，并从这里重新打开概览页引导。',
     },
     {
-      target: '[data-tour="sidebar-nav"]',
-      skipBeacon: true,
-      placement: 'right',
-      content: '左侧导航依然是主工作区入口。现在除了原有栏目，还新增了团队笔记入口，后续多人协作会主要围绕这里展开。',
-    },
-    {
       target: '[data-tour="dashboard-stat-grid"]',
       skipBeacon: true,
       placement: 'bottom',
       content: '这里是模组统计概览。可以快速看到角色、怪物、地点、组织和最后更新时间，适合作为开工前的总览入口。',
+    },
+    {
+      target: '[data-tour="dashboard-search"]',
+      skipBeacon: true,
+      placement: 'bottom',
+      content: '这里是全局检索入口。输入关键词后按回车会进入首个匹配；同时下方会列出所有相关结果可直接点选。',
+    },
+    {
+      target: '[data-tour="dashboard-search-results"]',
+      skipBeacon: true,
+      placement: 'top',
+      content: '这是匹配结果列表。会按最近更新时间排序，点击任意项可直接跳转到对应条目。',
     },
     {
       target: '[data-tour="dashboard-notes"]',
@@ -69,17 +77,19 @@ const GUIDE_STEPS: Record<GuideId, Step[]> = {
       placement: 'top',
       content: '这里是模组概览笔记，适合记录总提纲、主持人备忘、待办事项。它和团队笔记不同，更偏向当前模组的总体摘要。',
     },
+  ],
+  clues: [
     {
-      target: '[data-tour="sidebar-settings"]',
+      target: '[data-tour="clue-tabs"]',
       skipBeacon: true,
-      placement: 'right',
-      content: '设置页依然负责主题风格、导入导出和资源管理；主页则负责模组卡片、访问控制和成员概览。',
+      placement: 'bottom',
+      content: '线索模块已经合并为一个入口。你可以在“线索列表”和“线索板”之间切换，不再需要单独导航页。',
     },
     {
-      target: '[data-tour="sidebar-team-notes"]',
+      target: '[data-tour="clue-board"]',
       skipBeacon: true,
-      placement: 'right',
-      content: '团队笔记页是多人协作入口。当前已经支持共享团队笔记、编辑状态提示、删除确认和基础编辑时间。',
+      placement: 'top',
+      content: '线索板支持状态推进与揭秘记录，适合主持人在跑团中快速追踪线索流转。',
     },
   ],
   'entity-list': [
@@ -129,6 +139,18 @@ const GUIDE_STEPS: Record<GuideId, Step[]> = {
       placement: 'top',
       content: '这里是资源列表，可以查看、筛选和删除当前模组已经上传的图片资源。',
     },
+    {
+      target: '[data-tour="settings-import-assistant"]',
+      skipBeacon: true,
+      placement: 'top',
+      content: '导入助手已收纳进设置页并默认折叠，需要时展开即可执行映射预览与导入。',
+    },
+    {
+      target: '[data-tour="settings-version-history"]',
+      skipBeacon: true,
+      placement: 'top',
+      content: '版本记录已放到设置页最底部并默认折叠，可按需展开查看历史与差异。',
+    },
   ],
   'relation-graphs': [
     {
@@ -156,6 +178,38 @@ const GUIDE_STEPS: Record<GuideId, Step[]> = {
       skipBeacon: true,
       placement: 'top',
       content: '这里是团队笔记正文区域。当前版本支持团队共享、限定编辑时间和自动保存，后续会继续接入实时协作。',
+    },
+  ],
+  'session-tasks': [
+    {
+      target: '[data-tour="task-board-header"]',
+      skipBeacon: true,
+      placement: 'bottom',
+      content: '任务看板已升级为协作模式：显示当前身份、看板版本与租约状态，方便 GM 主导团队协作。',
+    },
+    {
+      target: '[data-tour="task-board-permissions"]',
+      skipBeacon: true,
+      placement: 'bottom',
+      content: 'GM 可在这里配置 PL 的可查看/可编辑权限。关闭查看会同时关闭编辑，避免权限冲突。',
+    },
+    {
+      target: '[data-tour="task-board-actions"]',
+      skipBeacon: true,
+      placement: 'bottom',
+      content: '通过这里进入/结束编辑。编辑态下会自动续租与自动保存，冲突时会弹出对比处理。',
+    },
+    {
+      target: '[data-tour="task-board-create"]',
+      skipBeacon: true,
+      placement: 'top',
+      content: '任务归属已改为标签（tags）。创建任务时可直接输入逗号分隔标签，后续也可以在任务卡内继续编辑标签。',
+    },
+    {
+      target: '[data-tour="task-board-tags"]',
+      skipBeacon: true,
+      placement: 'top',
+      content: '这里可以按标签筛选任务，也能快速点选现有标签进行过滤。',
     },
   ],
 };

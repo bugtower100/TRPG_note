@@ -49,6 +49,15 @@ const EntityCard: React.FC<EntityCardProps> = ({ entity, type }) => {
       <p className="mt-2 text-sm theme-text-secondary whitespace-pre-line max-h-16 overflow-hidden">
         {previewText}
       </p>
+      {(entity.tags || []).length > 0 && (
+        <div className="mt-2 flex flex-wrap gap-1">
+          {(entity.tags || []).slice(0, 4).map((tag) => (
+            <span key={tag} className="inline-flex px-2 py-0.5 rounded text-xs border border-theme bg-theme-card">
+              {tag}
+            </span>
+          ))}
+        </div>
+      )}
       
       <div className="mt-4 pt-2 border-t border-theme flex justify-between items-center text-xs theme-text-secondary">
         <span>更新于: {new Date(entity.updatedAt).toLocaleDateString()}</span>

@@ -17,6 +17,7 @@ export interface BaseEntity {
   id: string;
   name: string;
   details: string;
+  tags?: string[];
   customSubItems?: CustomSubItem[];
   sectionSubItems?: Record<string, CustomSubItem[]>;
   sectionVisibility?: Record<string, boolean>;
@@ -50,9 +51,21 @@ export interface Event extends BaseEntity {
   relations: Relation[];
 }
 
+export type ClueRevealStatus = 'untracked' | 'investigating' | 'revealed';
+
+export interface ClueRevealLogItem {
+  id: string;
+  target: string;
+  note?: string;
+  revealedAt: number;
+}
+
 export interface Clue extends BaseEntity {
   type: string; // e.g., "Letter", "Rumor"
   relations: Relation[];
+  revealStatus?: ClueRevealStatus;
+  revealTarget?: string;
+  revealLogs?: ClueRevealLogItem[];
 }
 
 export interface TimelineEvent {
@@ -123,7 +136,7 @@ export interface SharedEntityRecord {
 export interface VersionRecord {
   id: string;
   campaignId: string;
-  documentType: 'team_note' | 'shared_entity' | 'campaign_config';
+  documentType: 'team_note' | 'shared_entity' | 'campaign_config' | 'task_board';
   documentId: string;
   action: 'create' | 'update' | 'delete' | 'restore_copy';
   summary: string;
@@ -170,6 +183,31 @@ export interface RelationGraph {
   updatedAt: number;
 }
 
+export type SessionTaskStatus = 'todo' | 'in_progress' | 'done';
+
+export interface SessionTask {
+  id: string;
+  title: string;
+  description: string;
+  status: SessionTaskStatus;
+  tags: string[];
+  assignee?: string; // legacy field, kept for compatibility when loading old data
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface SessionTaskBoardDocument {
+  campaignId: string;
+  tasks: SessionTask[];
+  updatedBy: string;
+  updatedByName: string;
+  updatedAt: number;
+  version: number;
+  plCanView?: boolean;
+  plCanEdit?: boolean;
+  activeLease?: TeamNoteLease | null;
+}
+
 export interface CampaignData {
   id?: string; // Add optional ID for multi-campaign support
   meta: {
@@ -187,6 +225,7 @@ export interface CampaignData {
   clues: Clue[];
   timelines: Timeline[];
   monsters: Monster[];
+  sessionTasks: SessionTask[];
   relationGraphs?: RelationGraph[];
 }
 

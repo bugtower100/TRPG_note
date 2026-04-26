@@ -92,8 +92,10 @@ jobs:
           make_latest: true
           body: |
             ## ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || inputs.release_name }} 更新内容
-            - 修复了用户名是中文时无法参与共享的问题
-            - 修复了删除模组共享列表依然存在的缓存问题
+            - 更新了tag功能，可自行增加tag进行分类
+            - 任务看板升级为 GM 主导协作模型：统一编辑锁、成员协作写入与冲突保护
+            - 任务看板接入版本记录，可从版本页按文档筛选查看看板更新轨迹
+            - 新功能引导统一收纳到右下角问号内，补充了任务看板、线索合并、设置页折叠功能与概览检索说明
           files: TRPG模组笔记-windows-amd64.zip
           generate_release_notes: true
         env:

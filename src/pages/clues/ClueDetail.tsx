@@ -6,6 +6,7 @@ import CustomSubItemsEditor from '../../components/common/CustomSubItemsEditor';
 import CollapsibleSection from '../../components/common/CollapsibleSection';
 import SectionAddBar from '../../components/common/SectionAddBar';
 import EntityShareActions, { ShareSectionAction, ShareSubItemAction } from '../../components/common/EntityShareActions';
+import EntityTagEditor from '../../components/common/EntityTagEditor';
 
 interface ClueDetailProps {
   entityId?: string;
@@ -145,6 +146,10 @@ const ClueDetail: React.FC<ClueDetailProps> = ({ entityId }) => {
       </div>
 
       <div className="space-y-6">
+        <EntityTagEditor
+          tags={clue.tags}
+          onChange={(tags) => handleChange('tags', tags)}
+        />
         <SectionAddBar
           hiddenSections={sectionDefs.filter((s) => !isSectionVisible(s.key))}
           onAddSection={(key) => setSectionVisible(key, true)}

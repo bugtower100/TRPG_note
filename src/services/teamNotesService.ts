@@ -1,4 +1,5 @@
 import { CampaignConfig, CampaignMemberRole, CampaignVisibility, PublicCampaignSummary, TeamNoteDocument, UserProfile } from '../types';
+import { VersionConflictError } from './conflictError';
 
 const jsonHeaders = (user: UserProfile | null) => ({
   'Content-Type': 'application/json',
@@ -7,15 +8,32 @@ const jsonHeaders = (user: UserProfile | null) => ({
 });
 
 class TeamNotesService {
-  private async readErrorMessage(response: Response): Promise<string> {
-    const text = await response.text();
-    if (!text) return `HTTP ${response.status}`;
+  private parseErrorPayload(text: string): {
+    error?: string;
+    activeLease?: { username?: string; expiresAt?: number | null };
+    version?: number;
+    remoteNote?: TeamNoteDocument;
+  } | null {
+    if (!text) return null;
     try {
-      const payload = JSON.parse(text) as {
+      return JSON.parse(text) as {
         error?: string;
         activeLease?: { username?: string; expiresAt?: number | null };
         version?: number;
+        remoteNote?: TeamNoteDocument;
       };
+    } catch {
+      return null;
+    }
+  }
+
+  private messageFromPayload(payload: {
+    error?: string;
+    activeLease?: { username?: string; expiresAt?: number | null };
+    version?: number;
+  } | null, fallbackText: string, status: number): string {
+    if (!payload) return fallbackText || `HTTP ${status}`;
+    if (payload) {
       if (payload.error === 'lease_conflict') {
         const username = payload.activeLease?.username || '其他人';
         return `${username} 正在编辑这条团队笔记，请稍后再试`;
@@ -38,15 +56,28 @@ class TeamNotesService {
       if (typeof payload.error === 'string' && payload.error.trim()) {
         return payload.error;
       }
-    } catch {
-      return text;
     }
-    return text;
+    return fallbackText || `HTTP ${status}`;
+  }
+
+  private async readErrorMessage(response: Response): Promise<string> {
+    const text = await response.text();
+    const payload = this.parseErrorPayload(text);
+    return this.messageFromPayload(payload, text, response.status);
   }
 
   private async parseResponse<T>(response: Response): Promise<T> {
     if (!response.ok) {
-      throw new Error(await this.readErrorMessage(response));
+      const text = await response.text();
+      const payload = this.parseErrorPayload(text);
+      const message = this.messageFromPayload(payload, text, response.status);
+      if (payload?.error === 'version_conflict') {
+        throw new VersionConflictError<TeamNoteDocument>(message, {
+          version: payload.version,
+          remote: payload.remoteNote ?? null,
+        });
+      }
+      throw new Error(message);
     }
     return response.json() as Promise<T>;
   }

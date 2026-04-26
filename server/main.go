@@ -82,6 +82,29 @@ type TeamNoteDoc struct {
 	ActiveLease   *TeamNoteLease `json:"activeLease,omitempty"`
 }
 
+type SessionTaskItem struct {
+	ID          string   `json:"id"`
+	Title       string   `json:"title"`
+	Description string   `json:"description"`
+	Status      string   `json:"status"`
+	Assignee    string   `json:"assignee"`
+	Tags        []string `json:"tags,omitempty"`
+	CreatedAt   int64    `json:"createdAt"`
+	UpdatedAt   int64    `json:"updatedAt"`
+}
+
+type SessionTaskBoardDoc struct {
+	CampaignID    string            `json:"campaignId"`
+	Tasks         []SessionTaskItem `json:"tasks"`
+	UpdatedBy     string            `json:"updatedBy"`
+	UpdatedByName string            `json:"updatedByName"`
+	UpdatedAt     int64             `json:"updatedAt"`
+	Version       int               `json:"version"`
+	PLCanView     *bool             `json:"plCanView,omitempty"`
+	PLCanEdit     *bool             `json:"plCanEdit,omitempty"`
+	ActiveLease   *TeamNoteLease    `json:"activeLease,omitempty"`
+}
+
 type PublicCampaignSummary struct {
 	ID                string `json:"id"`
 	Name              string `json:"name"`
@@ -189,6 +212,10 @@ func campaignConfigKey(campaignID string) string {
 
 func teamNoteKey(campaignID, noteID string) string {
 	return "campaign:" + campaignID + ":team:" + noteID
+}
+
+func taskBoardKey(campaignID string) string {
+	return "campaign:" + campaignID + ":task_board"
 }
 
 func publicCampaignIndexKey() string {
@@ -474,6 +501,69 @@ func leaseExpired(lease *TeamNoteLease) bool {
 		return false
 	}
 	return *lease.ExpiresAt <= time.Now().UnixMilli()
+}
+
+func normalizeTaskStatus(status string) string {
+	switch strings.TrimSpace(status) {
+	case "todo", "in_progress", "done":
+		return status
+	default:
+		return "todo"
+	}
+}
+
+func ptrBool(value bool) *bool {
+	return &value
+}
+
+func normalizeTaskTags(tags []string, assignee string) []string {
+	seed := tags
+	if len(seed) == 0 && strings.TrimSpace(assignee) != "" {
+		seed = []string{assignee}
+	}
+	seen := make(map[string]struct{}, len(seed))
+	result := make([]string, 0, len(seed))
+	for _, value := range seed {
+		normalized := strings.TrimSpace(value)
+		if normalized == "" {
+			continue
+		}
+		lower := strings.ToLower(normalized)
+		if _, ok := seen[lower]; ok {
+			continue
+		}
+		seen[lower] = struct{}{}
+		result = append(result, normalized)
+	}
+	return result
+}
+
+func ensureTaskBoardPermissions(doc *SessionTaskBoardDoc) bool {
+	changed := false
+	if doc.PLCanView == nil {
+		value := true
+		doc.PLCanView = &value
+		changed = true
+	}
+	if doc.PLCanEdit == nil {
+		value := true
+		doc.PLCanEdit = &value
+		changed = true
+	}
+	if doc.PLCanView != nil && doc.PLCanEdit != nil && !*doc.PLCanView && *doc.PLCanEdit {
+		value := false
+		doc.PLCanEdit = &value
+		changed = true
+	}
+	for index := range doc.Tasks {
+		normalized := normalizeTaskTags(doc.Tasks[index].Tags, doc.Tasks[index].Assignee)
+		if len(normalized) != len(doc.Tasks[index].Tags) || strings.TrimSpace(doc.Tasks[index].Assignee) != "" {
+			doc.Tasks[index].Tags = normalized
+			doc.Tasks[index].Assignee = ""
+			changed = true
+		}
+	}
+	return changed
 }
 
 func loadConfig() Config {
@@ -1128,7 +1218,11 @@ func main() {
 			return
 		}
 		if body.ExpectedVersion != nil && *body.ExpectedVersion != record.Version {
-			c.JSON(409, gin.H{"error": "version_conflict", "version": record.Version})
+			c.JSON(409, gin.H{
+				"error":       "version_conflict",
+				"version":     record.Version,
+				"remoteShare": record,
+			})
 			return
 		}
 		previousSnapshot := toGenericMap(record)
@@ -1432,7 +1526,11 @@ func main() {
 			return
 		}
 		if body.ExpectedVersion != nil && *body.ExpectedVersion != note.Version {
-			c.JSON(409, gin.H{"error": "version_conflict", "version": note.Version})
+			c.JSON(409, gin.H{
+				"error":      "version_conflict",
+				"version":    note.Version,
+				"remoteNote": note,
+			})
 			return
 		}
 		if note.ActiveLease != nil && note.ActiveLease.UserID == userID && body.LeaseStartedAt != nil && *body.LeaseStartedAt != note.ActiveLease.StartedAt {
@@ -1663,6 +1761,366 @@ func main() {
 			}
 			note.ActiveLease = nil
 			if _, err := kvSaveJSON(db, teamNoteKey(campaignID, noteID), note); err != nil {
+				c.JSON(500, gin.H{"error": "database_error"})
+				return
+			}
+		}
+		c.Status(204)
+	})
+
+	campaignAPI.GET("/:campaignId/session-tasks", func(c *gin.Context) {
+		campaignID := strings.TrimSpace(c.Param("campaignId"))
+		userID, username := requestUser(c)
+		if campaignID == "" || userID == "" || username == "" {
+			c.JSON(400, gin.H{"error": "missing_identity"})
+			return
+		}
+		cfg, err := ensureCampaignConfig(db, campaignID, userID, username)
+		if err != nil {
+			c.JSON(500, gin.H{"error": "database_error"})
+			return
+		}
+		role := memberRole(cfg, userID)
+		var doc SessionTaskBoardDoc
+		ok, _, err := kvLoadJSON(db, taskBoardKey(campaignID), &doc)
+		if err != nil {
+			c.JSON(500, gin.H{"error": "database_error"})
+			return
+		}
+		if !ok {
+			now := time.Now().UnixMilli()
+			doc = SessionTaskBoardDoc{
+				CampaignID:    campaignID,
+				Tasks:         []SessionTaskItem{},
+				UpdatedBy:     userID,
+				UpdatedByName: username,
+				UpdatedAt:     now,
+				Version:       1,
+				PLCanView:     ptrBool(true),
+				PLCanEdit:     ptrBool(true),
+				ActiveLease:   nil,
+			}
+			if _, err := kvSaveJSON(db, taskBoardKey(campaignID), doc); err != nil {
+				c.JSON(500, gin.H{"error": "database_error"})
+				return
+			}
+		}
+		if leaseExpired(doc.ActiveLease) {
+			doc.ActiveLease = nil
+			if _, err := kvSaveJSON(db, taskBoardKey(campaignID), doc); err != nil {
+				c.JSON(500, gin.H{"error": "database_error"})
+				return
+			}
+		}
+		if ensureTaskBoardPermissions(&doc) {
+			if _, err := kvSaveJSON(db, taskBoardKey(campaignID), doc); err != nil {
+				c.JSON(500, gin.H{"error": "database_error"})
+				return
+			}
+		}
+		if role != "GM" && doc.PLCanView != nil && !*doc.PLCanView {
+			c.JSON(403, gin.H{"error": "forbidden_view"})
+			return
+		}
+		c.JSON(200, doc)
+	})
+
+	campaignAPI.PUT("/:campaignId/session-tasks", func(c *gin.Context) {
+		campaignID := strings.TrimSpace(c.Param("campaignId"))
+		userID, username := requestUser(c)
+		if campaignID == "" || userID == "" || username == "" {
+			c.JSON(400, gin.H{"error": "missing_identity"})
+			return
+		}
+		cfg, err := ensureCampaignConfig(db, campaignID, userID, username)
+		if err != nil {
+			c.JSON(500, gin.H{"error": "database_error"})
+			return
+		}
+		role := memberRole(cfg, userID)
+		var doc SessionTaskBoardDoc
+		ok, _, err := kvLoadJSON(db, taskBoardKey(campaignID), &doc)
+		if err != nil {
+			c.JSON(500, gin.H{"error": "database_error"})
+			return
+		}
+		if !ok {
+			doc = SessionTaskBoardDoc{
+				CampaignID:    campaignID,
+				Tasks:         []SessionTaskItem{},
+				UpdatedBy:     userID,
+				UpdatedByName: username,
+				UpdatedAt:     time.Now().UnixMilli(),
+				Version:       1,
+				PLCanView:     ptrBool(true),
+				PLCanEdit:     ptrBool(true),
+			}
+		}
+		ensureTaskBoardPermissions(&doc)
+		if role != "GM" && doc.PLCanEdit != nil && !*doc.PLCanEdit {
+			c.JSON(403, gin.H{"error": "forbidden_edit"})
+			return
+		}
+		if doc.ActiveLease != nil && doc.ActiveLease.UserID != userID && !leaseExpired(doc.ActiveLease) {
+			c.JSON(409, gin.H{"error": "lease_conflict", "activeLease": doc.ActiveLease})
+			return
+		}
+		var body struct {
+			Tasks           []SessionTaskItem `json:"tasks"`
+			ExpectedVersion *int              `json:"expectedVersion"`
+			LeaseStartedAt  *int64            `json:"leaseStartedAt"`
+			PLCanView       *bool             `json:"plCanView"`
+			PLCanEdit       *bool             `json:"plCanEdit"`
+		}
+		if err := c.ShouldBindJSON(&body); err != nil {
+			c.JSON(400, gin.H{"error": "invalid_payload"})
+			return
+		}
+		if body.ExpectedVersion != nil && *body.ExpectedVersion != doc.Version {
+			c.JSON(409, gin.H{
+				"error":     "version_conflict",
+				"version":   doc.Version,
+				"remoteDoc": doc,
+			})
+			return
+		}
+		if doc.ActiveLease != nil && doc.ActiveLease.UserID == userID && body.LeaseStartedAt != nil && *body.LeaseStartedAt != doc.ActiveLease.StartedAt {
+			c.JSON(409, gin.H{"error": "lease_missing"})
+			return
+		}
+		previousSnapshot := toGenericMap(doc)
+		now := time.Now().UnixMilli()
+		nextTasks := make([]SessionTaskItem, 0, len(body.Tasks))
+		nextTaskIDs := make(map[string]struct{}, len(body.Tasks))
+		for _, item := range body.Tasks {
+			trimmedID := strings.TrimSpace(item.ID)
+			if trimmedID == "" {
+				trimmedID = fmt.Sprintf("task_%d", time.Now().UnixNano())
+			}
+			nextTaskIDs[trimmedID] = struct{}{}
+			title := strings.TrimSpace(item.Title)
+			if title == "" {
+				title = "未命名任务"
+			}
+			createdAt := item.CreatedAt
+			if createdAt <= 0 {
+				createdAt = now
+			}
+			updatedAt := item.UpdatedAt
+			if updatedAt <= 0 {
+				updatedAt = now
+			}
+			nextTasks = append(nextTasks, SessionTaskItem{
+				ID:          trimmedID,
+				Title:       title,
+				Description: item.Description,
+				Status:      normalizeTaskStatus(item.Status),
+				Assignee:    "",
+				Tags:        normalizeTaskTags(item.Tags, item.Assignee),
+				CreatedAt:   createdAt,
+				UpdatedAt:   updatedAt,
+			})
+		}
+		if role != "GM" {
+			for _, original := range doc.Tasks {
+				if _, exists := nextTaskIDs[original.ID]; !exists {
+					c.JSON(403, gin.H{"error": "forbidden_delete"})
+					return
+				}
+			}
+		}
+		doc.Tasks = nextTasks
+		doc.UpdatedBy = userID
+		doc.UpdatedByName = username
+		doc.UpdatedAt = now
+		if role == "GM" {
+			if body.PLCanView != nil {
+				value := *body.PLCanView
+				doc.PLCanView = &value
+			}
+			if body.PLCanEdit != nil {
+				value := *body.PLCanEdit
+				doc.PLCanEdit = &value
+			}
+		}
+		ensureTaskBoardPermissions(&doc)
+		doc.Version++
+		if role == "PL" {
+			expiresAt := now + int64(10*time.Minute/time.Millisecond)
+			doc.ActiveLease = &TeamNoteLease{UserID: userID, Username: username, Role: role, StartedAt: now, ExpiresAt: &expiresAt}
+		}
+		if _, err := kvSaveJSON(db, taskBoardKey(campaignID), doc); err != nil {
+			c.JSON(500, gin.H{"error": "database_error"})
+			return
+		}
+		if err := appendVersionRecord(db, campaignID, VersionRecord{
+			ID:               fmt.Sprintf("ver_%d", time.Now().UnixNano()),
+			CampaignID:       campaignID,
+			DocumentType:     "task_board",
+			DocumentID:       "session_tasks",
+			Action:           "update",
+			Summary:          fmt.Sprintf("更新任务看板（%d 条）", len(doc.Tasks)),
+			OperatorUserID:   userID,
+			OperatorUsername: username,
+			CreatedAt:        now,
+			Snapshot:         toGenericMap(doc),
+			PreviousSnapshot: previousSnapshot,
+		}); err != nil {
+			c.JSON(500, gin.H{"error": "database_error"})
+			return
+		}
+		c.JSON(200, doc)
+	})
+
+	campaignAPI.POST("/:campaignId/session-tasks/lease/start", func(c *gin.Context) {
+		campaignID := strings.TrimSpace(c.Param("campaignId"))
+		userID, username := requestUser(c)
+		if campaignID == "" || userID == "" || username == "" {
+			c.JSON(400, gin.H{"error": "missing_identity"})
+			return
+		}
+		cfg, err := ensureCampaignConfig(db, campaignID, userID, username)
+		if err != nil {
+			c.JSON(500, gin.H{"error": "database_error"})
+			return
+		}
+		role := memberRole(cfg, userID)
+		var doc SessionTaskBoardDoc
+		ok, _, err := kvLoadJSON(db, taskBoardKey(campaignID), &doc)
+		if err != nil {
+			c.JSON(500, gin.H{"error": "database_error"})
+			return
+		}
+		if !ok {
+			doc = SessionTaskBoardDoc{
+				CampaignID:    campaignID,
+				Tasks:         []SessionTaskItem{},
+				UpdatedBy:     userID,
+				UpdatedByName: username,
+				UpdatedAt:     time.Now().UnixMilli(),
+				Version:       1,
+				PLCanView:     ptrBool(true),
+				PLCanEdit:     ptrBool(true),
+			}
+		}
+		ensureTaskBoardPermissions(&doc)
+		if role != "GM" && doc.PLCanEdit != nil && !*doc.PLCanEdit {
+			c.JSON(403, gin.H{"error": "forbidden_edit"})
+			return
+		}
+		if doc.ActiveLease != nil && doc.ActiveLease.UserID != userID && !leaseExpired(doc.ActiveLease) {
+			c.JSON(409, gin.H{"error": "lease_conflict", "activeLease": doc.ActiveLease})
+			return
+		}
+		now := time.Now().UnixMilli()
+		var expiresAt *int64
+		if role == "PL" {
+			value := now + int64(10*time.Minute/time.Millisecond)
+			expiresAt = &value
+		}
+		doc.ActiveLease = &TeamNoteLease{UserID: userID, Username: username, Role: role, StartedAt: now, ExpiresAt: expiresAt}
+		if _, err := kvSaveJSON(db, taskBoardKey(campaignID), doc); err != nil {
+			c.JSON(500, gin.H{"error": "database_error"})
+			return
+		}
+		c.JSON(200, doc)
+	})
+
+	campaignAPI.POST("/:campaignId/session-tasks/lease/refresh", func(c *gin.Context) {
+		campaignID := strings.TrimSpace(c.Param("campaignId"))
+		userID, username := requestUser(c)
+		if campaignID == "" || userID == "" || username == "" {
+			c.JSON(400, gin.H{"error": "missing_identity"})
+			return
+		}
+		cfg, err := ensureCampaignConfig(db, campaignID, userID, username)
+		if err != nil {
+			c.JSON(500, gin.H{"error": "database_error"})
+			return
+		}
+		role := memberRole(cfg, userID)
+		var doc SessionTaskBoardDoc
+		ok, _, err := kvLoadJSON(db, taskBoardKey(campaignID), &doc)
+		if err != nil {
+			c.JSON(500, gin.H{"error": "database_error"})
+			return
+		}
+		if !ok {
+			c.JSON(404, gin.H{"error": "not_found"})
+			return
+		}
+		ensureTaskBoardPermissions(&doc)
+		if role != "GM" && doc.PLCanEdit != nil && !*doc.PLCanEdit {
+			c.JSON(403, gin.H{"error": "forbidden_edit"})
+			return
+		}
+		var body struct {
+			Role           string `json:"role"`
+			LeaseStartedAt *int64 `json:"leaseStartedAt"`
+		}
+		if err := c.ShouldBindJSON(&body); err != nil {
+			c.JSON(400, gin.H{"error": "invalid_payload"})
+			return
+		}
+		if doc.ActiveLease == nil || doc.ActiveLease.UserID != userID || leaseExpired(doc.ActiveLease) {
+			c.JSON(409, gin.H{"error": "lease_missing"})
+			return
+		}
+		if body.LeaseStartedAt != nil && *body.LeaseStartedAt != doc.ActiveLease.StartedAt {
+			c.JSON(409, gin.H{"error": "lease_missing"})
+			return
+		}
+		now := time.Now().UnixMilli()
+		doc.ActiveLease.Username = username
+		doc.ActiveLease.Role = role
+		if role == "PL" {
+			value := now + int64(10*time.Minute/time.Millisecond)
+			doc.ActiveLease.ExpiresAt = &value
+		} else {
+			doc.ActiveLease.ExpiresAt = nil
+		}
+		if _, err := kvSaveJSON(db, taskBoardKey(campaignID), doc); err != nil {
+			c.JSON(500, gin.H{"error": "database_error"})
+			return
+		}
+		c.JSON(200, doc)
+	})
+
+	campaignAPI.POST("/:campaignId/session-tasks/lease/end", func(c *gin.Context) {
+		campaignID := strings.TrimSpace(c.Param("campaignId"))
+		userID, username := requestUser(c)
+		if campaignID == "" || userID == "" || username == "" {
+			c.JSON(400, gin.H{"error": "missing_identity"})
+			return
+		}
+		if _, err := ensureCampaignConfig(db, campaignID, userID, username); err != nil {
+			c.JSON(500, gin.H{"error": "database_error"})
+			return
+		}
+		var doc SessionTaskBoardDoc
+		ok, _, err := kvLoadJSON(db, taskBoardKey(campaignID), &doc)
+		if err != nil {
+			c.JSON(500, gin.H{"error": "database_error"})
+			return
+		}
+		if !ok {
+			c.Status(204)
+			return
+		}
+		var body struct {
+			LeaseStartedAt *int64 `json:"leaseStartedAt"`
+		}
+		if err := c.ShouldBindJSON(&body); err != nil {
+			c.JSON(400, gin.H{"error": "invalid_payload"})
+			return
+		}
+		if doc.ActiveLease != nil && doc.ActiveLease.UserID == userID {
+			if body.LeaseStartedAt != nil && *body.LeaseStartedAt != doc.ActiveLease.StartedAt {
+				c.JSON(409, gin.H{"error": "lease_missing"})
+				return
+			}
+			doc.ActiveLease = nil
+			if _, err := kvSaveJSON(db, taskBoardKey(campaignID), doc); err != nil {
 				c.JSON(500, gin.H{"error": "database_error"})
 				return
 			}

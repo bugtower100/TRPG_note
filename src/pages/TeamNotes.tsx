@@ -3,9 +3,11 @@ import { AlertCircle, FilePlus2, History, Lock, Trash2, Unlock } from 'lucide-re
 import RichTextEditor from '../components/common/RichTextEditor';
 import RichTextDisplay from '../components/common/RichTextDisplay';
 import ConfirmDialog from '../components/common/ConfirmDialog';
+import ConflictResolveDialog from '../components/common/ConflictResolveDialog';
 import { useCampaign } from '../context/CampaignContext';
 import { CampaignConfig, TeamNoteDocument } from '../types';
 import { teamNotesService } from '../services/teamNotesService';
+import { VersionConflictError } from '../services/conflictError';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 
 const TeamNotes: React.FC = () => {
@@ -22,6 +24,7 @@ const TeamNotes: React.FC = () => {
   const [statusText, setStatusText] = useState('');
   const [deletingNote, setDeletingNote] = useState<TeamNoteDocument | null>(null);
   const [leaseStartedAt, setLeaseStartedAt] = useState<number | null>(null);
+  const [conflictNote, setConflictNote] = useState<TeamNoteDocument | null>(null);
   const saveTimerRef = useRef<number | null>(null);
   const cleanupStateRef = useRef<{
     campaignId: string | null;
@@ -42,6 +45,12 @@ const TeamNotes: React.FC = () => {
     if (!config || !user) return 'PL';
     return config.members.find((member) => member.userId === user.id)?.role || 'PL';
   }, [config, user]);
+
+  const summarizeNote = (note: { title: string; content: string }) => {
+    const plainContent = note.content.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+    const contentPreview = plainContent.length > 120 ? `${plainContent.slice(0, 120)}...` : plainContent;
+    return [note.title || '（无标题）', contentPreview || '（无正文）'].join('\n');
+  };
 
   const loadAll = React.useCallback(async () => {
     if (!currentCampaignId || !user) return;
@@ -112,6 +121,9 @@ const TeamNotes: React.FC = () => {
         setNotes((prev) => prev.map((item) => item.id === saved.id ? saved : item));
         setStatusText(`已自动保存：${new Date(saved.updatedAt).toLocaleTimeString()}`);
       }).catch((error) => {
+        if (error instanceof VersionConflictError && error.remote) {
+          setConflictNote(error.remote);
+        }
         setStatusText(error instanceof Error ? error.message : '保存失败');
       });
     }, 1200);
@@ -198,6 +210,9 @@ const TeamNotes: React.FC = () => {
       await teamNotesService.endLease(currentCampaignId, selectedNote.id, user, leaseStartedAt);
       shouldExitEdit = true;
     } catch (error) {
+      if (error instanceof VersionConflictError && error.remote) {
+        setConflictNote(error.remote);
+      }
       setStatusText(error instanceof Error ? error.message : '保存失败，未结束编辑');
       return false;
     } finally {
@@ -224,6 +239,7 @@ const TeamNotes: React.FC = () => {
       const stopped = await handleStopEdit();
       if (!stopped) return;
     }
+    setConflictNote(null);
     setLeaseStartedAt(null);
     setSelectedId(noteId);
   };
@@ -250,6 +266,37 @@ const TeamNotes: React.FC = () => {
       setStatusText('团队笔记已删除');
     } finally {
       setBusy(false);
+    }
+  };
+
+  const handleUseRemoteConflict = () => {
+    if (!conflictNote) return;
+    setNotes((prev) => prev.map((item) => item.id === conflictNote.id ? conflictNote : item));
+    if (selectedId === conflictNote.id) {
+      setDraftTitle(conflictNote.title);
+      setDraftContent(conflictNote.content);
+    }
+    setConflictNote(null);
+    setStatusText('已加载远端最新版本');
+  };
+
+  const handleOverwriteConflict = async () => {
+    if (!currentCampaignId || !user || !conflictNote || selectedId !== conflictNote.id) return;
+    try {
+      const saved = await teamNotesService.saveTeamNote(currentCampaignId, conflictNote.id, user, {
+        title: draftTitle,
+        content: draftContent,
+        expectedVersion: conflictNote.version,
+        leaseStartedAt,
+      });
+      setNotes((prev) => prev.map((item) => item.id === saved.id ? saved : item));
+      setConflictNote(null);
+      setStatusText(`已覆盖保存：${new Date(saved.updatedAt).toLocaleTimeString()}`);
+    } catch (error) {
+      if (error instanceof VersionConflictError && error.remote) {
+        setConflictNote(error.remote);
+      }
+      setStatusText(error instanceof Error ? error.message : '覆盖保存失败');
     }
   };
 
@@ -395,6 +442,19 @@ const TeamNotes: React.FC = () => {
         cancelText="取消"
         onCancel={() => setDeletingNote(null)}
         onConfirm={handleDeleteNote}
+      />
+      <ConflictResolveDialog
+        open={Boolean(conflictNote) && selectedId === conflictNote?.id}
+        title="检测到编辑冲突"
+        description="远端内容已经更新。你可以加载远端版本，或使用当前草稿进行覆盖保存。"
+        localSummary={summarizeNote({ title: draftTitle, content: draftContent })}
+        remoteSummary={summarizeNote({
+          title: conflictNote?.title || '',
+          content: conflictNote?.content || '',
+        })}
+        onUseRemote={handleUseRemoteConflict}
+        onOverwrite={() => void handleOverwriteConflict()}
+        onCancel={() => setConflictNote(null)}
       />
     </div>
   );

@@ -4,8 +4,10 @@ import { useCampaign } from '../context/CampaignContext';
 import CustomSubItemsEditor from '../components/common/CustomSubItemsEditor';
 import RichTextEditor from '../components/common/RichTextEditor';
 import RichTextDisplay from '../components/common/RichTextDisplay';
+import ConflictResolveDialog from '../components/common/ConflictResolveDialog';
 import { CustomSubItem, GraphEntityType, SharedEntityRecord, TimelineEvent } from '../types';
 import { sharingService } from '../services/sharingService';
+import { VersionConflictError } from '../services/conflictError';
 import { useNavigate } from 'react-router-dom';
 
 type SharedSectionDraft = {
@@ -35,6 +37,7 @@ const SharedContent: React.FC<SharedContentProps> = ({ embedded = false, shareId
   const [draftEntitySections, setDraftEntitySections] = useState<SharedSectionDraft[]>([]);
   const [leaseStartedAt, setLeaseStartedAt] = useState<number | null>(null);
   const [leaseConflict, setLeaseConflict] = useState(false);
+  const [conflictShare, setConflictShare] = useState<SharedEntityRecord | null>(null);
   const [collapsedKeys, setCollapsedKeys] = useState<Record<string, boolean>>({});
   const saveTimerRef = useRef<number | null>(null);
   const cleanupRef = useRef<{
@@ -71,6 +74,7 @@ const SharedContent: React.FC<SharedContentProps> = ({ embedded = false, shareId
 
   useEffect(() => {
     setCollapsedKeys({});
+    setConflictShare(null);
   }, [selectedId]);
 
   useEffect(() => {
@@ -89,13 +93,12 @@ const SharedContent: React.FC<SharedContentProps> = ({ embedded = false, shareId
     return isSelf ? '你正在编辑' : `${selected.activeLease.username} 正在编辑`;
   }, [selected, user?.id]);
 
-  useEffect(() => {
-    if (!selected || editing) return;
-    setDraftContent(selected.snapshot.subItem?.content || '');
-    setDraftSubItemItems(selected.snapshot.subItem ? [{ ...selected.snapshot.subItem }] : []);
-    setDraftSectionItems((selected.snapshot.sectionItems || []).map((item) => ({ ...item })));
-    setDraftDetails(selected.snapshot.details || '');
-    setDraftTimelineEvents((selected.snapshot.timelineEvents || []).map((event) => ({
+  const hydrateDraftFromShare = (share: SharedEntityRecord) => {
+    setDraftContent(share.snapshot.subItem?.content || '');
+    setDraftSubItemItems(share.snapshot.subItem ? [{ ...share.snapshot.subItem }] : []);
+    setDraftSectionItems((share.snapshot.sectionItems || []).map((item) => ({ ...item })));
+    setDraftDetails(share.snapshot.details || '');
+    setDraftTimelineEvents((share.snapshot.timelineEvents || []).map((event) => ({
       id: String(event.id || `timeline_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`),
       time: String(event.time || ''),
       content: String(event.content || ''),
@@ -103,11 +106,71 @@ const SharedContent: React.FC<SharedContentProps> = ({ embedded = false, shareId
       relatedImages: Array.isArray(event.relatedImages) ? event.relatedImages.map((item) => String(item)) : [],
       isRevealed: Boolean(event.isRevealed),
     })));
-    setDraftEntitySections((selected.snapshot.allSections || []).map((section) => ({
+    setDraftEntitySections((share.snapshot.allSections || []).map((section) => ({
       key: section.key,
       title: section.title,
       items: section.items.map((item) => ({ ...item })),
     })));
+  };
+
+  const buildComparableContent = (share: SharedEntityRecord) => (
+    share.scope === 'entity'
+      ? JSON.stringify({
+          details: share.snapshot.details || '',
+          timelineEvents: share.snapshot.timelineEvents || [],
+          allSections: share.snapshot.allSections || [],
+        })
+      : share.scope === 'section'
+        ? JSON.stringify(share.snapshot.sectionItems || [])
+        : JSON.stringify(share.snapshot.subItem ? [share.snapshot.subItem] : [])
+  );
+
+  const buildDraftContent = (share: SharedEntityRecord) => (
+    share.scope === 'entity'
+      ? JSON.stringify({ details: draftDetails, timelineEvents: draftTimelineEvents, allSections: draftEntitySections })
+      : share.scope === 'section'
+        ? JSON.stringify(draftSectionItems)
+        : JSON.stringify(draftSubItemItems)
+  );
+
+  const buildSavePayload = (share: SharedEntityRecord, expectedVersion?: number) => ({
+    content: share.scope === 'subItem' ? draftContent : undefined,
+    subItem: share.scope === 'subItem' ? (draftSubItemItems[0] ? draftSubItemItems[0] as unknown as Record<string, unknown> : null) : undefined,
+    sectionItems: share.scope === 'section' ? draftSectionItems as unknown as Array<Record<string, unknown>> : undefined,
+    details: share.scope === 'entity' ? draftDetails : undefined,
+    timelineEvents: share.scope === 'entity' ? draftTimelineEvents as unknown as Array<Record<string, unknown>> : undefined,
+    allSections: share.scope === 'entity' ? draftEntitySections as unknown as Array<Record<string, unknown>> : undefined,
+    expectedVersion,
+    leaseStartedAt,
+  });
+
+  const summarizeShare = (share: SharedEntityRecord | null) => {
+    if (!share) return '（空）';
+    if (share.scope === 'subItem') {
+      const text = (share.snapshot.subItem?.content || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+      return `${share.snapshot.subItemTitle || '共享条目'}\n${text || '（无正文）'}`;
+    }
+    if (share.scope === 'section') {
+      return `${share.snapshot.sectionTitle || '共享区块'}\n条目数：${(share.snapshot.sectionItems || []).length}`;
+    }
+    return `${share.entityName}\n区块数：${(share.snapshot.allSections || []).length}，事件数：${(share.snapshot.timelineEvents || []).length}`;
+  };
+
+  const summarizeLocalDraft = (share: SharedEntityRecord | null) => {
+    if (!share) return '（空）';
+    if (share.scope === 'subItem') {
+      const text = (draftSubItemItems[0]?.content || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+      return `${share.snapshot.subItemTitle || '共享条目'}\n${text || '（无正文）'}`;
+    }
+    if (share.scope === 'section') {
+      return `${share.snapshot.sectionTitle || '共享区块'}\n条目数：${draftSectionItems.length}`;
+    }
+    return `${share.entityName}\n区块数：${draftEntitySections.length}，事件数：${draftTimelineEvents.length}`;
+  };
+
+  useEffect(() => {
+    if (!selected || editing) return;
+    hydrateDraftFromShare(selected);
   }, [editing, selected]);
 
   useEffect(() => {
@@ -137,23 +200,7 @@ const SharedContent: React.FC<SharedContentProps> = ({ embedded = false, shareId
     sharingService.startShareLease(currentCampaignId, selected.id, user)
       .then((next) => {
         setShares((prev) => prev.map((item) => item.id === next.id ? next : item));
-        setDraftContent(next.snapshot.subItem?.content || '');
-        setDraftSubItemItems(next.snapshot.subItem ? [{ ...next.snapshot.subItem }] : []);
-        setDraftSectionItems((next.snapshot.sectionItems || []).map((item) => ({ ...item })));
-        setDraftDetails(next.snapshot.details || '');
-        setDraftTimelineEvents((next.snapshot.timelineEvents || []).map((event) => ({
-          id: String(event.id || `timeline_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`),
-          time: String(event.time || ''),
-          content: String(event.content || ''),
-          relations: Array.isArray(event.relations) ? event.relations : [],
-          relatedImages: Array.isArray(event.relatedImages) ? event.relatedImages.map((item) => String(item)) : [],
-          isRevealed: Boolean(event.isRevealed),
-        })));
-        setDraftEntitySections((next.snapshot.allSections || []).map((section) => ({
-          key: section.key,
-          title: section.title,
-          items: section.items.map((item) => ({ ...item })),
-        })));
+        hydrateDraftFromShare(next);
         setLeaseStartedAt(next.activeLease?.startedAt ?? null);
         setLeaseConflict(false);
         setEditing(true);
@@ -184,32 +231,18 @@ const SharedContent: React.FC<SharedContentProps> = ({ embedded = false, shareId
 
   useEffect(() => {
     if (!editing || !currentCampaignId || !selected || !user) return;
-    const currentContent = selected.scope === 'entity'
-      ? JSON.stringify({ details: selected.snapshot.details || '', timelineEvents: selected.snapshot.timelineEvents || [], allSections: selected.snapshot.allSections || [] })
-      : selected.scope === 'section'
-        ? JSON.stringify(selected.snapshot.sectionItems || [])
-        : JSON.stringify(selected.snapshot.subItem ? [selected.snapshot.subItem] : []);
-    const nextContent = selected.scope === 'entity'
-      ? JSON.stringify({ details: draftDetails, timelineEvents: draftTimelineEvents, allSections: draftEntitySections })
-      : selected.scope === 'section'
-        ? JSON.stringify(draftSectionItems)
-        : JSON.stringify(draftSubItemItems);
+    const currentContent = buildComparableContent(selected);
+    const nextContent = buildDraftContent(selected);
     if (nextContent === currentContent) return;
     if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current);
     saveTimerRef.current = window.setTimeout(() => {
-      sharingService.saveShareContent(currentCampaignId, selected.id, user, {
-        content: selected.scope === 'subItem' ? draftContent : undefined,
-        subItem: selected.scope === 'subItem' ? (draftSubItemItems[0] ? draftSubItemItems[0] as unknown as Record<string, unknown> : null) : undefined,
-        sectionItems: selected.scope === 'section' ? draftSectionItems as unknown as Array<Record<string, unknown>> : undefined,
-        details: selected.scope === 'entity' ? draftDetails : undefined,
-        timelineEvents: selected.scope === 'entity' ? draftTimelineEvents as unknown as Array<Record<string, unknown>> : undefined,
-        allSections: selected.scope === 'entity' ? draftEntitySections as unknown as Array<Record<string, unknown>> : undefined,
-        expectedVersion: selected.version,
-        leaseStartedAt,
-      }).then((next) => {
+      sharingService.saveShareContent(currentCampaignId, selected.id, user, buildSavePayload(selected, selected.version)).then((next) => {
         setShares((prev) => prev.map((item) => item.id === next.id ? next : item));
         setStatusText(`已自动保存：${new Date(next.updatedAt).toLocaleTimeString()}`);
       }).catch((error) => {
+        if (error instanceof VersionConflictError && error.remote) {
+          setConflictShare(error.remote);
+        }
         setStatusText(error instanceof Error ? error.message : '共享内容保存失败');
       });
     }, 1200);
@@ -219,35 +252,18 @@ const SharedContent: React.FC<SharedContentProps> = ({ embedded = false, shareId
         saveTimerRef.current = null;
       }
     };
-  }, [currentCampaignId, draftContent, draftDetails, draftEntitySections, draftSectionItems, draftSubItemItems, draftTimelineEvents, editing, leaseStartedAt, selected, user]);
+  }, [currentCampaignId, draftContent, draftDetails, draftEntitySections, draftSectionItems, draftSubItemItems, draftTimelineEvents, editing, selected, user]);
 
   const persistDraft = async () => {
     if (!currentCampaignId || !selected || !user) return selected;
-    const currentContent = selected.scope === 'entity'
-      ? JSON.stringify({ details: selected.snapshot.details || '', timelineEvents: selected.snapshot.timelineEvents || [], allSections: selected.snapshot.allSections || [] })
-      : selected.scope === 'section'
-        ? JSON.stringify(selected.snapshot.sectionItems || [])
-        : JSON.stringify(selected.snapshot.subItem ? [selected.snapshot.subItem] : []);
-    const nextContent = selected.scope === 'entity'
-      ? JSON.stringify({ details: draftDetails, timelineEvents: draftTimelineEvents, allSections: draftEntitySections })
-      : selected.scope === 'section'
-        ? JSON.stringify(draftSectionItems)
-        : JSON.stringify(draftSubItemItems);
+    const currentContent = buildComparableContent(selected);
+    const nextContent = buildDraftContent(selected);
     if (nextContent === currentContent) return selected;
     if (saveTimerRef.current) {
       window.clearTimeout(saveTimerRef.current);
       saveTimerRef.current = null;
     }
-    const next = await sharingService.saveShareContent(currentCampaignId, selected.id, user, {
-      content: selected.scope === 'subItem' ? draftContent : undefined,
-      subItem: selected.scope === 'subItem' ? (draftSubItemItems[0] ? draftSubItemItems[0] as unknown as Record<string, unknown> : null) : undefined,
-      sectionItems: selected.scope === 'section' ? draftSectionItems as unknown as Array<Record<string, unknown>> : undefined,
-      details: selected.scope === 'entity' ? draftDetails : undefined,
-      timelineEvents: selected.scope === 'entity' ? draftTimelineEvents as unknown as Array<Record<string, unknown>> : undefined,
-      allSections: selected.scope === 'entity' ? draftEntitySections as unknown as Array<Record<string, unknown>> : undefined,
-      expectedVersion: selected.version,
-      leaseStartedAt,
-    });
+    const next = await sharingService.saveShareContent(currentCampaignId, selected.id, user, buildSavePayload(selected, selected.version));
     setShares((prev) => prev.map((item) => item.id === next.id ? next : item));
     setStatusText(`已保存：${new Date(next.updatedAt).toLocaleTimeString()}`);
     return next;
@@ -261,6 +277,9 @@ const SharedContent: React.FC<SharedContentProps> = ({ embedded = false, shareId
       await sharingService.endShareLease(currentCampaignId, selected.id, user, leaseStartedAt);
       shouldExit = true;
     } catch (error) {
+      if (error instanceof VersionConflictError && error.remote) {
+        setConflictShare(error.remote);
+      }
       setStatusText(error instanceof Error ? error.message : '共享内容保存失败，未结束编辑');
       return false;
     } finally {
@@ -280,9 +299,40 @@ const SharedContent: React.FC<SharedContentProps> = ({ embedded = false, shareId
       const stopped = await handleStopEdit();
       if (!stopped) return;
     }
+    setConflictShare(null);
     setLeaseStartedAt(null);
     setLeaseConflict(false);
     setSelectedId(shareId);
+  };
+
+  const handleUseRemoteConflict = () => {
+    if (!conflictShare) return;
+    setShares((prev) => prev.map((item) => item.id === conflictShare.id ? conflictShare : item));
+    if (selectedId === conflictShare.id) {
+      hydrateDraftFromShare(conflictShare);
+    }
+    setConflictShare(null);
+    setStatusText('已加载远端最新版本');
+  };
+
+  const handleOverwriteConflict = async () => {
+    if (!currentCampaignId || !user || !conflictShare || selectedId !== conflictShare.id) return;
+    try {
+      const next = await sharingService.saveShareContent(
+        currentCampaignId,
+        conflictShare.id,
+        user,
+        buildSavePayload(conflictShare, conflictShare.version)
+      );
+      setShares((prev) => prev.map((item) => item.id === next.id ? next : item));
+      setConflictShare(null);
+      setStatusText(`已覆盖保存：${new Date(next.updatedAt).toLocaleTimeString()}`);
+    } catch (error) {
+      if (error instanceof VersionConflictError && error.remote) {
+        setConflictShare(error.remote);
+      }
+      setStatusText(error instanceof Error ? error.message : '覆盖保存失败');
+    }
   };
 
   const handleDeleteShare = async () => {
@@ -689,6 +739,16 @@ const SharedContent: React.FC<SharedContentProps> = ({ embedded = false, shareId
           </section>
         </div>
       )}
+      <ConflictResolveDialog
+        open={Boolean(conflictShare) && selectedId === conflictShare?.id}
+        title="检测到共享内容冲突"
+        description="远端内容已更新。你可以加载远端版本，或用当前草稿覆盖保存。"
+        localSummary={summarizeLocalDraft(selected)}
+        remoteSummary={summarizeShare(conflictShare)}
+        onUseRemote={handleUseRemoteConflict}
+        onOverwrite={() => void handleOverwriteConflict()}
+        onCancel={() => setConflictShare(null)}
+      />
     </div>
   );
 };

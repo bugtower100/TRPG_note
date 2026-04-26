@@ -1,4 +1,4 @@
-import { CampaignData, UserProfile, CampaignSummary, BaseEntity, Character, Location, Organization, Event, Clue, Timeline, Monster, RelationGraph } from '../types';
+import { CampaignData, UserProfile, CampaignSummary, BaseEntity, Character, Location, Organization, Event, Clue, Timeline, Monster, RelationGraph, ClueRevealStatus, ClueRevealLogItem, SessionTask, SessionTaskStatus } from '../types';
 import { v4 as uuidv4 } from 'uuid';
 import { StorageAdapter } from './storageAdapter';
 
@@ -26,6 +26,7 @@ export const DEFAULT_CAMPAIGN_DATA: CampaignData = {
   clues: [],
   timelines: [],
   monsters: [],
+  sessionTasks: [],
   relationGraphs: [],
 };
 
@@ -96,6 +97,51 @@ class DataService {
     return Array.from(new Set(normalized));
   }
 
+  private normalizeTags(tags: any): string[] {
+    if (!Array.isArray(tags)) return [];
+    const normalized = tags
+      .filter((value) => typeof value === 'string')
+      .map((value) => value.trim())
+      .filter(Boolean);
+    return Array.from(new Set(normalized));
+  }
+
+  private normalizeClueRevealStatus(status: any): ClueRevealStatus {
+    if (status === 'investigating' || status === 'revealed') return status;
+    return 'untracked';
+  }
+
+  private normalizeClueRevealLogs(logs: any): ClueRevealLogItem[] {
+    if (!Array.isArray(logs)) return [];
+    return logs
+      .map((log) => ({
+        id: typeof log?.id === 'string' && log.id ? log.id : uuidv4(),
+        target: typeof log?.target === 'string' ? log.target.trim() : '',
+        note: typeof log?.note === 'string' ? log.note : '',
+        revealedAt: typeof log?.revealedAt === 'number' ? log.revealedAt : Date.now(),
+      }))
+      .filter((log) => Boolean(log.target));
+  }
+
+  private normalizeSessionTaskStatus(status: any): SessionTaskStatus {
+    if (status === 'in_progress' || status === 'done') return status;
+    return 'todo';
+  }
+
+  private normalizeSessionTasks(tasks: any): SessionTask[] {
+    if (!Array.isArray(tasks)) return [];
+    return tasks.map((task) => ({
+      id: typeof task?.id === 'string' && task.id ? task.id : uuidv4(),
+      title: typeof task?.title === 'string' && task.title.trim() ? task.title.trim() : '未命名任务',
+      description: typeof task?.description === 'string' ? task.description : '',
+      status: this.normalizeSessionTaskStatus(task?.status),
+      tags: this.normalizeTags(Array.isArray(task?.tags) ? task.tags : [task?.assignee]),
+      assignee: typeof task?.assignee === 'string' ? task.assignee : '',
+      createdAt: typeof task?.createdAt === 'number' ? task.createdAt : Date.now(),
+      updatedAt: typeof task?.updatedAt === 'number' ? task.updatedAt : Date.now(),
+    }));
+  }
+
   private normalizeCampaignData(input: any): CampaignData {
     const raw = input?.data && input?.handle ? input.data : input;
 
@@ -137,6 +183,7 @@ class DataService {
         id: typeof e?.id === 'string' && e.id ? e.id : uuidv4(),
         name: typeof e?.name === 'string' ? e.name : '未命名',
         details: typeof e?.details === 'string' ? e.details : '',
+        tags: this.normalizeTags(e?.tags),
         customSubItems,
         sectionSubItems,
         sectionVisibility,
@@ -179,6 +226,9 @@ class DataService {
       ...normalizeBase(c),
       type: typeof c?.type === 'string' ? c.type : '普通',
       relations: safeArray<any>(c?.relations, []),
+      revealStatus: this.normalizeClueRevealStatus(c?.revealStatus),
+      revealTarget: typeof c?.revealTarget === 'string' ? c.revealTarget : '',
+      revealLogs: this.normalizeClueRevealLogs(c?.revealLogs),
     }));
 
     const timelines: Timeline[] = safeArray<any>(raw?.timelines, []).map((t) => ({
@@ -194,6 +244,8 @@ class DataService {
       drops: typeof m?.drops === 'string' ? m.drops : '',
       relations: safeArray<any>(m?.relations, []),
     }));
+
+    const sessionTasks = this.normalizeSessionTasks(raw?.sessionTasks);
 
     const relationGraphs: RelationGraph[] = safeArray<any>(raw?.relationGraphs, []).map((g) => ({
       id: typeof g?.id === 'string' && g.id ? g.id : uuidv4(),
@@ -252,6 +304,7 @@ class DataService {
       clues,
       timelines,
       monsters,
+      sessionTasks,
       relationGraphs,
     };
   }
@@ -564,8 +617,12 @@ class DataService {
   }
 
   createEntity<T extends BaseEntity>(data: Omit<T, 'id' | 'createdAt' | 'updatedAt'>): T {
+    const normalizedTags = Array.isArray((data as any).tags)
+      ? this.normalizeTags((data as any).tags)
+      : [];
     return {
       ...data,
+      tags: normalizedTags,
       id: this.generateId(),
       createdAt: Date.now(),
       updatedAt: Date.now(),

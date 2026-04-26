@@ -1,16 +1,30 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useCampaign } from '../context/CampaignContext';
 import { useGuide } from '../components/common/InteractiveGuide';
 import { useReceivedShares } from '../hooks/useReceivedShares';
+import { useNavigate } from 'react-router-dom';
+
+type SearchEntry = {
+  id: string;
+  entityType: string;
+  entityName: string;
+  route: string;
+  content: string;
+  updatedAt: number;
+};
 
 const Dashboard: React.FC = () => {
   const { campaignData, setCampaignData } = useCampaign();
+  const navigate = useNavigate();
   const { startGuide } = useGuide();
   const [notes, setNotes] = useState(campaignData.notes || '');
   const sharedCharacters = useReceivedShares('characters');
   const sharedMonsters = useReceivedShares('monsters');
   const sharedLocations = useReceivedShares('locations');
   const sharedOrganizations = useReceivedShares('organizations');
+  const [searchKeyword, setSearchKeyword] = useState('');
+  const [searchEntries, setSearchEntries] = useState<SearchEntry[]>([]);
+  const searchBuildVersionRef = useRef(0);
 
   useEffect(() => {
     setNotes(campaignData.notes || '');
@@ -25,6 +39,97 @@ const Dashboard: React.FC = () => {
     }, 180);
     return () => window.clearTimeout(timer);
   }, [startGuide]);
+
+  useEffect(() => {
+    const buildVersion = searchBuildVersionRef.current + 1;
+    searchBuildVersionRef.current = buildVersion;
+    const timer = window.setTimeout(() => {
+      const nextEntries: SearchEntry[] = [
+        ...campaignData.characters.map((item) => ({
+          id: item.id,
+          entityType: '角色',
+          entityName: item.name,
+          route: `/characters/${item.id}`,
+          content: [item.name, item.details, item.identity, item.appearance, item.desireOrGoal, item.attributes, ...(item.tags || [])].join(' ').toLowerCase(),
+          updatedAt: item.updatedAt,
+        })),
+        ...campaignData.monsters.map((item) => ({
+          id: item.id,
+          entityType: '怪物',
+          entityName: item.name,
+          route: `/monsters/${item.id}`,
+          content: [item.name, item.details, item.type, item.stats, item.abilities, item.drops, ...(item.tags || [])].join(' ').toLowerCase(),
+          updatedAt: item.updatedAt,
+        })),
+        ...campaignData.locations.map((item) => ({
+          id: item.id,
+          entityType: '地点',
+          entityName: item.name,
+          route: `/locations/${item.id}`,
+          content: [item.name, item.details, item.environment, ...(item.tags || [])].join(' ').toLowerCase(),
+          updatedAt: item.updatedAt,
+        })),
+        ...campaignData.organizations.map((item) => ({
+          id: item.id,
+          entityType: '组织',
+          entityName: item.name,
+          route: `/organizations/${item.id}`,
+          content: [item.name, item.details, item.notes, ...(item.tags || [])].join(' ').toLowerCase(),
+          updatedAt: item.updatedAt,
+        })),
+        ...campaignData.events.map((item) => ({
+          id: item.id,
+          entityType: '事件',
+          entityName: item.name,
+          route: `/events/${item.id}`,
+          content: [item.name, item.details, item.time, ...(item.tags || [])].join(' ').toLowerCase(),
+          updatedAt: item.updatedAt,
+        })),
+        ...campaignData.clues.map((item) => ({
+          id: item.id,
+          entityType: '线索',
+          entityName: item.name,
+          route: `/clues/${item.id}`,
+          content: [item.name, item.details, item.type, item.revealTarget || '', ...(item.tags || [])].join(' ').toLowerCase(),
+          updatedAt: item.updatedAt,
+        })),
+        ...campaignData.timelines.map((item) => ({
+          id: item.id,
+          entityType: '时间线',
+          entityName: item.name,
+          route: `/timelines/${item.id}`,
+          content: [item.name, item.details, ...(item.tags || []), ...(item.timelineEvents || []).map((event) => `${event.time} ${event.content}`)].join(' ').toLowerCase(),
+          updatedAt: item.updatedAt,
+        })),
+      ];
+      if (searchBuildVersionRef.current !== buildVersion) return;
+      setSearchEntries(nextEntries);
+    }, 20);
+    return () => window.clearTimeout(timer);
+  }, [campaignData]);
+
+  const handleSearchEnter = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key !== 'Enter') return;
+    const normalized = searchKeyword.trim().toLowerCase();
+    if (!normalized) return;
+    const target = searchEntries
+      .filter((entry) => entry.content.includes(normalized))
+      .sort((a, b) => b.updatedAt - a.updatedAt)[0];
+    if (!target) {
+      window.alert('未找到匹配结果。');
+      return;
+    }
+    navigate(target.route);
+  };
+
+  const matchedEntries = React.useMemo(() => {
+    const normalized = searchKeyword.trim().toLowerCase();
+    if (!normalized) return [];
+    return searchEntries
+      .filter((entry) => entry.content.includes(normalized))
+      .sort((a, b) => b.updatedAt - a.updatedAt)
+      .slice(0, 30);
+  }, [searchEntries, searchKeyword]);
 
   const handleNotesChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const newNotes = e.target.value;
@@ -42,12 +147,6 @@ const Dashboard: React.FC = () => {
         <h2 className="text-2xl font-bold text-gray-800">
             {campaignData.meta.projectName} <span className="text-gray-400 text-sm font-normal">概览</span>
         </h2>
-        <button 
-            onClick={() => startGuide('dashboard')}
-            className="text-primary text-sm hover:underline"
-        >
-            新手引导
-        </button>
       </div>
 
       <div data-tour="dashboard-stat-grid" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
@@ -73,6 +172,39 @@ const Dashboard: React.FC = () => {
                 {new Date(campaignData.meta.lastModified).toLocaleString()}
             </p>
         </div>
+      </div>
+
+      <div data-tour="dashboard-search" className="bg-theme-card p-6 rounded-lg shadow-sm border border-theme">
+        <h3 className="text-lg font-bold mb-3">全局检索</h3>
+        <input
+          type="text"
+          value={searchKeyword}
+          onChange={(event) => setSearchKeyword(event.target.value)}
+          onKeyDown={handleSearchEnter}
+          placeholder="搜索角色、怪物、线索、时间线（回车进入首个匹配）"
+          className="w-full px-3 py-2 border border-theme rounded-md bg-transparent"
+        />
+        {searchKeyword.trim() && (
+          <div data-tour="dashboard-search-results" className="mt-3 border border-theme rounded-lg divide-y divide-theme max-h-72 overflow-auto">
+            {matchedEntries.length > 0 ? (
+              matchedEntries.map((entry) => (
+                <button
+                  key={`${entry.entityType}-${entry.id}`}
+                  type="button"
+                  onClick={() => navigate(entry.route)}
+                  className="w-full text-left px-3 py-2 hover:bg-primary-light/50"
+                >
+                  <div className="font-medium">{entry.entityName}</div>
+                  <div className="text-xs theme-text-secondary">
+                    {entry.entityType} · 更新于 {new Date(entry.updatedAt).toLocaleString()}
+                  </div>
+                </button>
+              ))
+            ) : (
+              <div className="px-3 py-4 text-sm theme-text-secondary">没有找到匹配项</div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Campaign Notes Section */}

@@ -141,12 +141,23 @@ const VersionHistory: React.FC = () => {
 
   const loadVersions = React.useCallback(async () => {
     if (!currentCampaignId || !user) return;
-    const next = await sharingService.listVersions(currentCampaignId, user);
-    setVersions(next);
+    try {
+      const next = await sharingService.listVersions(currentCampaignId, user);
+      setVersions(next);
+      setStatusText('');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '版本记录加载失败';
+      if (message === 'forbidden') {
+        setStatusText('当前仅 GM 可查看历史版本，请联系主持人协助操作');
+      } else {
+        setStatusText(message);
+      }
+      setVersions([]);
+    }
   }, [currentCampaignId, user]);
 
   useEffect(() => {
-    loadVersions().catch((error) => setStatusText(error instanceof Error ? error.message : '版本记录加载失败'));
+    void loadVersions();
   }, [loadVersions]);
 
   const visibleVersions = useMemo(() => versions.filter((version) => {
@@ -216,7 +227,7 @@ const VersionHistory: React.FC = () => {
       <section className="bg-theme-card border border-theme rounded-lg shadow-sm p-4">
         <h2 className="text-xl sm:text-2xl font-bold">版本记录</h2>
         <div className="text-sm theme-text-secondary mt-1">
-          {filterDocumentType || filterDocumentId ? '这里显示当前内容相关的版本记录，方便直接从上下文进入。' : '当前先记录团队笔记与分享记录的版本变化，后续继续扩展更细粒度的差异比较。'}
+          {filterDocumentType || filterDocumentId ? '这里显示当前内容相关的版本记录，方便直接从上下文进入。' : '当前已记录团队笔记、任务看板与共享条目的版本变化。'}
         </div>
         {statusText && <div className="text-sm theme-text-secondary mt-2">{statusText}</div>}
       </section>
