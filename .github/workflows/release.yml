@@ -9,11 +9,11 @@ on:
       release_tag:
         description: "Release Tag"
         required: true
-        default: "v1.3.1"
+        default: "v1.4.0"
       release_name:
         description: "Release Name"
         required: true
-        default: "V1.3.1"
+        default: "V1.4.0"
       prerelease:
         description: "Mark as prerelease"
         required: true
