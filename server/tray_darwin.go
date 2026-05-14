@@ -1,4 +1,4 @@
-//go:build darwin
+//go:build darwin && !headless
 
 package main
 
@@ -21,6 +21,12 @@ import (
 func trayInit() {
 	runtime.LockOSThread()
 	systray.Run(onReady, onExit)
+}
+
+func startPlatformApp(router *gin.Engine, addr string, showConsole bool, hideUI bool) {
+	_ = showConsole
+	go httpServe(router, addr, hideUI)
+	trayInit()
 }
 
 func hideWindow() {

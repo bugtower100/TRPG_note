@@ -1,27 +1,17 @@
-//go:build !windows && !darwin && !headless
+//go:build headless
 
 package main
 
 import (
 	"net"
-	"os"
 	"os/exec"
 	"regexp"
-	"runtime"
-	"syscall"
 
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 )
 
 func trayInit() {
-	select {}
-}
-
-func startPlatformApp(router *gin.Engine, addr string, showConsole bool, hideUI bool) {
-	_ = showConsole
-	go httpServe(router, addr, hideUI)
-	trayInit()
 }
 
 func hideWindow() {
@@ -42,7 +32,13 @@ func showMsgBox(title string, message string) {
 	zap.S().Info(title, message)
 }
 
+func executeWin(name string, arg ...string) *exec.Cmd {
+	cmd := exec.Command(name, arg...)
+	return cmd
+}
+
 func httpServe(e *gin.Engine, addr string, hideUI bool) {
+	_ = hideUI
 	log := zap.S()
 	portStr := "3211"
 	rePort := regexp.MustCompile(`:(\d+)$`)
@@ -54,26 +50,17 @@ func httpServe(e *gin.Engine, addr string, hideUI bool) {
 	ln, err := net.Listen("tcp", ":"+portStr)
 	if err != nil {
 		log.Errorf("端口已被占用，即将自动退出: %s", addr)
-		runtime.Goexit()
+		return
 	}
 	_ = ln.Close()
 
-	log.Infof("如果浏览器没有自动打开，请手动访问:\nhttp://localhost:%s", portStr)
-	err = e.Run(addr)
-	if err != nil {
+	log.Infof("headless 模式启动成功，请访问:\nhttp://localhost:%s", portStr)
+	if err := e.Run(addr); err != nil {
 		log.Errorf("端口已被占用，即将自动退出: %s", addr)
-		return
 	}
 }
 
-func executeWin(name string, arg ...string) *exec.Cmd {
-	cmd := exec.Command(name, arg...)
-	cmd.SysProcAttr = &syscall.SysProcAttr{
-		Setpgid: true,
-		Pgid:    os.Getppid(),
-	}
-	cmd.Stderr = os.Stderr
-	cmd.Stdout = os.Stdout
-	cmd.Stdin = os.Stdin
-	return cmd
+func startPlatformApp(router *gin.Engine, addr string, showConsole bool, hideUI bool) {
+	_ = showConsole
+	httpServe(router, addr, hideUI)
 }

@@ -1,4 +1,4 @@
-//go:build windows
+//go:build windows && !headless
 
 package main
 
@@ -36,6 +36,19 @@ func trayInit() {
 	// 确保能收到系统消息，从而避免不能弹出菜单
 	runtime.LockOSThread()
 	systray.Run(onReady, onExit)
+}
+
+func startPlatformApp(router *gin.Engine, addr string, showConsole bool, hideUI bool) {
+	if showConsole {
+		showWindow()
+	} else {
+		hideWindow()
+	}
+	if TestRunning() {
+		return
+	}
+	go httpServe(router, addr, hideUI)
+	trayInit()
 }
 
 var (

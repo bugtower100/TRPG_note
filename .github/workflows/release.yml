@@ -1,4 +1,4 @@
-name: Build and Release Windows EXE
+name: Build and Release Desktop Packages
 
 on:
   push:
@@ -9,11 +9,11 @@ on:
       release_tag:
         description: "Release Tag"
         required: true
-        default: "v1.3.1"
+        default: "v1.4.1"
       release_name:
         description: "Release Name"
         required: true
-        default: "V1.3.1"
+        default: "V1.4.1"
       prerelease:
         description: "Mark as prerelease"
         required: true
@@ -23,8 +23,20 @@ permissions:
   contents: write
 
 jobs:
-  build-release:
-    runs-on: windows-latest
+  build-packages:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            platform: windows
+            artifact_name: release-windows-amd64
+            package_name: TRPG模组笔记-windows-amd64.zip
+          - os: ubuntu-latest
+            platform: linux
+            artifact_name: release-linux-amd64
+            package_name: TRPG模组笔记-linux-amd64.tar.gz
+    runs-on: ${{ matrix.os }}
 
     steps:
       - name: Checkout
@@ -44,14 +56,27 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Install Linux build dependencies
+        if: ${{ matrix.platform == 'linux' }}
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            gcc \
+            pkg-config \
+            libgtk-3-dev \
+            libglib2.0-dev \
+            libayatana-appindicator3-dev
+
       - name: Build frontend
         run: npm run build
 
       - name: Build Windows EXE
+        if: ${{ matrix.platform == 'windows' }}
         working-directory: server
         run: go build -o release/TRPG模组笔记.exe
 
-      - name: Create ZIP
+      - name: Create Windows ZIP
+        if: ${{ matrix.platform == 'windows' }}
         shell: pwsh
         run: |
           $staging = "server/release/package"
@@ -73,13 +98,56 @@ jobs:
             -DestinationPath "TRPG模组笔记-windows-amd64.zip" `
             -Force
 
+      - name: Build Linux binary
+        if: ${{ matrix.platform == 'linux' }}
+        working-directory: server
+        run: go build -o release/trpg-note
+
+      - name: Create Linux tar.gz
+        if: ${{ matrix.platform == 'linux' }}
+        shell: bash
+        run: |
+          staging="server/release/package"
+          rm -rf "$staging"
+          mkdir -p "$staging"
+
+          cp "server/release/trpg-note" "$staging/trpg-note"
+          chmod +x "$staging/trpg-note"
+
+          if [ -d "server/release/data" ]; then
+            cp -R "server/release/data" "$staging/data"
+          else
+            mkdir -p "$staging/data"
+          fi
+
+          tar -C "$staging" -czf "TRPG模组笔记-linux-amd64.tar.gz" .
+
+      - name: Upload package artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: ${{ matrix.package_name }}
+          if-no-files-found: error
+
+  publish-release:
+    needs: build-packages
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download package artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: release-*
+          merge-multiple: true
+
       - name: Validate release tag
         if: ${{ github.event_name == 'workflow_dispatch' }}
-        shell: pwsh
+        shell: bash
         run: |
-          if ("${{ inputs.release_tag }}" -notmatch "^v\d+\.\d+(\.\d+)?$") {
-            throw "release_tag 必须是 vX.Y 或 vX.Y.Z 格式，例如 v1.2 或 v1.2.0"
-          }
+          if [[ ! "${{ inputs.release_tag }}" =~ ^v[0-9]+\.[0-9]+(\.[0-9]+)?$ ]]; then
+            echo "release_tag 必须是 vX.Y 或 vX.Y.Z 格式，例如 v1.2 或 v1.2.0" >&2
+            exit 1
+          fi
 
       - name: Publish Release
         uses: softprops/action-gh-release@v2
@@ -92,11 +160,11 @@ jobs:
           make_latest: true
           body: |
             ## ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || inputs.release_name }} 更新内容
-            - 更新了tag功能，可自行增加tag进行分类
-            - 任务看板升级为 GM 主导协作模型：统一编辑锁、成员协作写入与冲突保护
-            - 任务看板接入版本记录，可从版本页按文档筛选查看看板更新轨迹
-            - 新功能引导统一收纳到右下角问号内，补充了任务看板、线索合并、设置页折叠功能与概览检索说明
-          files: TRPG模组笔记-windows-amd64.zip
+            - 新增了 Linux amd64 发布包
+            - 新增了 docker 镜像
+          files: |
+            TRPG模组笔记-windows-amd64.zip
+            TRPG模组笔记-linux-amd64.tar.gz
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

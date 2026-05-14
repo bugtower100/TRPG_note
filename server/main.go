@@ -17,8 +17,6 @@ import (
 	"time"
 	"unicode"
 
-	"runtime"
-
 	"github.com/gin-gonic/gin"
 	"github.com/glebarez/sqlite"
 	"github.com/spf13/viper"
@@ -2469,19 +2467,6 @@ func main() {
 		}
 		serveWeb(c, p)
 	})
-	// enforce single instance and console visibility on Windows
-	if runtime.GOOS == "windows" {
-		if *showConsole {
-			showWindow()
-		} else {
-			hideWindow()
-		}
-		if TestRunning() {
-			return
-		}
-	}
-	// 启动 HTTP 服务（后台），再在主线程启动托盘
 	addr := fmt.Sprintf("0.0.0.0:%d", cfg.Port)
-	go httpServe(router, addr, *hideUI)
-	trayInit()
+	startPlatformApp(router, addr, *showConsole, *hideUI)
 }

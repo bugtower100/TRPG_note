@@ -1,0 +1,16 @@
+.git
+.github
+.vercel
+node_modules
+dist
+coverage
+.DS_Store
+npm-debug.log*
+yarn-error.log
+
+server/data
+server/release
+server/.idea
+
+data
+docs
