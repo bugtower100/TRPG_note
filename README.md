@@ -62,8 +62,9 @@ TRPG_note 是一款面向主持人（GM）的模组管理工具。
 ### 普通用户（推荐）
 1. 打开项目的 GitHub Releases 页面
 2. Windows 下载最新版本 `TRPG模组笔记-windows-amd64.zip`
-3. Linux 下载最新版本 `TRPG模组笔记-linux-amd64.tar.gz`
-4. 解压到你常用目录后启动对应程序
+3. x86_64 Linux 下载 `TRPG模组笔记-linux-amd64.tar.gz`
+4. ARM64 Linux 下载 `TRPG模组笔记-linux-arm64.tar.gz`
+5. 解压到你常用目录后启动对应程序
 
 ### 便携建议
 - 建议把 EXE 与备份文件放在同一个专用目录
@@ -73,6 +74,7 @@ TRPG_note 是一款面向主持人（GM）的模组管理工具。
 - 已支持通过 Docker 方式部署纯服务端版，不依赖托盘图标
 - 推荐直接使用 `ghcr.io` 镜像，适合部署到 NAS、家庭服务器或云主机
 - Docker 镜像不再在容器内重复编译，而是直接封装 CI 产出的 `headless` Linux 二进制，并基于 Alpine 运行时镜像发布
+- Docker 镜像提供 `linux/amd64` 和 `linux/arm64` 多架构支持
 
 ```bash
 docker run -d \
@@ -112,8 +114,8 @@ http://localhost:8080/web
 
 ### 环境要求
 - Node.js 18+、npm 9+（前端构建）
-- Go 1.21+（后端服务）
-- Windows / Linux（当前发布目标）
+- Go 1.25+（后端服务）
+- Windows / Linux（当前发布目标：windows/amd64、linux/amd64、linux/arm64）
 
 ### 常用命令
 
@@ -137,14 +139,21 @@ cd server && go build -o release/TRPG模组笔记.exe
 ```
 
 ```bash
-# 3) 构建 Linux 版
-cd server && go build -o release/trpg-note
+# 3) 构建 Linux amd64 版
+cd server && GOOS=linux GOARCH=amd64 go build -o release/trpg-note
 ```
 
 ```bash
-# 4) 构建 Docker/headless 版
-cd server && go build -tags headless -o release/trpg-note-headless
+# 4) 构建 Linux arm64 版
+cd server && GOOS=linux GOARCH=arm64 go build -o release/trpg-note
 ```
+
+```bash
+# 5) 构建 Docker/headless 版
+cd server && GOOS=linux GOARCH=amd64 go build -tags headless -o release/trpg-note-headless
+```
+
+若需 arm64 headless 版，可将上面的 `GOARCH=amd64` 替换为 `GOARCH=arm64`。
 
 运行方式：
 - 双击 `release/TRPG模组笔记.exe` 后，访问托盘弹出的地址或浏览器自动打开的页面
