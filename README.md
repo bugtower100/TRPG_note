@@ -114,7 +114,7 @@ http://localhost:8080/web
 
 ### 环境要求
 - Node.js 18+、npm 9+（前端构建）
-- Go 1.25+（后端服务）
+- Go 1.21+（后端服务）
 - Windows / Linux（当前发布目标：windows/amd64、linux/amd64、linux/arm64）
 
 ### 常用命令
