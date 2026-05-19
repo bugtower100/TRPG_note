@@ -17,6 +17,12 @@ permissions:
 
 jobs:
   build-headless-binary:
+    strategy:
+      fail-fast: false
+      matrix:
+        goarch:
+          - amd64
+          - arm64
     runs-on: ubuntu-latest
 
     steps:
@@ -43,13 +49,13 @@ jobs:
       - name: Build headless Linux binary
         working-directory: server
         run: |
-          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -tags headless -trimpath -ldflags "-s -w" -o release/trpg-note
+          CGO_ENABLED=0 GOOS=linux GOARCH=${{ matrix.goarch }} go build -tags headless -trimpath -ldflags "-s -w" -o release/trpg-note-${{ matrix.goarch }}
 
       - name: Upload headless binary artifact
         uses: actions/upload-artifact@v4
         with:
-          name: trpg-note-headless-linux-amd64
-          path: server/release/trpg-note
+          name: trpg-note-headless-linux-${{ matrix.goarch }}
+          path: server/release/trpg-note-${{ matrix.goarch }}
           if-no-files-found: error
 
   docker:
@@ -63,8 +69,12 @@ jobs:
       - name: Download headless binary artifact
         uses: actions/download-artifact@v4
         with:
-          name: trpg-note-headless-linux-amd64
+          pattern: trpg-note-headless-linux-*
+          merge-multiple: true
           path: .docker-bin
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -108,7 +118,7 @@ jobs:
           context: .
           file: ./Dockerfile
           push: true
-          platforms: linux/amd64
+          platforms: linux/amd64,linux/arm64
           tags: ${{ steps.meta.outputs.tags }}
           labels: |
             org.opencontainers.image.title=TRPG_note

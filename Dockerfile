@@ -1,12 +1,16 @@
 FROM alpine:3.22
 
+ARG TARGETARCH
+
 WORKDIR /app
 
 RUN addgroup -S app && adduser -S -G app -u 10001 appuser
 
-COPY .docker-bin/trpg-note /app/trpg-note
+COPY .docker-bin/ /tmp/docker-bin/
 
-RUN chmod +x /app/trpg-note && \
+RUN cp "/tmp/docker-bin/trpg-note-${TARGETARCH}" /app/trpg-note && \
+    chmod +x /app/trpg-note && \
+    rm -rf /tmp/docker-bin && \
     mkdir -p /app/data && \
     chown -R appuser:app /app
 

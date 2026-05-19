@@ -30,12 +30,21 @@ jobs:
         include:
           - os: windows-latest
             platform: windows
+            goarch: amd64
             artifact_name: release-windows-amd64
             package_name: TRPG模组笔记-windows-amd64.zip
           - os: ubuntu-latest
             platform: linux
+            goos: linux
+            goarch: amd64
             artifact_name: release-linux-amd64
             package_name: TRPG模组笔记-linux-amd64.tar.gz
+          - os: ubuntu-latest
+            platform: linux
+            goos: linux
+            goarch: arm64
+            artifact_name: release-linux-arm64
+            package_name: TRPG模组笔记-linux-arm64.tar.gz
     runs-on: ${{ matrix.os }}
 
     steps:
@@ -55,17 +64,6 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
-
-      - name: Install Linux build dependencies
-        if: ${{ matrix.platform == 'linux' }}
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            gcc \
-            pkg-config \
-            libgtk-3-dev \
-            libglib2.0-dev \
-            libayatana-appindicator3-dev
 
       - name: Build frontend
         run: npm run build
@@ -101,6 +99,9 @@ jobs:
       - name: Build Linux binary
         if: ${{ matrix.platform == 'linux' }}
         working-directory: server
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
         run: go build -o release/trpg-note
 
       - name: Create Linux tar.gz
@@ -120,7 +121,7 @@ jobs:
             mkdir -p "$staging/data"
           fi
 
-          tar -C "$staging" -czf "TRPG模组笔记-linux-amd64.tar.gz" .
+          tar -C "$staging" -czf "${{ matrix.package_name }}" .
 
       - name: Upload package artifact
         uses: actions/upload-artifact@v4
@@ -160,11 +161,12 @@ jobs:
           make_latest: true
           body: |
             ## ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || inputs.release_name }} 更新内容
-            - 新增了 Linux amd64 发布包
+            - 提供 Windows amd64、Linux amd64 和 Linux arm64 发布包
             - 新增了 docker 镜像
           files: |
             TRPG模组笔记-windows-amd64.zip
             TRPG模组笔记-linux-amd64.tar.gz
+            TRPG模组笔记-linux-arm64.tar.gz
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
