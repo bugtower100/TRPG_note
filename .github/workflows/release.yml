@@ -4,8 +4,6 @@ on:
   push:
     tags:
       - "v*"
-    branches:
-      - "macos-runner-test"
   workflow_dispatch:
     inputs:
       release_tag:
@@ -164,7 +162,6 @@ jobs:
           if-no-files-found: error
 
   publish-release:
-    if: ${{ startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch' }}
     needs: build-packages
     runs-on: ubuntu-latest
 
