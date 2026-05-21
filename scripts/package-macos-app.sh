@@ -25,7 +25,7 @@ mkdir -p "${MACOS_DIR}" "${RESOURCES_DIR}" "${RESOURCES_DIR}/data"
 cp "${BINARY_PATH}" "${MACOS_DIR}/${MAIN_BINARY_NAME}"
 chmod +x "${MACOS_DIR}/${MAIN_BINARY_NAME}"
 
-cat > "${MACOS_DIR}/${LAUNCHER_NAME}" <<EOF
+cat > "${MACOS_DIR}/${LAUNCHER_NAME}" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -35,7 +35,7 @@ DATA_DIR="${RESOURCE_DIR}/data"
 mkdir -p "${DATA_DIR}"
 export BTR_DB_PATH="${DATA_DIR}/storage.db"
 cd "${RESOURCE_DIR}"
-exec "${SCRIPT_DIR}/${MAIN_BINARY_NAME}" "$@"
+exec "${SCRIPT_DIR}/trpg-note" "$@"
 EOF
 chmod +x "${MACOS_DIR}/${LAUNCHER_NAME}"
 
