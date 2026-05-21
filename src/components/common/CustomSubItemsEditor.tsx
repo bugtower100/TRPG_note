@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import RichTextEditor from './RichTextEditor';
+import RichTextDisplay from './RichTextDisplay';
 import ConfirmDialog from './ConfirmDialog';
 import { CustomSubItem } from '../../types';
 
@@ -25,6 +26,7 @@ const CustomSubItemsEditor: React.FC<CustomSubItemsEditorProps> = ({
 }) => {
   const [search, setSearch] = useState('');
   const [removingItem, setRemovingItem] = useState<CustomSubItem | null>(null);
+  const [editingIds, setEditingIds] = useState<string[]>([]);
 
   useEffect(() => {
     if (ensureOneItem && items.length === 0) {
@@ -44,21 +46,28 @@ const CustomSubItemsEditor: React.FC<CustomSubItemsEditorProps> = ({
     if (!stillExists) setRemovingItem(null);
   }, [items, removingItem]);
 
+  useEffect(() => {
+    setEditingIds((prev) => prev.filter((id) => items.some((item) => item.id === id)));
+  }, [items]);
+
   const toggleCollapse = (id: string) => {
     const next = items.map((item) =>
       item.id === id ? { ...item, collapsed: !item.collapsed } : item
     );
+    setEditingIds((prev) => prev.filter((editingId) => editingId !== id));
     onChange(next);
   };
 
   const addItem = () => {
+    const newItem = {
+      id: uuidv4(),
+      title: '新子项目',
+      content: ''
+    } as CustomSubItem;
+    setEditingIds((prev) => [...prev, newItem.id]);
     onChange([
       ...items,
-      {
-        id: uuidv4(),
-        title: '新子项目',
-        content: ''
-      } as CustomSubItem
+      newItem,
     ]);
   };
 
@@ -76,6 +85,14 @@ const CustomSubItemsEditor: React.FC<CustomSubItemsEditorProps> = ({
       return;
     }
     setRemovingItem(target);
+  };
+
+  const startEditing = (id: string) => {
+    setEditingIds((prev) => (prev.includes(id) ? prev : [...prev, id]));
+  };
+
+  const stopEditing = (id: string) => {
+    setEditingIds((prev) => prev.filter((editingId) => editingId !== id));
   };
 
   const filteredItems = useMemo(() => {
@@ -124,6 +141,7 @@ const CustomSubItemsEditor: React.FC<CustomSubItemsEditorProps> = ({
       )}
       {filteredItems.map((item) => {
         const collapsed = Boolean(item.collapsed);
+        const isEditing = editingIds.includes(item.id);
         return (
           <div
             key={item.id}
@@ -139,13 +157,32 @@ const CustomSubItemsEditor: React.FC<CustomSubItemsEditorProps> = ({
               >
                 {collapsed ? '展开' : '收起'}
               </button>
-              <input
-                type="text"
-                value={item.title}
-                onChange={(e) => updateItem(item.id, { title: e.target.value })}
-                className="flex-1 min-w-[180px] p-2 border border-theme rounded focus:outline-none focus:border-primary bg-transparent"
-                placeholder="子项目标题"
-              />
+              {isEditing ? (
+                <input
+                  type="text"
+                  value={item.title}
+                  onChange={(e) => updateItem(item.id, { title: e.target.value })}
+                  className="flex-1 min-w-[180px] p-2 border border-theme rounded focus:outline-none focus:border-primary bg-transparent"
+                  placeholder="子项目标题"
+                />
+              ) : (
+                <div className="flex-1 min-w-[180px] px-1 py-2 font-medium break-words">
+                  {item.title || '未命名子项目'}
+                </div>
+              )}
+              {!collapsed && (
+                <button
+                  type="button"
+                  onClick={() => (isEditing ? stopEditing(item.id) : startEditing(item.id))}
+                  className={`text-xs px-2 py-1 rounded border ${
+                    isEditing
+                      ? 'border-primary/40 text-primary hover:bg-primary/10'
+                      : 'border-theme theme-text-secondary hover:text-primary'
+                  }`}
+                >
+                  {isEditing ? '结束编辑' : '开始编辑'}
+                </button>
+              )}
               {renderItemActions?.(item)}
               <button
                 type="button"
@@ -156,12 +193,22 @@ const CustomSubItemsEditor: React.FC<CustomSubItemsEditorProps> = ({
               </button>
             </div>
             {!collapsed && (
-              <RichTextEditor
-                value={item.content}
-                onChange={(val) => updateItem(item.id, { content: val })}
-                placeholder="子项目内容..."
-                minHeight="100px"
-              />
+              isEditing ? (
+                <RichTextEditor
+                  value={item.content}
+                  onChange={(val) => updateItem(item.id, { content: val })}
+                  placeholder="子项目内容..."
+                  minHeight="100px"
+                />
+              ) : (
+                <div className="border border-theme rounded-md bg-theme-card/60 px-3 py-3 min-h-[96px]">
+                  {item.content?.trim() ? (
+                    <RichTextDisplay content={item.content} />
+                  ) : (
+                    <div className="text-sm theme-text-secondary">暂无内容，点击“开始编辑”补充。</div>
+                  )}
+                </div>
+              )
             )}
           </div>
         );

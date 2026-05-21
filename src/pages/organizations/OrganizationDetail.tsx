@@ -111,6 +111,21 @@ const OrganizationDetail: React.FC<OrganizationDetailProps> = ({ entityId }) => 
     updateEntity('organizations', updated);
   };
 
+  const visibleSectionKeys = [
+    ...sectionDefs.filter((section) => isSectionVisible(section.key)).map((section) => section.key),
+    ...(organization.customSections || []),
+  ];
+  const allVisibleExpanded = visibleSectionKeys.length > 0 && visibleSectionKeys.every((key) => collapsed[key] === false);
+
+  const expandAllPreview = () => {
+    const next: Record<string, boolean> = {};
+    const nextCollapsed = allVisibleExpanded;
+    for (const sectionKey of visibleSectionKeys) {
+      next[sectionKey] = nextCollapsed;
+    }
+    setCollapsed((prev) => ({ ...prev, ...next }));
+  };
+
   return (
     <div className="max-w-4xl mx-auto space-y-6 pb-12 px-2 sm:px-0">
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 border-b pb-3">
@@ -136,6 +151,13 @@ const OrganizationDetail: React.FC<OrganizationDetailProps> = ({ entityId }) => 
         </div>
         
         <div className="flex items-center gap-2 sm:gap-3">
+            <button
+                type="button"
+                onClick={expandAllPreview}
+                className="px-3 py-1.5 border border-theme rounded hover:bg-primary-light text-sm"
+            >
+                {allVisibleExpanded ? '收起全部' : '展开全部'}
+            </button>
             <EntityShareActions entityType="organizations" entity={organization} scope="entity" label="分享整张卡片" />
             <button
                 onClick={saveCampaign}

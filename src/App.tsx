@@ -61,7 +61,7 @@ function AppContent() {
             <Route path="clue-board" element={<Navigate to="/clues" replace />} />
             <Route path="session-tasks" element={<SessionTaskBoard />} />
             <Route path="timelines" element={<TimelineList />} />
-            <Route path="timelines/:id" element={<TimelineDetail />} />
+            <Route path="timelines/:id" element={<TimelineList />} />
             <Route path="timelines/shared/:shareId" element={<SharedEntityDetailRoute entityType="timelines" />} />
             <Route path="relation-graphs" element={<RelationGraphs />} />
             <Route path="team-notes" element={<TeamNotes />} />

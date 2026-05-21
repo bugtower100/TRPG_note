@@ -30,6 +30,16 @@ export const DEFAULT_CAMPAIGN_DATA: CampaignData = {
   relationGraphs: [],
 };
 
+const timelineEventFallbackTitle = (raw: any): string => {
+  const explicitTitle = typeof raw?.title === 'string' ? raw.title.trim() : '';
+  if (explicitTitle) return explicitTitle;
+  const content = typeof raw?.content === 'string' ? raw.content.replace(/[#>*_\-\n\r`]/g, ' ').trim() : '';
+  if (content) return content.slice(0, 14);
+  const time = typeof raw?.time === 'string' ? raw.time.trim() : '';
+  if (time) return time;
+  return '未命名节点';
+};
+
 const hashSecret = (input: string): string => {
   const normalized = (input || '').trim();
   let hash = 2166136261;
@@ -254,7 +264,15 @@ class DataService {
 
     const timelines: Timeline[] = safeArray<any>(raw?.timelines, []).map((t) => ({
       ...normalizeBase(t),
-      timelineEvents: safeArray<any>(t?.timelineEvents, []),
+      timelineEvents: safeArray<any>(t?.timelineEvents, []).map((event) => ({
+        id: typeof event?.id === 'string' && event.id ? event.id : uuidv4(),
+        title: timelineEventFallbackTitle(event),
+        time: typeof event?.time === 'string' ? event.time : '',
+        content: typeof event?.content === 'string' ? event.content : '',
+        relations: safeArray<any>(event?.relations, []),
+        relatedImages: safeArray<any>(event?.relatedImages, []),
+        isRevealed: Boolean(event?.isRevealed),
+      })),
     }));
 
     const monsters: Monster[] = safeArray<any>(raw?.monsters, []).map((m) => ({

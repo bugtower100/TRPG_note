@@ -111,6 +111,21 @@ const LocationDetail: React.FC<LocationDetailProps> = ({ entityId }) => {
     updateEntity('locations', updated);
   };
 
+  const visibleSectionKeys = [
+    ...sectionDefs.filter((section) => isSectionVisible(section.key)).map((section) => section.key),
+    ...(location.customSections || []),
+  ];
+  const allVisibleExpanded = visibleSectionKeys.length > 0 && visibleSectionKeys.every((key) => collapsed[key] === false);
+
+  const expandAllPreview = () => {
+    const next: Record<string, boolean> = {};
+    const nextCollapsed = allVisibleExpanded;
+    for (const sectionKey of visibleSectionKeys) {
+      next[sectionKey] = nextCollapsed;
+    }
+    setCollapsed((prev) => ({ ...prev, ...next }));
+  };
+
   return (
     <div className="max-w-4xl mx-auto space-y-6 pb-12 px-2 sm:px-0">
       {/* Header */}
@@ -137,6 +152,13 @@ const LocationDetail: React.FC<LocationDetailProps> = ({ entityId }) => {
         </div>
         
         <div className="flex items-center gap-2 sm:gap-3">
+            <button
+                type="button"
+                onClick={expandAllPreview}
+                className="px-3 py-1.5 border border-theme rounded hover:bg-primary-light text-sm"
+            >
+                {allVisibleExpanded ? '收起全部' : '展开全部'}
+            </button>
             <EntityShareActions entityType="locations" entity={location} scope="entity" label="分享整张卡片" />
             <button
                 onClick={saveCampaign}

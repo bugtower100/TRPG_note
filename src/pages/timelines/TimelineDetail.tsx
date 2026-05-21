@@ -1,118 +1,134 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useCampaign } from '../../context/CampaignContext';
 import { Timeline, TimelineEvent } from '../../types';
 import { v4 as uuidv4 } from 'uuid';
 import RichTextEditor from '../../components/common/RichTextEditor';
+import RichTextDisplay from '../../components/common/RichTextDisplay';
 import CustomSubItemsEditor from '../../components/common/CustomSubItemsEditor';
 import CollapsibleSection from '../../components/common/CollapsibleSection';
-import SectionAddBar from '../../components/common/SectionAddBar';
 import EntityShareActions, { ShareSectionAction, ShareSubItemAction } from '../../components/common/EntityShareActions';
-import EntityTagEditor from '../../components/common/EntityTagEditor';
+import { markdownToPreviewText } from '../../components/common/richTextReference';
 
 interface TimelineDetailProps {
   entityId?: string;
+  embedded?: boolean;
+  onDeleted?: () => void;
 }
 
-const TimelineDetail: React.FC<TimelineDetailProps> = ({ entityId }) => {
+const TimelineDetail: React.FC<TimelineDetailProps> = ({ entityId, embedded = false, onDeleted }) => {
   const { id: paramId } = useParams<{ id: string }>();
   const id = entityId || paramId;
   const navigate = useNavigate();
   const { campaignData, updateEntity, deleteEntity, saveCampaign } = useCampaign();
   const [timeline, setTimeline] = useState<Timeline | null>(null);
-  const [collapsedIds, setCollapsedIds] = useState<string[]>([]);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({
     intro: true,
-    events: true,
   });
-  const sectionDefs = [
-    { key: 'intro', title: '简介' },
-  ];
+  const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
+  const [isEditingEvent, setIsEditingEvent] = useState(false);
+  const [eventDraft, setEventDraft] = useState<TimelineEvent | null>(null);
+  const [isEditingIntro, setIsEditingIntro] = useState(false);
+  const sectionDefs = [{ key: 'intro', title: '简介' }];
+  const [hasInitializedSelection, setHasInitializedSelection] = useState(false);
 
   useEffect(() => {
-    const found = campaignData.timelines.find(t => t.id === id);
+    const found = campaignData.timelines.find((t) => t.id === id);
     if (found) {
       setTimeline(found);
-    } else {
+    } else if (!embedded) {
       navigate('/timelines');
     }
-  }, [id, campaignData.timelines, navigate]);
+  }, [id, campaignData.timelines, navigate, embedded]);
 
-  if (!timeline) return <div>加载中...</div>;
+  useEffect(() => {
+    const handlePointerDown = (event: MouseEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (!target) return;
+      if (target.closest('[data-timeline-node="true"]')) return;
+      if (target.closest('[data-timeline-note-panel="true"]')) return;
+      setSelectedEventId(null);
+      setIsEditingEvent(false);
+    };
+    window.addEventListener('mousedown', handlePointerDown);
+    return () => window.removeEventListener('mousedown', handlePointerDown);
+  }, []);
+
+  const getEventTitle = (event: TimelineEvent) => {
+    const explicit = (event.title || '').trim();
+    if (explicit) return explicit;
+    const preview = markdownToPreviewText(event.content || '').trim();
+    if (preview) return preview.slice(0, 14);
+    return event.time?.trim() || '未命名节点';
+  };
+
+  const persistTimeline = (updatedTimeline: Timeline) => {
+    setTimeline(updatedTimeline);
+    updateEntity('timelines', updatedTimeline);
+  };
 
   const handleChange = (field: keyof Timeline, value: any) => {
     const updatedTimeline = { ...timeline, [field]: value };
-    setTimeline(updatedTimeline);
-    updateEntity('timelines', updatedTimeline);
+    persistTimeline(updatedTimeline);
   };
 
   const handleDelete = () => {
     if (confirm('确定要删除这条时间线吗？')) {
       deleteEntity('timelines', id!);
-      navigate('/timelines');
+      onDeleted?.();
+      if (!embedded) {
+        navigate('/timelines');
+      }
     }
   };
 
-  // Timeline Event Management
   const addEvent = () => {
     const newEvent: TimelineEvent = {
       id: uuidv4(),
+      title: `新节点 ${timeline.timelineEvents.length + 1}`,
       time: '',
       content: '',
       relations: [],
       relatedImages: [],
-      isRevealed: false
+      isRevealed: false,
     };
-    
+
     const updatedTimeline = {
       ...timeline,
-      timelineEvents: [...timeline.timelineEvents, newEvent]
+      timelineEvents: [...timeline.timelineEvents, newEvent],
     };
-    
-    setTimeline(updatedTimeline);
-    updateEntity('timelines', updatedTimeline);
-  };
 
-  const updateEvent = (eventId: string, field: keyof TimelineEvent, value: any) => {
-    const updatedEvents = timeline.timelineEvents.map(e => 
-      e.id === eventId ? { ...e, [field]: value } : e
-    );
-    const updatedTimeline = { ...timeline, timelineEvents: updatedEvents };
-    setTimeline(updatedTimeline);
-    updateEntity('timelines', updatedTimeline);
+    persistTimeline(updatedTimeline);
+    setSelectedEventId(newEvent.id);
+    setEventDraft({ ...newEvent });
+    setIsEditingEvent(true);
   };
 
   const deleteEvent = (eventId: string) => {
     if (confirm('删除此事件节点？')) {
-      const updatedEvents = timeline.timelineEvents.filter(e => e.id !== eventId);
-      const updatedTimeline = { ...timeline, timelineEvents: updatedEvents };
-      setTimeline(updatedTimeline);
-      updateEntity('timelines', updatedTimeline);
+      const updatedEvents = timeline.timelineEvents.filter((event) => event.id !== eventId);
+      persistTimeline({ ...timeline, timelineEvents: updatedEvents });
+      if (selectedEventId === eventId) {
+        setSelectedEventId(updatedEvents[0]?.id || null);
+        setIsEditingEvent(false);
+        setEventDraft(null);
+      }
     }
   };
 
   const moveEvent = (index: number, direction: 'up' | 'down') => {
     if (
-      (direction === 'up' && index === 0) || 
+      (direction === 'up' && index === 0) ||
       (direction === 'down' && index === timeline.timelineEvents.length - 1)
     ) return;
 
-    const newEvents = [...timeline.timelineEvents];
+    const nextEvents = [...timeline.timelineEvents];
     const targetIndex = direction === 'up' ? index - 1 : index + 1;
-    [newEvents[index], newEvents[targetIndex]] = [newEvents[targetIndex], newEvents[index]];
-    
-    const updatedTimeline = { ...timeline, timelineEvents: newEvents };
-    setTimeline(updatedTimeline);
-    updateEntity('timelines', updatedTimeline);
+    [nextEvents[index], nextEvents[targetIndex]] = [nextEvents[targetIndex], nextEvents[index]];
+    persistTimeline({ ...timeline, timelineEvents: nextEvents });
   };
 
-  const toggleCollapse = (eventId: string) => {
-    setCollapsedIds((prev) =>
-      prev.includes(eventId) ? prev.filter((id) => id !== eventId) : [...prev, eventId]
-    );
-  };
-
-  const isSectionVisible = (key: string) => timeline.sectionVisibility?.[key] !== false;
+  const isSectionVisible = (key: string) => timeline?.sectionVisibility?.[key] !== false;
 
   const setSectionVisible = (key: string, visible: boolean) => {
     handleChange('sectionVisibility' as keyof Timeline, {
@@ -139,49 +155,119 @@ const TimelineDetail: React.FC<TimelineDetailProps> = ({ entityId }) => {
     });
   };
 
-  const addCustomSection = () => {
-    const name = window.prompt('请输入新内置区块名称', '新内置区块');
-    if (!name || !name.trim()) return;
-    const key = `custom_${Date.now()}`;
-    const updated = {
-      ...timeline,
-      customSections: [...(timeline.customSections || []), key],
-      sectionTitles: { ...(timeline.sectionTitles || {}), [key]: name.trim() },
-      sectionVisibility: { ...(timeline.sectionVisibility || {}), [key]: true },
-      sectionSubItems: { ...(timeline.sectionSubItems || {}), [key]: [] },
-    };
-    setTimeline(updated);
-    updateEntity('timelines', updated);
-    setCollapsed((prev) => ({ ...prev, [key]: true }));
-  };
-
   const removeCustomSection = (key: string) => {
-    const nextCustomSections = (timeline.customSections || []).filter((k) => k !== key);
+    const nextCustomSections = (timeline.customSections || []).filter((sectionKey) => sectionKey !== key);
     const nextTitles = { ...(timeline.sectionTitles || {}) };
     const nextVisibility = { ...(timeline.sectionVisibility || {}) };
     const nextSubItems = { ...(timeline.sectionSubItems || {}) };
     delete nextTitles[key];
     delete nextVisibility[key];
     delete nextSubItems[key];
-    const updated = {
+    persistTimeline({
       ...timeline,
       customSections: nextCustomSections,
       sectionTitles: nextTitles,
       sectionVisibility: nextVisibility,
       sectionSubItems: nextSubItems,
-    };
-    setTimeline(updated);
-    updateEntity('timelines', updated);
+    });
   };
 
+  const selectedEvent = useMemo(
+    () => timeline?.timelineEvents.find((event) => event.id === selectedEventId) || null,
+    [timeline, selectedEventId]
+  );
+
+  useEffect(() => {
+    if (!timeline) return;
+    if (timeline.timelineEvents.length === 0) {
+      setSelectedEventId(null);
+      setEventDraft(null);
+      setIsEditingEvent(false);
+      setHasInitializedSelection(false);
+      return;
+    }
+    if (!hasInitializedSelection) {
+      setSelectedEventId(timeline.timelineEvents[0].id);
+      setHasInitializedSelection(true);
+      return;
+    }
+    if (selectedEventId && !timeline.timelineEvents.some((event) => event.id === selectedEventId)) {
+      setSelectedEventId(null);
+    }
+  }, [timeline, selectedEventId, hasInitializedSelection]);
+
+  useEffect(() => {
+    if (!timeline) return;
+    if (!selectedEvent) {
+      setEventDraft(null);
+      setIsEditingEvent(false);
+      return;
+    }
+    if (!isEditingEvent) {
+      setEventDraft({ ...selectedEvent });
+    }
+  }, [timeline, selectedEvent, isEditingEvent]);
+
+  const startEventEdit = () => {
+    if (!selectedEvent) return;
+    setEventDraft({ ...selectedEvent, title: getEventTitle(selectedEvent) });
+    setIsEditingEvent(true);
+  };
+
+  const finishEventEdit = () => {
+    if (!selectedEvent || !eventDraft) return;
+    const normalizedDraft: TimelineEvent = {
+      ...selectedEvent,
+      ...eventDraft,
+      title: (eventDraft.title || '').trim() || getEventTitle(eventDraft),
+      time: eventDraft.time || '',
+      content: eventDraft.content || '',
+    };
+    const updatedEvents = timeline.timelineEvents.map((event) =>
+      event.id === selectedEvent.id ? normalizedDraft : event
+    );
+    persistTimeline({ ...timeline, timelineEvents: updatedEvents });
+    setIsEditingEvent(false);
+  };
+
+  const cancelEventEdit = () => {
+    if (selectedEvent) {
+      setEventDraft({ ...selectedEvent });
+    }
+    setIsEditingEvent(false);
+  };
+
+  const selectedIndex = selectedEvent
+    ? (timeline?.timelineEvents.findIndex((event) => event.id === selectedEvent.id) ?? -1)
+    : -1;
+
+  const visibleSectionKeys = [
+    ...(isSectionVisible('intro') ? ['intro'] : []),
+    ...(timeline?.customSections || []),
+  ];
+  const allVisibleExpanded = visibleSectionKeys.length > 0 && visibleSectionKeys.every((key) => collapsed[key] === false);
+
+  const expandAllPreview = () => {
+    const next: Record<string, boolean> = {};
+    const nextCollapsed = allVisibleExpanded;
+    for (const sectionKey of visibleSectionKeys) {
+      next[sectionKey] = nextCollapsed;
+    }
+    setCollapsed((prev) => ({ ...prev, ...next }));
+    setIsEditingIntro(false);
+  };
+
+  if (!timeline) return <div>加载中...</div>;
+
   return (
-    <div className="max-w-4xl mx-auto space-y-6 pb-12 px-2 sm:px-0">
-      {/* Header */}
+    <div className={`${embedded ? 'space-y-6 pb-12' : 'max-w-5xl mx-auto space-y-6 pb-12 px-2 sm:px-0'}`}>
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 border-b pb-3">
         <div className="flex items-center gap-3 sm:gap-4 min-w-0 flex-1">
-          <button onClick={() => navigate('/timelines')} className="inline-flex items-center whitespace-nowrap shrink-0 text-gray-500 hover:text-gray-700">
-            &larr; 返回
-          </button>
+          {!embedded && (
+            <button onClick={() => navigate('/timelines')} className="inline-flex items-center whitespace-nowrap shrink-0 text-gray-500 hover:text-gray-700">
+              &larr; 返回
+            </button>
+          )}
           <input
             data-tour="entity-detail-name"
             type="text"
@@ -199,6 +285,13 @@ const TimelineDetail: React.FC<TimelineDetailProps> = ({ entityId }) => {
           />
         </div>
         <div className="flex items-center gap-2 sm:gap-3">
+          <button
+            type="button"
+            onClick={expandAllPreview}
+            className="px-3 py-1.5 border border-theme rounded hover:bg-primary-light text-sm"
+          >
+            {allVisibleExpanded ? '收起全部' : '展开全部'}
+          </button>
           <EntityShareActions entityType="timelines" entity={timeline} scope="entity" label="分享整张卡片" />
           <button
             onClick={saveCampaign}
@@ -207,7 +300,7 @@ const TimelineDetail: React.FC<TimelineDetailProps> = ({ entityId }) => {
             保存
           </button>
           <div className="w-px h-6 bg-gray-300 mx-1"></div>
-          <button 
+          <button
             onClick={handleDelete}
             className="text-red-500 hover:text-red-700 text-sm px-3 py-1.5 rounded hover:bg-red-50"
           >
@@ -216,45 +309,71 @@ const TimelineDetail: React.FC<TimelineDetailProps> = ({ entityId }) => {
         </div>
       </div>
 
-      <EntityTagEditor
-        tags={timeline.tags}
-        onChange={(tags) => handleChange('tags', tags)}
-      />
-
-      <SectionAddBar
-        hiddenSections={sectionDefs.filter((s) => !isSectionVisible(s.key))}
-        onAddSection={(key) => setSectionVisible(key, true)}
-        onAddCustomSection={addCustomSection}
-      />
-
-      {isSectionVisible('intro') && (
-      <CollapsibleSection
-        title={getSectionTitle('intro', '简介')}
-        collapsed={collapsed.intro}
-        onToggle={() => setCollapsed((prev) => ({ ...prev, intro: !prev.intro }))}
-        className="p-4"
-        removable
-        onRemove={() => setSectionVisible('intro', false)}
-        editableTitle
-        onRenameTitle={(title) => setSectionTitle('intro', title)}
-        headerActions={<ShareSectionAction entityType="timelines" entity={timeline} sectionKey="intro" />}
-      >
-        <RichTextEditor
-          value={timeline.details}
-          onChange={(val) => handleChange('details', val)}
-          placeholder="时间线简介..."
-          minHeight="90px"
-        />
-      </CollapsibleSection>
+      {sectionDefs.some((section) => !isSectionVisible(section.key)) && (
+        <div className="flex flex-wrap gap-2">
+          {sectionDefs.filter((section) => !isSectionVisible(section.key)).map((section) => (
+            <button
+              key={section.key}
+              type="button"
+              onClick={() => setSectionVisible(section.key, true)}
+              className="px-3 py-1.5 rounded border border-theme hover:bg-primary-light text-sm"
+            >
+              恢复{section.title}
+            </button>
+          ))}
+        </div>
       )}
 
-      <CollapsibleSection
-        title="事件节点"
-        collapsed={collapsed.events}
-        onToggle={() => setCollapsed((prev) => ({ ...prev, events: !prev.events }))}
-      >
-        <div className="space-y-4">
-        <div className="flex justify-between items-center">
+      {isSectionVisible('intro') && (
+        <CollapsibleSection
+          title={getSectionTitle('intro', '简介')}
+          collapsed={collapsed.intro}
+          onToggle={() => setCollapsed((prev) => ({ ...prev, intro: !prev.intro }))}
+          className="p-4"
+          removable
+          onRemove={() => setSectionVisible('intro', false)}
+          editableTitle
+          onRenameTitle={(title) => setSectionTitle('intro', title)}
+          headerActions={<ShareSectionAction entityType="timelines" entity={timeline} sectionKey="intro" />}
+        >
+          <div className="space-y-3">
+            {isEditingIntro ? (
+              <RichTextEditor
+                value={timeline.details}
+                onChange={(val) => handleChange('details', val)}
+                placeholder="时间线简介..."
+                minHeight="90px"
+              />
+            ) : (
+              <div className="border border-theme rounded-md bg-theme-card/60 px-3 py-3 min-h-[96px]">
+                {timeline.details?.trim() ? (
+                  <RichTextDisplay content={timeline.details} />
+                ) : (
+                  <div className="text-sm theme-text-secondary">暂无简介，点击“开始编辑”补充。</div>
+                )}
+              </div>
+            )}
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setIsEditingIntro((prev) => !prev)}
+                className="text-xs px-2 py-1 rounded border border-theme theme-text-secondary hover:text-primary"
+              >
+                {isEditingIntro ? '结束编辑' : '开始编辑'}
+              </button>
+            </div>
+          </div>
+        </CollapsibleSection>
+      )}
+
+      <section className="rounded-xl border border-theme theme-card p-4 space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h3 className="text-lg font-semibold">连续时间轴</h3>
+            <p className="text-sm theme-text-secondary">
+              点击添加节点，单击节点展开备注。
+            </p>
+          </div>
           <button
             onClick={addEvent}
             className="px-3 py-1 bg-primary text-white rounded hover:bg-primary-dark text-sm"
@@ -263,66 +382,46 @@ const TimelineDetail: React.FC<TimelineDetailProps> = ({ entityId }) => {
           </button>
         </div>
 
-        <div className="space-y-4 relative before:absolute before:left-4 before:top-2 before:bottom-2 before:w-0.5 before:bg-gray-200">
-          {timeline.timelineEvents.map((event, index) => (
-            <div key={event.id} className="relative pl-10">
-              {/* Timeline Dot */}
-              <div className="absolute left-2.5 top-4 w-3 h-3 bg-white border-2 border-primary rounded-full transform -translate-x-1/2"></div>
-              
-              <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-100 theme-card">
-                <div className="space-y-3">
-                    <div className="flex justify-between items-start">
-                        <input
-                        type="text"
-                        value={event.time}
-                        onChange={(e) => updateEvent(event.id, 'time', e.target.value)}
-                        className="font-mono text-sm font-bold text-primary w-1/3 border-b border-dashed border-gray-300 focus:border-primary focus:outline-none bg-transparent"
-                        placeholder="时间点..."
-                        />
-                        <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => toggleCollapse(event.id)}
-                          className="text-gray-400 hover:text-gray-700"
-                        >
-                          {collapsedIds.includes(event.id) ? '展开' : '收起'}
-                        </button>
-                        <button onClick={() => moveEvent(index, 'up')} disabled={index === 0} className="text-gray-400 hover:text-gray-600 disabled:opacity-30">↑</button>
-                        <button onClick={() => moveEvent(index, 'down')} disabled={index === timeline.timelineEvents.length - 1} className="text-gray-400 hover:text-gray-600 disabled:opacity-30">↓</button>
-                        <button onClick={() => deleteEvent(event.id)} className="text-red-400 hover:text-red-600 ml-2">×</button>
-                        </div>
-                    </div>
-
-                    {!collapsedIds.includes(event.id) && (
-                      <>
-                        <RichTextEditor
-                            value={event.content}
-                            onChange={(val) => updateEvent(event.id, 'content', val)}
-                            placeholder="发生了什么..."
-                            minHeight="100px"
-                        />
-
-                        <label className="flex items-center gap-2 text-xs text-gray-500">
-                            <input
-                            type="checkbox"
-                            checked={event.isRevealed}
-                            onChange={(e) => updateEvent(event.id, 'isRevealed', e.target.checked)}
-                            className="rounded text-primary focus:ring-primary"
-                            />
-                            节点公开
-                        </label>
-                      </>
-                    )}
-                </div>
-              </div>
+        {timeline.timelineEvents.length === 0 ? (
+          <p className="text-center text-gray-400 py-10">暂无事件节点，点击右上角开始添加节点。</p>
+        ) : (
+          <div className="relative pl-8 before:absolute before:left-3 before:top-2 before:bottom-2 before:w-0.5 before:bg-theme">
+            <div className="space-y-2">
+              {timeline.timelineEvents.map((event) => {
+                const selected = selectedEventId === event.id;
+                return (
+                  <div key={event.id} className="relative">
+                    <div className={`absolute left-3 top-5 h-4 w-4 -translate-x-1/2 rounded-full border-2 ${
+                      selected ? 'border-primary bg-primary' : 'border-primary bg-theme-card'
+                    }`} />
+                    <button
+                      type="button"
+                      data-timeline-node="true"
+                      onClick={() => {
+                        setSelectedEventId(event.id);
+                        setIsEditingEvent(false);
+                      }}
+                      className={`ml-5 w-[220px] max-w-full rounded-lg border px-3 py-2 text-left transition-colors ${
+                        selected
+                          ? 'border-primary bg-primary/10 ring-2 ring-primary/20'
+                          : 'border-theme hover:bg-primary-light/30'
+                      }`}
+                      title={getEventTitle(event)}
+                    >
+                      <div className="text-[11px] font-mono text-primary truncate">
+                        {event.time?.trim() || '未标注时间'}
+                      </div>
+                      <div className="mt-1 text-sm font-semibold truncate">
+                        {getEventTitle(event)}
+                      </div>
+                    </button>
+                  </div>
+                );
+              })}
             </div>
-          ))}
-          
-          {timeline.timelineEvents.length === 0 && (
-            <p className="text-center text-gray-400 py-8 pl-10">暂无事件节点</p>
-          )}
-        </div>
-      </div>
-      </CollapsibleSection>
+          </div>
+        )}
+      </section>
 
       {(timeline.customSections || []).map((sectionKey) => (
         <CollapsibleSection
@@ -346,6 +445,111 @@ const TimelineDetail: React.FC<TimelineDetailProps> = ({ entityId }) => {
           />
         </CollapsibleSection>
       ))}
+
+      {selectedEvent && (
+        <div data-timeline-note-panel="true" className="fixed inset-x-0 bottom-0 w-full md:inset-auto md:right-6 md:bottom-6 md:w-[380px] bg-theme-card border border-theme rounded-t-xl md:rounded-lg shadow-xl p-3 z-50">
+          <div className="flex items-center justify-between gap-2 mb-2">
+            <div className="min-w-0">
+              <div className="font-semibold truncate">{getEventTitle(selectedEvent)}</div>
+              <div className="text-xs theme-text-secondary">{selectedEvent.time?.trim() || '未标注时间'}</div>
+            </div>
+          </div>
+
+          {isEditingEvent && eventDraft ? (
+            <div className="space-y-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <input
+                  type="text"
+                  value={eventDraft.title || ''}
+                  onChange={(e) => setEventDraft((prev) => (prev ? { ...prev, title: e.target.value } : prev))}
+                  className="w-full px-3 py-2 rounded border border-theme bg-transparent"
+                  placeholder="短标题"
+                />
+                <input
+                  type="text"
+                  value={eventDraft.time || ''}
+                  onChange={(e) => setEventDraft((prev) => (prev ? { ...prev, time: e.target.value } : prev))}
+                  className="w-full px-3 py-2 rounded border border-theme bg-transparent"
+                  placeholder="时间"
+                />
+              </div>
+              <RichTextEditor
+                value={eventDraft.content || ''}
+                onChange={(value) => setEventDraft((prev) => (prev ? { ...prev, content: value } : prev))}
+                placeholder="节点备注..."
+                minHeight="150px"
+              />
+              <label className="flex items-center gap-2 text-sm theme-text-secondary">
+                <input
+                  type="checkbox"
+                  checked={Boolean(eventDraft.isRevealed)}
+                  onChange={(e) => setEventDraft((prev) => (prev ? { ...prev, isRevealed: e.target.checked } : prev))}
+                  className="rounded text-primary focus:ring-primary"
+                />
+                节点公开
+              </label>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={finishEventEdit}
+                  className="px-3 py-2 rounded bg-primary text-white hover:bg-primary-dark"
+                >
+                  完成编辑
+                </button>
+                <button
+                  type="button"
+                  onClick={cancelEventEdit}
+                  className="px-3 py-2 rounded border border-theme hover:bg-primary-light"
+                >
+                  取消
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <div className="min-h-[120px] rounded border border-theme p-3 bg-theme-card/60 overflow-auto">
+                {selectedEvent.content?.trim() ? (
+                  <RichTextDisplay content={selectedEvent.content} />
+                ) : (
+                  <div className="text-sm theme-text-secondary">暂无备注，点击“开始编辑”即可补充。</div>
+                )}
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={startEventEdit}
+                  className="px-3 py-2 rounded bg-primary text-white hover:bg-primary-dark"
+                >
+                  开始编辑
+                </button>
+                <button
+                  type="button"
+                  onClick={() => selectedIndex > 0 && moveEvent(selectedIndex, 'up')}
+                  disabled={selectedIndex <= 0}
+                  className="px-3 py-2 rounded border border-theme hover:bg-primary-light disabled:opacity-40"
+                >
+                  上移
+                </button>
+                <button
+                  type="button"
+                  onClick={() => selectedIndex >= 0 && selectedIndex < timeline.timelineEvents.length - 1 && moveEvent(selectedIndex, 'down')}
+                  disabled={selectedIndex < 0 || selectedIndex >= timeline.timelineEvents.length - 1}
+                  className="px-3 py-2 rounded border border-theme hover:bg-primary-light disabled:opacity-40"
+                >
+                  下移
+                </button>
+                <button
+                  type="button"
+                  onClick={() => deleteEvent(selectedEvent.id)}
+                  className="px-3 py-2 rounded border border-red-300 text-red-600 hover:bg-red-50"
+                >
+                  删除节点
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 };
