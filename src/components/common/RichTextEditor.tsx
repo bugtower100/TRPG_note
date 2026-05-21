@@ -11,9 +11,18 @@ import { EditorState, Plugin, PluginKey } from '@milkdown/prose/state';
 import { Decoration, DecorationSet } from '@milkdown/prose/view';
 import { createPortal } from 'react-dom';
 import { useCampaign } from '../../context/CampaignContext';
-import { resourceService, ResourceItem } from '../../services/resourceService';
+import {
+  buildResourceTree,
+  filterResourceItems,
+  ResourceFolder,
+  ResourceItem,
+  resourceFolderDisplayName,
+  resourceService,
+  RESOURCE_ROOT_PATH,
+} from '../../services/resourceService';
 import RichTextDisplay from './RichTextDisplay';
 import KeywordPreviewSheet from './KeywordPreviewSheet';
+import ResourceTreeView from './ResourceTreeView';
 import {
   RichTextTooltipContent,
   TooltipState,
@@ -313,7 +322,10 @@ const MilkdownEditorInner: React.FC<MilkdownEditorInnerProps> = ({
   const [isResourcePickerOpen, setIsResourcePickerOpen] = useState(false);
   const [resourceBusy, setResourceBusy] = useState(false);
   const [resources, setResources] = useState<ResourceItem[]>([]);
+  const [resourceFolders, setResourceFolders] = useState<ResourceFolder[]>([]);
   const [resourceKeyword, setResourceKeyword] = useState('');
+  const [resourceExpandedFolders, setResourceExpandedFolders] = useState<string[]>([RESOURCE_ROOT_PATH]);
+  const [resourceSelectedFolderPath, setResourceSelectedFolderPath] = useState(RESOURCE_ROOT_PATH);
   const [isColorPanelOpen, setIsColorPanelOpen] = useState(false);
   const [isBgColorPanelOpen, setIsBgColorPanelOpen] = useState(false);
   const [customTextColor, setCustomTextColor] = useState('#1d4ed8');
@@ -653,23 +665,25 @@ const MilkdownEditorInner: React.FC<MilkdownEditorInnerProps> = ({
   const loadResources = useCallback(async () => {
     setResourceBusy(true);
     try {
-      const list = await resourceService.list();
-      setResources(list);
+      const result = await resourceService.list();
+      setResources(result.items);
+      setResourceFolders(result.folders);
     } catch {
       setResources([]);
+      setResourceFolders([]);
     } finally {
       setResourceBusy(false);
     }
   }, []);
 
-  const filteredResources = useMemo(() => {
-    const keyword = resourceKeyword.trim().toLowerCase();
-    if (!keyword) return resources;
-    return resources.filter((item) => (
-      item.displayName.toLowerCase().includes(keyword) ||
-      item.ref.toLowerCase().includes(keyword)
-    ));
-  }, [resources, resourceKeyword]);
+  const filteredResourceTree = useMemo(
+    () => buildResourceTree(resourceFolders, resources, resourceKeyword),
+    [resourceFolders, resources, resourceKeyword]
+  );
+  const filteredResourceItems = useMemo(
+    () => filterResourceItems(resources, resourceSelectedFolderPath, resourceKeyword),
+    [resources, resourceSelectedFolderPath, resourceKeyword]
+  );
 
   const uploadAndInsertImages = useCallback(async (files: File[]) => {
     const imageFiles = files.filter((file) => file.type.startsWith('image/'));
@@ -706,6 +720,7 @@ const MilkdownEditorInner: React.FC<MilkdownEditorInnerProps> = ({
 
   const openImagePicker = () => {
     setResourceKeyword('');
+    setResourceSelectedFolderPath(RESOURCE_ROOT_PATH);
     setIsResourcePickerOpen(true);
     loadResources();
   };
@@ -965,7 +980,7 @@ const MilkdownEditorInner: React.FC<MilkdownEditorInnerProps> = ({
 
       {isResourcePickerOpen && createPortal(
         <div className="fixed inset-0 z-50 bg-black/35 flex items-center justify-center p-4">
-          <div className="w-full max-w-3xl max-h-[80vh] bg-theme-card border border-theme rounded-lg shadow-xl flex flex-col">
+          <div className="w-full max-w-5xl max-h-[82vh] bg-theme-card border border-theme rounded-lg shadow-xl flex flex-col">
             <div className="px-4 py-3 border-b border-theme flex items-center justify-between">
               <h3 className="font-semibold">插入资源图片</h3>
               <button
@@ -1003,35 +1018,58 @@ const MilkdownEditorInner: React.FC<MilkdownEditorInnerProps> = ({
               </div>
               <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
             </div>
-            <div className="p-3 overflow-auto space-y-2">
-              {resourceBusy && resources.length === 0 ? (
-                <div className="text-sm theme-text-secondary py-8 text-center">正在加载资源...</div>
-              ) : filteredResources.length === 0 ? (
-                <div className="text-sm theme-text-secondary py-8 text-center">没有匹配的资源</div>
+            <div className="min-h-0 flex-1 grid grid-cols-1 md:grid-cols-[220px_minmax(0,1fr)]">
+              {resourceBusy && resources.length === 0 && resourceFolders.length === 0 ? (
+                <div className="md:col-span-2 text-sm theme-text-secondary py-8 text-center">正在加载资源...</div>
+              ) : resources.length === 0 && resourceFolders.length === 0 ? (
+                <div className="md:col-span-2 text-sm theme-text-secondary py-8 text-center">暂无资源</div>
               ) : (
-                filteredResources.map((item) => (
-                  <button
-                    key={item.ref}
-                    type="button"
-                    onClick={() => {
-                      runCommand(insertImageCommand, {
-                        src: item.url,
-                        alt: item.displayName,
-                        title: item.displayName,
-                      });
-                      setIsResourcePickerOpen(false);
-                    }}
-                    className="w-full text-left border rounded p-2 transition border-theme hover:bg-primary-light/30"
-                  >
-                    <div className="flex items-center gap-3">
-                      <img src={item.url} alt={item.displayName} className="w-16 h-16 rounded object-cover border border-theme shrink-0" />
-                      <div className="min-w-0">
-                        <div className="text-sm font-medium truncate" title={item.displayName}>{item.displayName}</div>
-                        <div className="text-[11px] theme-text-secondary truncate" title={item.ref}>{item.ref}</div>
-                      </div>
+                <>
+                  <div className="border-r border-theme overflow-auto p-2">
+                    <ResourceTreeView
+                      tree={filteredResourceTree}
+                      expandedPaths={resourceExpandedFolders}
+                      onToggleFolder={(path) => setResourceExpandedFolders((prev) => (
+                        prev.includes(path) ? prev.filter((item) => item !== path) : [...prev, path]
+                      ))}
+                      onSelectFolder={setResourceSelectedFolderPath}
+                      selectedFolderPath={resourceSelectedFolderPath}
+                      autoExpandAll={Boolean(resourceKeyword.trim())}
+                      hideItems
+                      compact
+                      renderItem={() => null}
+                    />
+                  </div>
+                  <div className="overflow-auto p-3">
+                    <div className="text-xs theme-text-secondary mb-3">
+                      当前分类：{resourceFolderDisplayName(resourceSelectedFolderPath)}
                     </div>
-                  </button>
-                ))
+                    {filteredResourceItems.length === 0 ? (
+                      <div className="text-sm theme-text-secondary py-8 text-center">没有匹配的资源</div>
+                    ) : (
+                      <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 gap-3">
+                        {filteredResourceItems.map((item) => (
+                          <button
+                            key={item.ref}
+                            type="button"
+                            onClick={() => {
+                              runCommand(insertImageCommand, {
+                                src: item.url,
+                                alt: item.displayName,
+                                title: item.displayName,
+                              });
+                              setIsResourcePickerOpen(false);
+                            }}
+                            className="text-left border rounded-md p-2 transition border-theme hover:bg-primary-light/30"
+                          >
+                            <img src={item.url} alt={item.displayName} className="w-full aspect-square rounded object-cover border border-theme" />
+                            <div className="mt-2 text-[11px] leading-4 truncate" title={item.displayName}>{item.displayName}</div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </>
               )}
             </div>
           </div>

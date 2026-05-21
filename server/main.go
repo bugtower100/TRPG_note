@@ -7,10 +7,12 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"io/fs"
 	"log"
 	"mime"
 	"net/url"
 	"os"
+	pathpkg "path"
 	"path/filepath"
 	"slices"
 	"sort"
@@ -677,22 +679,69 @@ func openDB(cfg Config) *gorm.DB {
 	return db
 }
 
+const resourceRootRef = "graph_assets"
+
 func normalizeResourceRef(ref string) (string, bool) {
-	p := strings.TrimSpace(ref)
-	p = strings.TrimPrefix(p, "/")
-	if p == "" {
-		return "", false
-	}
-	if strings.Contains(p, "..") {
-		return "", false
-	}
-	if !strings.HasPrefix(p, "graph_assets/") {
-		p = "graph_assets/" + p
-	}
-	if strings.Contains(p, "..") {
+	p, ok := normalizeResourceFolderPath(ref)
+	if !ok || p == resourceRootRef {
 		return "", false
 	}
 	return p, true
+}
+
+func normalizeResourceFolderPath(raw string) (string, bool) {
+	p := strings.TrimSpace(strings.ReplaceAll(raw, "\\", "/"))
+	p = strings.TrimPrefix(p, "/")
+	if p == "" || p == "." {
+		return resourceRootRef, true
+	}
+	cleaned := pathpkg.Clean("/" + p)
+	cleaned = strings.TrimPrefix(cleaned, "/")
+	if cleaned == "." || cleaned == "" {
+		return resourceRootRef, true
+	}
+	if cleaned == ".." || strings.HasPrefix(cleaned, "../") {
+		return "", false
+	}
+	if cleaned == resourceRootRef {
+		return resourceRootRef, true
+	}
+	if !strings.HasPrefix(cleaned, resourceRootRef+"/") {
+		cleaned = resourceRootRef + "/" + cleaned
+	}
+	if cleaned == resourceRootRef || strings.HasPrefix(cleaned, resourceRootRef+"/") {
+		return cleaned, true
+	}
+	return "", false
+}
+
+func resourceRefToFullPath(baseDir, ref string) string {
+	return filepath.Join(baseDir, filepath.FromSlash(ref))
+}
+
+func isSupportedResourceExt(name string) bool {
+	switch strings.ToLower(filepath.Ext(name)) {
+	case ".png", ".jpg", ".jpeg", ".webp":
+		return true
+	default:
+		return false
+	}
+}
+
+func resourceParentPath(ref string) string {
+	dir := pathpkg.Dir(ref)
+	if dir == "." || dir == "/" {
+		return resourceRootRef
+	}
+	return dir
+}
+
+func buildResourceURL(ref string) string {
+	parts := strings.Split(ref, "/")
+	for i := range parts {
+		parts[i] = url.PathEscape(parts[i])
+	}
+	return "/api/resources/file/" + strings.Join(parts, "/")
 }
 
 func sanitizeFilenameBase(name string) string {
@@ -742,26 +791,123 @@ func parseDisplayNameFromStored(filename string) string {
 }
 
 func findExistingResourceRefByHash(assetDir string, hash string) (string, bool) {
-	entries, err := os.ReadDir(assetDir)
-	if err != nil {
-		return "", false
-	}
 	prefix := hash + "__"
-	for _, entry := range entries {
-		if entry.IsDir() {
-			continue
+	var found string
+	_ = filepath.WalkDir(assetDir, func(current string, d fs.DirEntry, err error) error {
+		if err != nil || d == nil || d.IsDir() {
+			return nil
 		}
-		name := entry.Name()
-		if !strings.HasPrefix(name, prefix) {
-			continue
+		name := d.Name()
+		if !strings.HasPrefix(name, prefix) || !isSupportedResourceExt(name) {
+			return nil
 		}
-		ext := strings.ToLower(filepath.Ext(name))
-		switch ext {
-		case ".png", ".jpg", ".jpeg", ".webp":
-			return "graph_assets/" + name, true
+		rel, relErr := filepath.Rel(filepath.Dir(assetDir), current)
+		if relErr != nil {
+			return nil
 		}
+		found = filepath.ToSlash(rel)
+		return fs.SkipAll
+	})
+	return found, found != ""
+}
+
+func findResourceRefByBaseName(assetDir string, baseName string) (string, bool) {
+	var found string
+	_ = filepath.WalkDir(assetDir, func(current string, d fs.DirEntry, err error) error {
+		if err != nil || d == nil || d.IsDir() || d.Name() != baseName {
+			return nil
+		}
+		rel, relErr := filepath.Rel(filepath.Dir(assetDir), current)
+		if relErr != nil {
+			return nil
+		}
+		found = filepath.ToSlash(rel)
+		return fs.SkipAll
+	})
+	return found, found != ""
+}
+
+func uniqueTargetPath(targetDir, fileName string) string {
+	ext := filepath.Ext(fileName)
+	base := strings.TrimSuffix(fileName, ext)
+	candidate := filepath.Join(targetDir, fileName)
+	index := 1
+	for {
+		if _, err := os.Stat(candidate); os.IsNotExist(err) {
+			return candidate
+		}
+		candidate = filepath.Join(targetDir, fmt.Sprintf("%s__%d%s", base, index, ext))
+		index++
 	}
-	return "", false
+}
+
+func scanResourceLibrary(assetDir string) ([]gin.H, []gin.H, error) {
+	folders := []gin.H{}
+	items := []gin.H{}
+	err := filepath.WalkDir(assetDir, func(current string, d fs.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if current == assetDir {
+			return nil
+		}
+		rel, err := filepath.Rel(filepath.Dir(assetDir), current)
+		if err != nil {
+			return nil
+		}
+		refPath := filepath.ToSlash(rel)
+		if d.IsDir() {
+			info, infoErr := d.Info()
+			if infoErr != nil {
+				return nil
+			}
+			folders = append(folders, gin.H{
+				"path":       refPath,
+				"name":       pathpkg.Base(refPath),
+				"parentPath": resourceParentPath(refPath),
+				"updatedAt":  info.ModTime().UnixMilli(),
+			})
+			return nil
+		}
+		if !isSupportedResourceExt(d.Name()) {
+			return nil
+		}
+		info, infoErr := d.Info()
+		if infoErr != nil {
+			return nil
+		}
+		items = append(items, gin.H{
+			"ref":         refPath,
+			"url":         buildResourceURL(refPath),
+			"displayName": parseDisplayNameFromStored(d.Name()),
+			"size":        info.Size(),
+			"updatedAt":   info.ModTime().UnixMilli(),
+			"parentPath":  resourceParentPath(refPath),
+		})
+		return nil
+	})
+	if err != nil {
+		return nil, nil, err
+	}
+	sort.Slice(folders, func(i, j int) bool {
+		left := fmt.Sprintf("%s/%s", folders[i]["parentPath"].(string), folders[i]["name"].(string))
+		right := fmt.Sprintf("%s/%s", folders[j]["parentPath"].(string), folders[j]["name"].(string))
+		return strings.ToLower(left) < strings.ToLower(right)
+	})
+	sort.Slice(items, func(i, j int) bool {
+		leftParent := items[i]["parentPath"].(string)
+		rightParent := items[j]["parentPath"].(string)
+		if leftParent != rightParent {
+			return strings.ToLower(leftParent) < strings.ToLower(rightParent)
+		}
+		leftTime := items[i]["updatedAt"].(int64)
+		rightTime := items[j]["updatedAt"].(int64)
+		if leftTime != rightTime {
+			return leftTime > rightTime
+		}
+		return strings.ToLower(items[i]["displayName"].(string)) < strings.ToLower(items[j]["displayName"].(string))
+	})
+	return folders, items, nil
 }
 
 func main() {
@@ -2378,13 +2524,23 @@ func main() {
 		if ref, ok := findExistingResourceRefByHash(assetDir, hash); ok {
 			c.JSON(200, gin.H{
 				"ref": ref,
-				"url": "/api/resources/file/" + ref,
+				"url": buildResourceURL(ref),
 			})
+			return
+		}
+		targetFolder, ok := normalizeResourceFolderPath(c.PostForm("folderPath"))
+		if !ok {
+			c.JSON(400, gin.H{"error": "invalid_folder_path"})
+			return
+		}
+		targetDir := resourceRefToFullPath(filepath.Dir(cfg.DBPath), targetFolder)
+		if err := os.MkdirAll(targetDir, 0o755); err != nil {
+			c.JSON(500, gin.H{"error": "create_folder_failed"})
 			return
 		}
 		displayBase := sanitizeFilenameBase(header.Filename)
 		filename := hash + "__" + displayBase + ext
-		dstPath := filepath.Join(assetDir, filename)
+		dstPath := filepath.Join(targetDir, filename)
 		dst, err := os.Create(dstPath)
 		if err != nil {
 			c.JSON(500, gin.H{"error": "create_file_failed"})
@@ -2395,49 +2551,175 @@ func main() {
 			c.JSON(500, gin.H{"error": "write_file_failed"})
 			return
 		}
-		ref := "graph_assets/" + filename
+		rel, err := filepath.Rel(filepath.Dir(cfg.DBPath), dstPath)
+		if err != nil {
+			c.JSON(500, gin.H{"error": "build_ref_failed"})
+			return
+		}
+		ref := filepath.ToSlash(rel)
 		c.JSON(200, gin.H{
 			"ref": ref,
-			"url": "/api/resources/file/" + ref,
+			"url": buildResourceURL(ref),
 		})
 	})
 
 	resourceAPI.GET("/list", func(c *gin.Context) {
-		entries, err := os.ReadDir(assetDir)
+		folders, items, err := scanResourceLibrary(assetDir)
 		if err != nil {
 			c.JSON(500, gin.H{"error": "read_dir_failed"})
 			return
 		}
-		items := make([]gin.H, 0, len(entries))
-		for _, entry := range entries {
-			if entry.IsDir() {
-				continue
-			}
-			name := entry.Name()
-			ext := strings.ToLower(filepath.Ext(name))
-			switch ext {
-			case ".png", ".jpg", ".jpeg", ".webp":
-			default:
-				continue
-			}
-			info, err := entry.Info()
-			if err != nil {
-				continue
-			}
-			ref := "graph_assets/" + name
-			displayName := parseDisplayNameFromStored(name)
-			items = append(items, gin.H{
-				"ref":         ref,
-				"url":         "/api/resources/file/" + ref,
-				"displayName": displayName,
-				"size":        info.Size(),
-				"updatedAt":   info.ModTime().UnixMilli(),
-			})
+		c.JSON(200, gin.H{"folders": folders, "items": items})
+	})
+
+	resourceAPI.POST("/folders", func(c *gin.Context) {
+		var body struct {
+			Path string `json:"path"`
 		}
-		sort.Slice(items, func(i, j int) bool {
-			return items[i]["updatedAt"].(int64) > items[j]["updatedAt"].(int64)
-		})
-		c.JSON(200, gin.H{"items": items})
+		if err := c.ShouldBindJSON(&body); err != nil {
+			c.JSON(400, gin.H{"error": "invalid_payload"})
+			return
+		}
+		folderPath, ok := normalizeResourceFolderPath(body.Path)
+		if !ok || folderPath == resourceRootRef {
+			c.JSON(400, gin.H{"error": "invalid_folder_path"})
+			return
+		}
+		full := resourceRefToFullPath(filepath.Dir(cfg.DBPath), folderPath)
+		if err := os.MkdirAll(full, 0o755); err != nil {
+			c.JSON(500, gin.H{"error": "create_folder_failed"})
+			return
+		}
+		c.JSON(200, gin.H{"path": folderPath})
+	})
+
+	resourceAPI.POST("/folders/rename", func(c *gin.Context) {
+		var body struct {
+			Path    string `json:"path"`
+			NewName string `json:"newName"`
+		}
+		if err := c.ShouldBindJSON(&body); err != nil {
+			c.JSON(400, gin.H{"error": "invalid_payload"})
+			return
+		}
+		sourcePath, ok := normalizeResourceFolderPath(body.Path)
+		if !ok || sourcePath == resourceRootRef {
+			c.JSON(400, gin.H{"error": "invalid_folder_path"})
+			return
+		}
+		newName := sanitizeFilenameBase(body.NewName)
+		if newName == "" || newName == "image" {
+			c.JSON(400, gin.H{"error": "invalid_folder_name"})
+			return
+		}
+		targetPath := pathpkg.Join(resourceParentPath(sourcePath), newName)
+		if normalized, valid := normalizeResourceFolderPath(targetPath); !valid || normalized == sourcePath {
+			c.JSON(400, gin.H{"error": "invalid_folder_name"})
+			return
+		} else {
+			targetPath = normalized
+		}
+		sourceFull := resourceRefToFullPath(filepath.Dir(cfg.DBPath), sourcePath)
+		targetFull := resourceRefToFullPath(filepath.Dir(cfg.DBPath), targetPath)
+		if _, err := os.Stat(sourceFull); err != nil {
+			c.JSON(404, gin.H{"error": "folder_not_found"})
+			return
+		}
+		if _, err := os.Stat(targetFull); err == nil {
+			c.JSON(409, gin.H{"error": "folder_exists"})
+			return
+		}
+		if err := os.Rename(sourceFull, targetFull); err != nil {
+			c.JSON(500, gin.H{"error": "rename_folder_failed"})
+			return
+		}
+		c.JSON(200, gin.H{"path": targetPath})
+	})
+
+	resourceAPI.DELETE("/folders/*filepath", func(c *gin.Context) {
+		raw := strings.TrimPrefix(c.Param("filepath"), "/")
+		folderPath, ok := normalizeResourceFolderPath(raw)
+		if !ok || folderPath == resourceRootRef {
+			c.JSON(400, gin.H{"error": "invalid_folder_path"})
+			return
+		}
+		full := resourceRefToFullPath(filepath.Dir(cfg.DBPath), folderPath)
+		if !strings.HasPrefix(filepath.Clean(full), filepath.Clean(filepath.Dir(cfg.DBPath))) {
+			c.JSON(403, gin.H{"error": "forbidden"})
+			return
+		}
+		if err := os.RemoveAll(full); err != nil {
+			c.JSON(500, gin.H{"error": "delete_folder_failed"})
+			return
+		}
+		c.Status(204)
+	})
+
+	resourceAPI.POST("/move", func(c *gin.Context) {
+		var body struct {
+			Refs         []string `json:"refs"`
+			TargetFolder string   `json:"targetFolder"`
+		}
+		if err := c.ShouldBindJSON(&body); err != nil || len(body.Refs) == 0 {
+			c.JSON(400, gin.H{"error": "invalid_payload"})
+			return
+		}
+		targetFolder, ok := normalizeResourceFolderPath(body.TargetFolder)
+		if !ok {
+			c.JSON(400, gin.H{"error": "invalid_target_folder"})
+			return
+		}
+		targetDir := resourceRefToFullPath(filepath.Dir(cfg.DBPath), targetFolder)
+		if err := os.MkdirAll(targetDir, 0o755); err != nil {
+			c.JSON(500, gin.H{"error": "create_folder_failed"})
+			return
+		}
+		failed := make([]string, 0)
+		moved := make([]gin.H, 0, len(body.Refs))
+		for _, raw := range body.Refs {
+			ref, ok := normalizeResourceRef(raw)
+			if !ok {
+				failed = append(failed, raw)
+				continue
+			}
+			sourceFull := resourceRefToFullPath(filepath.Dir(cfg.DBPath), ref)
+			if _, err := os.Stat(sourceFull); err != nil {
+				if altRef, found := findResourceRefByBaseName(assetDir, filepath.Base(ref)); found {
+					ref = altRef
+					sourceFull = resourceRefToFullPath(filepath.Dir(cfg.DBPath), ref)
+				} else {
+					failed = append(failed, raw)
+					continue
+				}
+			}
+			if resourceParentPath(ref) == targetFolder {
+				moved = append(moved, gin.H{"from": raw, "to": ref})
+				continue
+			}
+			targetFull := filepath.Join(targetDir, filepath.Base(ref))
+			if filepath.Clean(targetFull) == filepath.Clean(sourceFull) {
+				moved = append(moved, gin.H{"from": raw, "to": ref})
+				continue
+			}
+			if _, err := os.Stat(targetFull); err == nil {
+				targetFull = uniqueTargetPath(targetDir, filepath.Base(ref))
+			}
+			if err := os.Rename(sourceFull, targetFull); err != nil {
+				failed = append(failed, raw)
+				continue
+			}
+			rel, err := filepath.Rel(filepath.Dir(cfg.DBPath), targetFull)
+			if err != nil {
+				failed = append(failed, raw)
+				continue
+			}
+			moved = append(moved, gin.H{"from": raw, "to": filepath.ToSlash(rel)})
+		}
+		status := 200
+		if len(failed) > 0 {
+			status = 207
+		}
+		c.JSON(status, gin.H{"moved": moved, "failed": failed})
 	})
 
 	resourceAPI.DELETE("/file/*filepath", func(c *gin.Context) {
@@ -2507,8 +2789,12 @@ func main() {
 			return
 		}
 		if _, err := os.Stat(full); err != nil {
-			c.Status(404)
-			return
+			if altRef, found := findResourceRefByBaseName(assetDir, filepath.Base(p)); found {
+				full = resourceRefToFullPath(filepath.Dir(cfg.DBPath), altRef)
+			} else {
+				c.Status(404)
+				return
+			}
 		}
 		c.Header("Cache-Control", "public, max-age=31536000")
 		c.File(full)

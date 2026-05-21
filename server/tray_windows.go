@@ -110,7 +110,7 @@ var systrayQuited bool = false
 
 func onReady() {
 	log := zap.S()
-	ver := "v1.4.3"
+	ver := "v1.4.4"
 	systray.SetIcon(trayIcon)
 	systray.SetTitle("跑团笔记")
 	systray.SetTooltip("跑团笔记 " + ver)
@@ -196,7 +196,7 @@ func httpServe(e *gin.Engine, addr string, hideUI bool) {
 	log := zap.S()
 	portStr := "3211"
 	go func() {
-		ver := "V1.4.3"
+		ver := "v1.4.4"
 		for {
 			time.Sleep(5 * time.Second)
 			if systrayQuited {

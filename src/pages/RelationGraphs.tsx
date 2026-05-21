@@ -4,8 +4,18 @@ import { dataService } from '../services/dataService';
 import { relationGraphService } from '../services/relationGraphService';
 import { CampaignData, RelationEdgeDirection, RelationGraph, RelationGraphEdge, RelationGraphNode } from '../types';
 import RichTextEditor from '../components/common/RichTextEditor';
-import { resourceService, ResourceItem } from '../services/resourceService';
+import {
+  buildResourceFileUrl,
+  buildResourceTree,
+  filterResourceItems,
+  ResourceFolder,
+  ResourceItem,
+  resourceFolderDisplayName,
+  resourceService,
+  RESOURCE_ROOT_PATH,
+} from '../services/resourceService';
 import { useReceivedShares } from '../hooks/useReceivedShares';
+import ResourceTreeView from '../components/common/ResourceTreeView';
 
 type GraphEntity = {
   id: string;
@@ -30,7 +40,7 @@ const edgeLabelMetrics = (edge: RelationGraphEdge) => {
 const resolveTokenImage = (ref?: string) => {
   if (!ref) return '';
   if (ref.startsWith('http') || ref.startsWith('data:')) return ref;
-  return `/api/resources/file/${ref}`;
+  return buildResourceFileUrl(ref);
 };
 
 const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
@@ -184,8 +194,11 @@ const RelationGraphs: React.FC = () => {
   const [historyPast, setHistoryPast] = useState<RelationGraph[]>([]);
   const [historyFuture, setHistoryFuture] = useState<RelationGraph[]>([]);
   const [resources, setResources] = useState<ResourceItem[]>([]);
+  const [resourceFolders, setResourceFolders] = useState<ResourceFolder[]>([]);
   const [resourcePickerOpen, setResourcePickerOpen] = useState(false);
   const [resourceKeyword, setResourceKeyword] = useState('');
+  const [resourceExpandedFolders, setResourceExpandedFolders] = useState<string[]>([RESOURCE_ROOT_PATH]);
+  const [resourceSelectedFolderPath, setResourceSelectedFolderPath] = useState(RESOURCE_ROOT_PATH);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingSaveRef = useRef<CampaignData | null>(null);
 
@@ -303,10 +316,12 @@ const RelationGraphs: React.FC = () => {
 
   const loadResources = useCallback(async () => {
     try {
-      const list = await resourceService.list();
-      setResources(list);
+      const result = await resourceService.list();
+      setResources(result.items);
+      setResourceFolders(result.folders);
     } catch {
       setResources([]);
+      setResourceFolders([]);
     }
   }, []);
 
@@ -606,17 +621,13 @@ const RelationGraphs: React.FC = () => {
   const selectedEdge = activeGraph?.edges.find((e) => e.id === edgeEditorId);
   const selectedResourceRef = selectedPrimaryNode?.tokenImageRef || '';
   const selectedResourceMeta = resources.find((r) => r.ref === selectedResourceRef) || null;
-  const filteredResourceList = useMemo(
-    () =>
-      resources.filter((item) => {
-        const key = resourceKeyword.trim().toLowerCase();
-        if (!key) return true;
-        return (
-          item.displayName.toLowerCase().includes(key) ||
-          item.ref.toLowerCase().includes(key)
-        );
-      }),
-    [resources, resourceKeyword]
+  const filteredResourceTree = useMemo(
+    () => buildResourceTree(resourceFolders, resources, resourceKeyword),
+    [resourceFolders, resources, resourceKeyword]
+  );
+  const filteredResourceItems = useMemo(
+    () => filterResourceItems(resources, resourceSelectedFolderPath, resourceKeyword),
+    [resources, resourceSelectedFolderPath, resourceKeyword]
   );
 
   const updateNode = (nodeId: string, patch: Partial<RelationGraphNode>) => {
@@ -924,6 +935,7 @@ const RelationGraphs: React.FC = () => {
             <button
               onClick={() => {
                 setResourceKeyword('');
+                setResourceSelectedFolderPath(RESOURCE_ROOT_PATH);
                 setResourcePickerOpen(true);
               }}
               className="text-sm px-2 py-1 rounded border border-theme hover:bg-primary-light"
@@ -946,7 +958,7 @@ const RelationGraphs: React.FC = () => {
 
       {resourcePickerOpen && selectedPrimaryNode && (
         <div className="fixed inset-0 z-50 bg-black/35 flex items-center justify-center p-4">
-          <div className="w-full max-w-3xl max-h-[80vh] bg-theme-card border border-theme rounded-lg shadow-xl flex flex-col">
+          <div className="w-full max-w-5xl max-h-[82vh] bg-theme-card border border-theme rounded-lg shadow-xl flex flex-col">
             <div className="px-4 py-3 border-b border-theme flex items-center justify-between">
               <h3 className="font-semibold">选择资源图片</h3>
               <button onClick={() => setResourcePickerOpen(false)} className="px-3 py-1 rounded border border-theme hover:bg-primary-light text-sm">关闭</button>
@@ -959,31 +971,53 @@ const RelationGraphs: React.FC = () => {
                 className="w-full px-3 py-2 rounded border border-theme bg-transparent"
               />
             </div>
-            <div className="p-3 overflow-auto space-y-2">
-              {filteredResourceList.map((item) => {
-                const active = selectedPrimaryNode.tokenImageRef === item.ref;
-                return (
-                  <button
-                    key={item.ref}
-                    onClick={() => {
-                      updateNode(selectedPrimaryNode.id, { tokenImageRef: item.ref });
-                      setResourcePickerOpen(false);
-                    }}
-                    className={`w-full text-left border rounded p-2 transition ${active ? 'border-primary ring-2 ring-primary/30' : 'border-theme hover:bg-primary-light/30'}`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <img src={item.url} alt={item.displayName} className="w-16 h-16 rounded object-cover border border-theme shrink-0" />
-                      <div className="min-w-0">
-                        <div className="text-sm font-medium truncate" title={item.displayName}>{item.displayName}</div>
-                        <div className="text-[11px] theme-text-secondary truncate" title={item.ref}>{item.ref}</div>
-                      </div>
-                    </div>
-                  </button>
-                );
-              })}
-              {filteredResourceList.length === 0 && (
-                <div className="text-sm theme-text-secondary py-8 text-center">没有匹配的资源</div>
-              )}
+            <div className="min-h-0 flex-1 grid grid-cols-1 md:grid-cols-[220px_minmax(0,1fr)]">
+              <div className="border-r border-theme overflow-auto p-2">
+                {resources.length === 0 && resourceFolders.length === 0 ? (
+                  <div className="text-sm theme-text-secondary py-8 text-center">暂无资源</div>
+                ) : (
+                  <ResourceTreeView
+                    tree={filteredResourceTree}
+                    expandedPaths={resourceExpandedFolders}
+                    onToggleFolder={(path) => setResourceExpandedFolders((prev) => (
+                      prev.includes(path) ? prev.filter((item) => item !== path) : [...prev, path]
+                    ))}
+                    onSelectFolder={setResourceSelectedFolderPath}
+                    selectedFolderPath={resourceSelectedFolderPath}
+                    autoExpandAll={Boolean(resourceKeyword.trim())}
+                    hideItems
+                    compact
+                    renderItem={() => null}
+                  />
+                )}
+              </div>
+              <div className="overflow-auto p-3">
+                <div className="text-xs theme-text-secondary mb-3">
+                  当前分类：{resourceFolderDisplayName(resourceSelectedFolderPath)}
+                </div>
+                {filteredResourceItems.length === 0 ? (
+                  <div className="text-sm theme-text-secondary py-8 text-center">没有匹配的资源</div>
+                ) : (
+                  <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 gap-3">
+                    {filteredResourceItems.map((item) => {
+                      const active = selectedPrimaryNode.tokenImageRef === item.ref;
+                      return (
+                        <button
+                          key={item.ref}
+                          onClick={() => {
+                            updateNode(selectedPrimaryNode.id, { tokenImageRef: item.ref });
+                            setResourcePickerOpen(false);
+                          }}
+                          className={`text-left border rounded-md p-2 transition hover:bg-primary-light/30 ${active ? 'border-primary ring-2 ring-primary/30 bg-primary/5' : 'border-theme'}`}
+                        >
+                          <img src={item.url} alt={item.displayName} className="w-full aspect-square rounded object-cover border border-theme" />
+                          <div className="mt-2 text-[11px] leading-4 truncate" title={item.displayName}>{item.displayName}</div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>

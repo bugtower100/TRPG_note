@@ -9,11 +9,11 @@ on:
       release_tag:
         description: "Release Tag"
         required: true
-        default: "v1.4.3"
+        default: "v1.4.4"
       release_name:
         description: "Release Name"
         required: true
-        default: "v1.4.3"
+        default: "v1.4.4"
       prerelease:
         description: "Mark as prerelease"
         required: true
@@ -195,16 +195,7 @@ jobs:
           make_latest: true
           body: |
             ## ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || inputs.release_name }} 更新内容
-            - 新增 macOS arm64 应用包；压缩包 `TRPG模组笔记-macos-arm64.zip` 解压后为 `TRPG模组笔记-macOS/` 目录，内含 `TRPG模组笔记.app` 与 `macOS终端启动说明.txt`。
-            - 新增 登录可选密码 功能，未设置密码时仍可空密码登录，兼容旧数据。
-            - 新增 公开模组进入密码 ，GM 可设置/清除，PL 进入公开模组时需要密码，旧模组未设置时可直接进入。
-            - 新增 主页模组卡片移除 PL 功能，可把中途跳车或长期不再进入的 PL 从成员列表移除。
-            - 新增 图片上传自动压缩 ，上传时转为 webp ，资源缩略图统一调整为 64px 。
-            - 新增 实体标题颜色自定义 ，角色、怪物、地点、组织、事件、线索、时间线等卡片标题支持自行选色。
-            - 修复 未来科技主题 下主页欢迎文字过暗、看不见的问题。
-            - 重做了时间线界面，支持多条时间线
-            - 调整了展开逻辑
-            - 增设了一键展开/收起
+            - 为资源管理添加了子分类和管理功能
           files: |
             TRPG模组笔记-windows-amd64.zip
             TRPG模组笔记-linux-amd64.tar.gz
