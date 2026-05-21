@@ -3,6 +3,7 @@
 package main
 
 import (
+	"fmt"
 	"net"
 	"os"
 	"os/exec"
@@ -116,6 +117,7 @@ func httpServe(e *gin.Engine, addr string, hideUI bool) {
 	m := rePort.FindStringSubmatch(addr)
 	if len(m) > 0 {
 		portStr = m[1]
+		_trayPortStr = portStr
 	}
 
 	ln, err := net.Listen("tcp", ":"+portStr)
@@ -125,8 +127,16 @@ func httpServe(e *gin.Engine, addr string, hideUI bool) {
 	}
 	_ = ln.Close()
 
-	// exec.Command(`cmd`, `/c`, `start`, fmt.Sprintf(`http://localhost:%s`, portStr)).Start()
-	log.Infof("如果浏览器没有自动打开，请手动访问:\nhttp://localhost:%s", portStr)
+	showUI := func() {
+		if hideUI {
+			return
+		}
+		time.Sleep(2 * time.Second)
+		_ = exec.Command(`open`, fmt.Sprintf(`http://localhost:%s/web`, portStr)).Start()
+	}
+
+	log.Infof("如果浏览器没有自动打开，请手动访问:\nhttp://localhost:%s/web", portStr)
+	go showUI()
 	err = e.Run(addr)
 	if err != nil {
 		log.Errorf("端口已被占用，即将自动退出: %s", addr)
