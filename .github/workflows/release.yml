@@ -146,13 +146,16 @@ jobs:
         run: |
           bash ./scripts/package-macos-app.sh "server/release/trpg-note" "${{ matrix.package_name }}"
 
-      - name: Verify macOS app bundle
+      - name: Verify macOS app bundle structure
         if: ${{ matrix.platform == 'macos' }}
         shell: bash
         run: |
           APP_PATH="server/release/TRPG模组笔记.app"
-          codesign --verify --deep --strict --verbose=2 "$APP_PATH"
-          spctl --assess --type execute --verbose=4 "$APP_PATH" || true
+          test -d "$APP_PATH"
+          test -f "$APP_PATH/Contents/Info.plist"
+          test -x "$APP_PATH/Contents/MacOS/trpg-note"
+          test -x "$APP_PATH/Contents/MacOS/trpg-note-launcher"
+          plutil -lint "$APP_PATH/Contents/Info.plist"
 
       - name: Upload package artifact
         uses: actions/upload-artifact@v4

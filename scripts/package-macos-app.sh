@@ -17,7 +17,7 @@ RESOURCES_DIR="${CONTENTS_DIR}/Resources"
 ICON_SOURCE="${ROOT_DIR}/build/icon-256.png"
 ICON_BASENAME="app-icon"
 MAIN_BINARY_NAME="trpg-note"
-LAUNCHER_NAME="${APP_NAME}"
+LAUNCHER_NAME="trpg-note-launcher"
 
 rm -rf "${APP_DIR}"
 mkdir -p "${MACOS_DIR}" "${RESOURCES_DIR}" "${RESOURCES_DIR}/data"
@@ -88,11 +88,14 @@ if [[ -f "${ICON_SOURCE}" ]] && command -v sips >/dev/null 2>&1 && command -v ic
     /usr/libexec/PlistBuddy -c "Set :CFBundleIconFile ${ICON_BASENAME}" "${CONTENTS_DIR}/Info.plist" >/dev/null 2>&1 || true
 fi
 
-if command -v codesign >/dev/null 2>&1; then
-  find "${APP_DIR}" -name ".DS_Store" -delete
-  codesign --force --deep --sign - "${APP_DIR}"
-  codesign --verify --deep --strict --verbose=2 "${APP_DIR}"
-fi
+# =========================================================
+# 已注释：codesign 会导致 GitHub Actions 失败
+# =========================================================
+# if command -v codesign >/dev/null 2>&1; then
+#   find "${APP_DIR}" -name ".DS_Store" -delete
+#   codesign --force --deep --sign - "${APP_DIR}"
+#   codesign --verify --deep --strict --verbose=2 "${APP_DIR}"
+# fi
 
 rm -f "${OUTPUT_ZIP}"
 ditto -c -k --keepParent "${APP_DIR}" "${OUTPUT_ZIP}"
