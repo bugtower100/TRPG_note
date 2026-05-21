@@ -30,6 +30,16 @@ export const DEFAULT_CAMPAIGN_DATA: CampaignData = {
   relationGraphs: [],
 };
 
+const hashSecret = (input: string): string => {
+  const normalized = (input || '').trim();
+  let hash = 2166136261;
+  for (let i = 0; i < normalized.length; i += 1) {
+    hash ^= normalized.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return `h_${(hash >>> 0).toString(16).padStart(8, '0')}`;
+};
+
 class DataService {
   private storage: StorageAdapter = {
     getItem: (key) => window.localStorage.getItem(key),
@@ -104,6 +114,16 @@ class DataService {
       .map((value) => value.trim())
       .filter(Boolean);
     return Array.from(new Set(normalized));
+  }
+
+  private sanitizeUserProfile(user: UserProfile & { loginPasswordHash?: string }): UserProfile {
+    return {
+      id: user.id,
+      username: user.username,
+      role: 'GM',
+      lastActive: user.lastActive,
+      passwordConfigured: Boolean(user.loginPasswordHash),
+    };
   }
 
   private normalizeClueRevealStatus(status: any): ClueRevealStatus {
@@ -182,6 +202,7 @@ class DataService {
       return {
         id: typeof e?.id === 'string' && e.id ? e.id : uuidv4(),
         name: typeof e?.name === 'string' ? e.name : '未命名',
+        titleColor: typeof e?.titleColor === 'string' && e.titleColor.trim() ? e.titleColor : '#111827',
         details: typeof e?.details === 'string' ? e.details : '',
         tags: this.normalizeTags(e?.tags),
         customSubItems,
@@ -331,19 +352,53 @@ class DataService {
 
   // --- User Management ---
   getUsers(): UserProfile[] {
-    return this.getStoredData<UserProfile[]>(STORAGE_KEYS.USERS) || [];
+    const users = (this.getStoredData<Array<UserProfile & { loginPasswordHash?: string }>>(STORAGE_KEYS.USERS) || [])
+      .map((user) => this.sanitizeUserProfile(user));
+    return users;
+  }
+
+  verifyUserPassword(username: string, password: string): { ok: boolean; message?: string } {
+    const users = this.getStoredData<Array<UserProfile & { loginPasswordHash?: string }>>(STORAGE_KEYS.USERS) || [];
+    const existing = users.find((user) => user.username === username);
+    if (!existing?.loginPasswordHash) {
+      return { ok: true };
+    }
+    if (hashSecret(password) !== existing.loginPasswordHash) {
+      return { ok: false, message: '密码错误，请重试。' };
+    }
+    return { ok: true };
+  }
+
+  updateUserPassword(userId: string, password: string): UserProfile | null {
+    const users = this.getStoredData<Array<UserProfile & { loginPasswordHash?: string }>>(STORAGE_KEYS.USERS) || [];
+    const index = users.findIndex((user) => user.id === userId);
+    if (index < 0) return null;
+    const normalized = password.trim();
+    const updated = {
+      ...users[index],
+      loginPasswordHash: normalized ? hashSecret(normalized) : '',
+      passwordConfigured: Boolean(normalized),
+      lastActive: Date.now(),
+    };
+    users[index] = updated;
+    this.saveDataToStorage(STORAGE_KEYS.USERS, users);
+    const currentUser = this.getCurrentUser();
+    if (currentUser?.id === userId) {
+      this.setCurrentUser(this.sanitizeUserProfile(updated));
+    }
+    return this.sanitizeUserProfile(updated);
   }
 
   createUser(username: string): UserProfile {
-    const users = this.getUsers();
+    const users = this.getStoredData<Array<UserProfile & { loginPasswordHash?: string }>>(STORAGE_KEYS.USERS) || [];
     // Check if exists
     const existing = users.find(u => u.username === username);
     if (existing) {
-      const updated = { ...existing, lastActive: Date.now() };
+      const updated = { ...existing, lastActive: Date.now(), passwordConfigured: Boolean(existing.loginPasswordHash) };
       const idx = users.findIndex(u => u.username === username);
       if (idx >= 0) users[idx] = updated;
       this.saveDataToStorage(STORAGE_KEYS.USERS, users);
-      return updated;
+      return this.sanitizeUserProfile(updated);
     }
 
     const hashUsername = (name: string): string => {
@@ -361,16 +416,19 @@ class DataService {
       id: hashUsername(username),
       username,
       role: 'GM',
-      lastActive: Date.now()
+      lastActive: Date.now(),
+      passwordConfigured: false,
     };
     
-    users.push(newUser);
+    users.push(newUser as UserProfile & { loginPasswordHash?: string });
     this.saveDataToStorage(STORAGE_KEYS.USERS, users);
-    return newUser;
+    return this.sanitizeUserProfile(newUser);
   }
 
   getCurrentUser(): UserProfile | null {
-    return this.getStoredData<UserProfile>(STORAGE_KEYS.CURRENT_USER);
+    const user = this.getStoredData<UserProfile>(STORAGE_KEYS.CURRENT_USER);
+    if (!user) return null;
+    return { ...user, passwordConfigured: Boolean(user.passwordConfigured) };
   }
 
   setCurrentUser(user: UserProfile | null): void {

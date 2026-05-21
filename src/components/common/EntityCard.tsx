@@ -34,7 +34,7 @@ const EntityCard: React.FC<EntityCardProps> = ({ entity, type }) => {
       className="p-4 rounded-lg shadow-sm border theme-card hover:shadow-md transition-shadow cursor-pointer relative group"
     >
       <div className="flex justify-between items-start">
-        <h3 className="text-lg font-bold truncate pr-6">{entity.name}</h3>
+        <h3 className="text-lg font-bold truncate pr-6" style={{ color: entity.titleColor || '#111827' }}>{entity.name}</h3>
         <button
           data-tour="entity-card-split"
           onClick={handleOpenInTab}

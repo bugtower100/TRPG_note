@@ -3,6 +3,7 @@ package main
 import (
 	"crypto/sha256"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -45,16 +46,18 @@ type CampaignMember struct {
 }
 
 type CampaignConfigDoc struct {
-	CampaignID    string           `json:"campaignId"`
-	Name          string           `json:"name"`
-	Description   string           `json:"description"`
-	LastModified  int64            `json:"lastModified"`
-	Visibility    string           `json:"visibility"`
-	OwnerUserID   string           `json:"ownerUserId"`
-	SchemaVersion int              `json:"schemaVersion"`
-	Members       []CampaignMember `json:"members"`
-	CreatedAt     int64            `json:"createdAt"`
-	UpdatedAt     int64            `json:"updatedAt"`
+	CampaignID             string           `json:"campaignId"`
+	Name                   string           `json:"name"`
+	Description            string           `json:"description"`
+	LastModified           int64            `json:"lastModified"`
+	Visibility             string           `json:"visibility"`
+	JoinPasswordHash       string           `json:"joinPasswordHash,omitempty"`
+	JoinPasswordConfigured bool             `json:"joinPasswordConfigured,omitempty"`
+	OwnerUserID            string           `json:"ownerUserId"`
+	SchemaVersion          int              `json:"schemaVersion"`
+	Members                []CampaignMember `json:"members"`
+	CreatedAt              int64            `json:"createdAt"`
+	UpdatedAt              int64            `json:"updatedAt"`
 }
 
 type TeamNoteLease struct {
@@ -111,9 +114,15 @@ type PublicCampaignSummary struct {
 	OwnerID           string `json:"ownerId"`
 	OwnerUsername     string `json:"ownerUsername"`
 	Visibility        string `json:"visibility"`
+	HasJoinPassword   bool   `json:"hasJoinPassword,omitempty"`
 	MemberCount       int    `json:"memberCount"`
 	OnlineMemberCount int    `json:"onlineMemberCount"`
 }
+
+var (
+	errCampaignForbidden    = errors.New("campaign_forbidden")
+	errJoinPasswordRequired = errors.New("join_password_required")
+)
 
 type SharedEntitySnapshot struct {
 	EntityName     string           `json:"entityName"`
@@ -239,6 +248,15 @@ func requestUser(c *gin.Context) (string, string) {
 	return userID, username
 }
 
+func requestCampaignPassword(c *gin.Context) string {
+	return strings.TrimSpace(c.GetHeader("X-TRPG-Campaign-Password"))
+}
+
+func hashCampaignSecret(secret string) string {
+	sum := sha256.Sum256([]byte(strings.TrimSpace(secret)))
+	return fmt.Sprintf("%x", sum[:])
+}
+
 func loadPublicCampaignIndex(db *gorm.DB) ([]PublicCampaignSummary, error) {
 	var items []PublicCampaignSummary
 	ok, _, err := kvLoadJSON(db, publicCampaignIndexKey(), &items)
@@ -355,6 +373,7 @@ func toPublicCampaignSummary(cfg CampaignConfigDoc) PublicCampaignSummary {
 		OwnerID:           cfg.OwnerUserID,
 		OwnerUsername:     ownerUsername,
 		Visibility:        cfg.Visibility,
+		HasJoinPassword:   strings.TrimSpace(cfg.JoinPasswordHash) != "",
 		MemberCount:       len(cfg.Members),
 		OnlineMemberCount: onlineCount,
 	}
@@ -383,7 +402,34 @@ func rebuildPublicCampaignIndex(db *gorm.DB) ([]PublicCampaignSummary, error) {
 	return result, nil
 }
 
-func ensureCampaignConfig(db *gorm.DB, campaignID, userID, username string) (CampaignConfigDoc, error) {
+func sanitizeCampaignConfig(cfg CampaignConfigDoc) CampaignConfigDoc {
+	safe := cfg
+	safe.JoinPasswordConfigured = strings.TrimSpace(cfg.JoinPasswordHash) != ""
+	safe.JoinPasswordHash = ""
+	return safe
+}
+
+func isCampaignMember(cfg CampaignConfigDoc, userID string) bool {
+	for _, member := range cfg.Members {
+		if member.UserID == userID {
+			return true
+		}
+	}
+	return false
+}
+
+func saveCampaignConfigDoc(db *gorm.DB, cfg CampaignConfigDoc) error {
+	cfg.JoinPasswordConfigured = strings.TrimSpace(cfg.JoinPasswordHash) != ""
+	if _, err := kvSaveJSON(db, campaignConfigKey(cfg.CampaignID), cfg); err != nil {
+		return err
+	}
+	if cfg.Visibility == "public" {
+		return upsertPublicCampaignIndex(db, toPublicCampaignSummary(cfg))
+	}
+	return removePublicCampaignIndex(db, cfg.CampaignID)
+}
+
+func ensureCampaignConfig(db *gorm.DB, campaignID, userID, username, campaignPassword string) (CampaignConfigDoc, error) {
 	now := time.Now().UnixMilli()
 	key := campaignConfigKey(campaignID)
 	var cfg CampaignConfigDoc
@@ -412,10 +458,22 @@ func ensureCampaignConfig(db *gorm.DB, campaignID, userID, username string) (Cam
 			CreatedAt: now,
 			UpdatedAt: now,
 		}
+		cfg.JoinPasswordConfigured = false
 		if _, err := kvSaveJSON(db, key, cfg); err != nil {
 			return CampaignConfigDoc{}, err
 		}
 		return cfg, nil
+	}
+	cfg.JoinPasswordConfigured = strings.TrimSpace(cfg.JoinPasswordHash) != ""
+	existingRole := memberRole(cfg, userID)
+	isOwner := cfg.OwnerUserID == userID || existingRole == "GM"
+	if cfg.Visibility != "public" && !isOwner && !isCampaignMember(cfg, userID) {
+		return CampaignConfigDoc{}, errCampaignForbidden
+	}
+	if cfg.Visibility == "public" && cfg.JoinPasswordConfigured && !isOwner {
+		if hashCampaignSecret(campaignPassword) != cfg.JoinPasswordHash {
+			return CampaignConfigDoc{}, errJoinPasswordRequired
+		}
 	}
 	found := false
 	for index := range cfg.Members {
@@ -429,24 +487,42 @@ func ensureCampaignConfig(db *gorm.DB, campaignID, userID, username string) (Cam
 		break
 	}
 	if !found && userID != "" {
+		role := "PL"
+		if userID == cfg.OwnerUserID {
+			role = "GM"
+		}
+		if cfg.Visibility != "public" && role != "GM" {
+			return CampaignConfigDoc{}, errCampaignForbidden
+		}
 		cfg.Members = append(cfg.Members, CampaignMember{
 			UserID:       userID,
 			Username:     username,
-			Role:         "PL",
+			Role:         role,
 			JoinedAt:     now,
 			LastActiveAt: now,
 		})
 	}
 	cfg.UpdatedAt = now
-	if _, err := kvSaveJSON(db, key, cfg); err != nil {
+	if err := saveCampaignConfigDoc(db, cfg); err != nil {
 		return CampaignConfigDoc{}, err
 	}
-	if cfg.Visibility == "public" {
-		if err := upsertPublicCampaignIndex(db, toPublicCampaignSummary(cfg)); err != nil {
-			return CampaignConfigDoc{}, err
-		}
-	}
 	return cfg, nil
+}
+
+func loadCampaignConfigForRequest(c *gin.Context, db *gorm.DB, campaignID, userID, username string) (CampaignConfigDoc, bool) {
+	cfg, err := ensureCampaignConfig(db, campaignID, userID, username, requestCampaignPassword(c))
+	if err != nil {
+		switch err {
+		case errCampaignForbidden:
+			c.JSON(403, gin.H{"error": "forbidden"})
+		case errJoinPasswordRequired:
+			c.JSON(403, gin.H{"error": "join_password_required"})
+		default:
+			c.JSON(500, gin.H{"error": "database_error"})
+		}
+		return CampaignConfigDoc{}, false
+	}
+	return cfg, true
 }
 
 func memberRole(cfg CampaignConfigDoc, userID string) string {
@@ -731,12 +807,11 @@ func main() {
 			c.JSON(400, gin.H{"error": "missing_identity"})
 			return
 		}
-		cfg, err := ensureCampaignConfig(db, campaignID, userID, username)
-		if err != nil {
-			c.JSON(500, gin.H{"error": "database_error"})
+		cfg, ok := loadCampaignConfigForRequest(c, db, campaignID, userID, username)
+		if !ok {
 			return
 		}
-		c.JSON(200, cfg)
+		c.JSON(200, sanitizeCampaignConfig(cfg))
 	})
 
 	campaignAPI.PUT("/:campaignId/config", func(c *gin.Context) {
@@ -746,9 +821,8 @@ func main() {
 			c.JSON(400, gin.H{"error": "missing_identity"})
 			return
 		}
-		cfg, err := ensureCampaignConfig(db, campaignID, userID, username)
-		if err != nil {
-			c.JSON(500, gin.H{"error": "database_error"})
+		cfg, ok := loadCampaignConfigForRequest(c, db, campaignID, userID, username)
+		if !ok {
 			return
 		}
 		if memberRole(cfg, userID) != "GM" {
@@ -756,10 +830,12 @@ func main() {
 			return
 		}
 		var body struct {
-			Name         *string `json:"name"`
-			Description  *string `json:"description"`
-			LastModified *int64  `json:"lastModified"`
-			Visibility   string  `json:"visibility"`
+			Name              *string `json:"name"`
+			Description       *string `json:"description"`
+			LastModified      *int64  `json:"lastModified"`
+			Visibility        string  `json:"visibility"`
+			JoinPassword      *string `json:"joinPassword"`
+			ClearJoinPassword bool    `json:"clearJoinPassword"`
 		}
 		if err := c.ShouldBindJSON(&body); err != nil {
 			c.JSON(400, gin.H{"error": "invalid_payload"})
@@ -777,26 +853,60 @@ func main() {
 		if body.Visibility == "public" || body.Visibility == "private" {
 			cfg.Visibility = body.Visibility
 		}
+		if body.ClearJoinPassword {
+			cfg.JoinPasswordHash = ""
+		} else if body.JoinPassword != nil {
+			normalized := strings.TrimSpace(*body.JoinPassword)
+			if normalized == "" {
+				cfg.JoinPasswordHash = ""
+			} else {
+				cfg.JoinPasswordHash = hashCampaignSecret(normalized)
+			}
+		}
 		cfg.UpdatedAt = time.Now().UnixMilli()
 		if cfg.LastModified == 0 {
 			cfg.LastModified = cfg.UpdatedAt
 		}
-		if _, err := kvSaveJSON(db, campaignConfigKey(campaignID), cfg); err != nil {
+		if err := saveCampaignConfigDoc(db, cfg); err != nil {
 			c.JSON(500, gin.H{"error": "database_error"})
 			return
 		}
-		if cfg.Visibility == "public" {
-			if err := upsertPublicCampaignIndex(db, toPublicCampaignSummary(cfg)); err != nil {
-				c.JSON(500, gin.H{"error": "database_error"})
-				return
-			}
-		} else {
-			if err := removePublicCampaignIndex(db, cfg.CampaignID); err != nil {
-				c.JSON(500, gin.H{"error": "database_error"})
-				return
-			}
+		c.JSON(200, sanitizeCampaignConfig(cfg))
+	})
+
+	campaignAPI.DELETE("/:campaignId/members/:memberUserId", func(c *gin.Context) {
+		campaignID := strings.TrimSpace(c.Param("campaignId"))
+		memberUserID := strings.TrimSpace(c.Param("memberUserId"))
+		userID, username := requestUser(c)
+		if campaignID == "" || memberUserID == "" || userID == "" || username == "" {
+			c.JSON(400, gin.H{"error": "missing_identity"})
+			return
 		}
-		c.JSON(200, cfg)
+		cfg, ok := loadCampaignConfigForRequest(c, db, campaignID, userID, username)
+		if !ok {
+			return
+		}
+		if memberRole(cfg, userID) != "GM" {
+			c.JSON(403, gin.H{"error": "forbidden"})
+			return
+		}
+		index := slices.IndexFunc(cfg.Members, func(member CampaignMember) bool { return member.UserID == memberUserID })
+		if index < 0 {
+			c.JSON(200, sanitizeCampaignConfig(cfg))
+			return
+		}
+		target := cfg.Members[index]
+		if target.UserID == cfg.OwnerUserID || target.Role == "GM" {
+			c.JSON(403, gin.H{"error": "forbidden"})
+			return
+		}
+		cfg.Members = append(cfg.Members[:index], cfg.Members[index+1:]...)
+		cfg.UpdatedAt = time.Now().UnixMilli()
+		if err := saveCampaignConfigDoc(db, cfg); err != nil {
+			c.JSON(500, gin.H{"error": "database_error"})
+			return
+		}
+		c.JSON(200, sanitizeCampaignConfig(cfg))
 	})
 
 	campaignAPI.GET("/:campaignId/shares", func(c *gin.Context) {
@@ -807,9 +917,8 @@ func main() {
 			c.JSON(400, gin.H{"error": "missing_identity"})
 			return
 		}
-		cfg, err := ensureCampaignConfig(db, campaignID, userID, username)
-		if err != nil {
-			c.JSON(500, gin.H{"error": "database_error"})
+		cfg, accessOK := loadCampaignConfigForRequest(c, db, campaignID, userID, username)
+		if !accessOK {
 			return
 		}
 		role := memberRole(cfg, userID)
@@ -842,9 +951,8 @@ func main() {
 			c.JSON(400, gin.H{"error": "missing_identity"})
 			return
 		}
-		cfg, err := ensureCampaignConfig(db, campaignID, userID, username)
-		if err != nil {
-			c.JSON(500, gin.H{"error": "database_error"})
+		cfg, accessOK := loadCampaignConfigForRequest(c, db, campaignID, userID, username)
+		if !accessOK {
 			return
 		}
 		if memberRole(cfg, userID) != "GM" {
@@ -951,9 +1059,8 @@ func main() {
 			c.JSON(400, gin.H{"error": "missing_identity"})
 			return
 		}
-		cfg, err := ensureCampaignConfig(db, campaignID, userID, username)
-		if err != nil {
-			c.JSON(500, gin.H{"error": "database_error"})
+		cfg, accessOK := loadCampaignConfigForRequest(c, db, campaignID, userID, username)
+		if !accessOK {
 			return
 		}
 		items, err := loadShareIndex(db, campaignID)
@@ -1003,9 +1110,8 @@ func main() {
 			c.JSON(400, gin.H{"error": "missing_identity"})
 			return
 		}
-		cfg, err := ensureCampaignConfig(db, campaignID, userID, username)
-		if err != nil {
-			c.JSON(500, gin.H{"error": "database_error"})
+		cfg, accessOK := loadCampaignConfigForRequest(c, db, campaignID, userID, username)
+		if !accessOK {
 			return
 		}
 		items, err := loadShareIndex(db, campaignID)
@@ -1065,9 +1171,8 @@ func main() {
 			c.JSON(400, gin.H{"error": "invalid_payload"})
 			return
 		}
-		cfg, err := ensureCampaignConfig(db, campaignID, userID, username)
-		if err != nil {
-			c.JSON(500, gin.H{"error": "database_error"})
+		cfg, accessOK := loadCampaignConfigForRequest(c, db, campaignID, userID, username)
+		if !accessOK {
 			return
 		}
 		items, err := loadShareIndex(db, campaignID)
@@ -1121,9 +1226,8 @@ func main() {
 			c.JSON(400, gin.H{"error": "invalid_payload"})
 			return
 		}
-		cfg, err := ensureCampaignConfig(db, campaignID, userID, username)
-		if err != nil {
-			c.JSON(500, gin.H{"error": "database_error"})
+		cfg, accessOK := loadCampaignConfigForRequest(c, db, campaignID, userID, username)
+		if !accessOK {
 			return
 		}
 		items, err := loadShareIndex(db, campaignID)
@@ -1182,9 +1286,8 @@ func main() {
 			c.JSON(400, gin.H{"error": "invalid_payload"})
 			return
 		}
-		cfg, err := ensureCampaignConfig(db, campaignID, userID, username)
-		if err != nil {
-			c.JSON(500, gin.H{"error": "database_error"})
+		cfg, accessOK := loadCampaignConfigForRequest(c, db, campaignID, userID, username)
+		if !accessOK {
 			return
 		}
 		items, err := loadShareIndex(db, campaignID)
@@ -1268,9 +1371,8 @@ func main() {
 			c.JSON(400, gin.H{"error": "missing_identity"})
 			return
 		}
-		cfg, err := ensureCampaignConfig(db, campaignID, userID, username)
-		if err != nil {
-			c.JSON(500, gin.H{"error": "database_error"})
+		cfg, accessOK := loadCampaignConfigForRequest(c, db, campaignID, userID, username)
+		if !accessOK {
 			return
 		}
 		if memberRole(cfg, userID) != "GM" {
@@ -1293,9 +1395,8 @@ func main() {
 			c.JSON(400, gin.H{"error": "missing_identity"})
 			return
 		}
-		cfg, err := ensureCampaignConfig(db, campaignID, userID, username)
-		if err != nil {
-			c.JSON(500, gin.H{"error": "database_error"})
+		cfg, accessOK := loadCampaignConfigForRequest(c, db, campaignID, userID, username)
+		if !accessOK {
 			return
 		}
 		if memberRole(cfg, userID) != "GM" {
@@ -1403,8 +1504,7 @@ func main() {
 			c.JSON(400, gin.H{"error": "missing_identity"})
 			return
 		}
-		if _, err := ensureCampaignConfig(db, campaignID, userID, username); err != nil {
-			c.JSON(500, gin.H{"error": "database_error"})
+		if _, accessOK := loadCampaignConfigForRequest(c, db, campaignID, userID, username); !accessOK {
 			return
 		}
 		var items []KV
@@ -1434,8 +1534,7 @@ func main() {
 			c.JSON(400, gin.H{"error": "missing_identity"})
 			return
 		}
-		if _, err := ensureCampaignConfig(db, campaignID, userID, username); err != nil {
-			c.JSON(500, gin.H{"error": "database_error"})
+		if _, accessOK := loadCampaignConfigForRequest(c, db, campaignID, userID, username); !accessOK {
 			return
 		}
 		var body struct {
@@ -1493,9 +1592,8 @@ func main() {
 			c.JSON(400, gin.H{"error": "missing_identity"})
 			return
 		}
-		cfg, err := ensureCampaignConfig(db, campaignID, userID, username)
-		if err != nil {
-			c.JSON(500, gin.H{"error": "database_error"})
+		cfg, accessOK := loadCampaignConfigForRequest(c, db, campaignID, userID, username)
+		if !accessOK {
 			return
 		}
 		role := memberRole(cfg, userID)
@@ -1579,9 +1677,8 @@ func main() {
 			c.JSON(400, gin.H{"error": "missing_identity"})
 			return
 		}
-		cfg, err := ensureCampaignConfig(db, campaignID, userID, username)
-		if err != nil {
-			c.JSON(500, gin.H{"error": "database_error"})
+		cfg, accessOK := loadCampaignConfigForRequest(c, db, campaignID, userID, username)
+		if !accessOK {
 			return
 		}
 		role := memberRole(cfg, userID)
@@ -1633,9 +1730,8 @@ func main() {
 			c.JSON(400, gin.H{"error": "missing_identity"})
 			return
 		}
-		cfg, err := ensureCampaignConfig(db, campaignID, userID, username)
-		if err != nil {
-			c.JSON(500, gin.H{"error": "database_error"})
+		cfg, accessOK := loadCampaignConfigForRequest(c, db, campaignID, userID, username)
+		if !accessOK {
 			return
 		}
 		role := memberRole(cfg, userID)
@@ -1675,9 +1771,8 @@ func main() {
 			c.JSON(400, gin.H{"error": "missing_identity"})
 			return
 		}
-		cfg, err := ensureCampaignConfig(db, campaignID, userID, username)
-		if err != nil {
-			c.JSON(500, gin.H{"error": "database_error"})
+		cfg, accessOK := loadCampaignConfigForRequest(c, db, campaignID, userID, username)
+		if !accessOK {
 			return
 		}
 		role := memberRole(cfg, userID)
@@ -1731,8 +1826,7 @@ func main() {
 			c.JSON(400, gin.H{"error": "missing_identity"})
 			return
 		}
-		if _, err := ensureCampaignConfig(db, campaignID, userID, username); err != nil {
-			c.JSON(500, gin.H{"error": "database_error"})
+		if _, accessOK := loadCampaignConfigForRequest(c, db, campaignID, userID, username); !accessOK {
 			return
 		}
 		var note TeamNoteDoc
@@ -1773,9 +1867,8 @@ func main() {
 			c.JSON(400, gin.H{"error": "missing_identity"})
 			return
 		}
-		cfg, err := ensureCampaignConfig(db, campaignID, userID, username)
-		if err != nil {
-			c.JSON(500, gin.H{"error": "database_error"})
+		cfg, accessOK := loadCampaignConfigForRequest(c, db, campaignID, userID, username)
+		if !accessOK {
 			return
 		}
 		role := memberRole(cfg, userID)
@@ -1830,9 +1923,8 @@ func main() {
 			c.JSON(400, gin.H{"error": "missing_identity"})
 			return
 		}
-		cfg, err := ensureCampaignConfig(db, campaignID, userID, username)
-		if err != nil {
-			c.JSON(500, gin.H{"error": "database_error"})
+		cfg, accessOK := loadCampaignConfigForRequest(c, db, campaignID, userID, username)
+		if !accessOK {
 			return
 		}
 		role := memberRole(cfg, userID)
@@ -1977,9 +2069,8 @@ func main() {
 			c.JSON(400, gin.H{"error": "missing_identity"})
 			return
 		}
-		cfg, err := ensureCampaignConfig(db, campaignID, userID, username)
-		if err != nil {
-			c.JSON(500, gin.H{"error": "database_error"})
+		cfg, accessOK := loadCampaignConfigForRequest(c, db, campaignID, userID, username)
+		if !accessOK {
 			return
 		}
 		role := memberRole(cfg, userID)
@@ -2031,9 +2122,8 @@ func main() {
 			c.JSON(400, gin.H{"error": "missing_identity"})
 			return
 		}
-		cfg, err := ensureCampaignConfig(db, campaignID, userID, username)
-		if err != nil {
-			c.JSON(500, gin.H{"error": "database_error"})
+		cfg, accessOK := loadCampaignConfigForRequest(c, db, campaignID, userID, username)
+		if !accessOK {
 			return
 		}
 		role := memberRole(cfg, userID)
@@ -2091,8 +2181,7 @@ func main() {
 			c.JSON(400, gin.H{"error": "missing_identity"})
 			return
 		}
-		if _, err := ensureCampaignConfig(db, campaignID, userID, username); err != nil {
-			c.JSON(500, gin.H{"error": "database_error"})
+		if _, accessOK := loadCampaignConfigForRequest(c, db, campaignID, userID, username); !accessOK {
 			return
 		}
 		var doc SessionTaskBoardDoc

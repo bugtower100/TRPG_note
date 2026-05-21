@@ -30,7 +30,7 @@ interface CampaignContextType {
   
   // User Session
   user: UserProfile | null;
-  login: (username: string) => void;
+  login: (username: string, password?: string) => { success: boolean; message?: string };
   logout: () => void;
   
   // Campaign Management
@@ -175,7 +175,11 @@ export const CampaignProvider: React.FC<{ children: ReactNode }> = ({ children }
     setCampaignList(list);
   };
 
-  const login = (username: string) => {
+  const login = (username: string, password: string = '') => {
+    const validation = dataService.verifyUserPassword(username, password);
+    if (!validation.ok) {
+      return { success: false, message: validation.message };
+    }
     const newUser = dataService.createUser(username);
     dataService.setCurrentUser(newUser);
     setUser(newUser);
@@ -183,6 +187,7 @@ export const CampaignProvider: React.FC<{ children: ReactNode }> = ({ children }
     initializeStorageAdapter().then((adapter) => {
       dataService.setStorageAdapter(adapter);
     }).catch(() => void 0);
+    return { success: true };
   };
 
   const logout = () => {

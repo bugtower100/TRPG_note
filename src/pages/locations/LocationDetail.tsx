@@ -125,6 +125,14 @@ const LocationDetail: React.FC<LocationDetailProps> = ({ entityId }) => {
             value={location.name}
             onChange={(e) => handleChange('name', e.target.value)}
             className="flex-1 min-w-0 text-xl sm:text-2xl font-bold border-b border-transparent hover:border-gray-300 focus:border-primary focus:outline-none bg-transparent"
+            style={{ color: location.titleColor || '#111827' }}
+          />
+          <input
+            type="color"
+            value={location.titleColor || '#111827'}
+            onChange={(e) => handleChange('titleColor' as keyof Location, e.target.value)}
+            className="w-10 h-10 rounded border border-theme bg-transparent shrink-0"
+            title="标题颜色"
           />
         </div>
         

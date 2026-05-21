@@ -16,6 +16,8 @@ type GraphEntity = {
 };
 
 const NODE_RADIUS = 30;
+const EDGE_CURVE_STEP = 36;
+const EDGE_ENDPOINT_OFFSET_STEP = 10;
 
 const tokenText = (name: string) => (name || '？').trim().slice(0, 1).toUpperCase();
 
@@ -32,6 +34,133 @@ const resolveTokenImage = (ref?: string) => {
 };
 
 const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
+
+const pairKeyForNodes = (a: string, b: string) => [a, b].sort().join('::');
+
+const computeEdgeCurveSlots = (edges: RelationGraphEdge[]): Record<string, number> => {
+  const grouped = new Map<string, RelationGraphEdge[]>();
+  edges.forEach((edge) => {
+    const key = pairKeyForNodes(edge.fromNodeId, edge.toNodeId);
+    const group = grouped.get(key) || [];
+    group.push(edge);
+    grouped.set(key, group);
+  });
+
+  const slots: Record<string, number> = {};
+  const balancedSlots = (count: number, allowCenter: boolean) => {
+    if (count <= 0) return [];
+    if (allowCenter) {
+      return Array.from({ length: count }, (_, index) => {
+        if (index === 0) return 0;
+        const level = Math.ceil(index / 2);
+        return index % 2 === 1 ? level : -level;
+      });
+    }
+    return Array.from({ length: count }, (_, index) => {
+      const level = Math.floor(index / 2) + 0.5;
+      return index % 2 === 0 ? level : -level;
+    });
+  };
+
+  grouped.forEach((group) => {
+    if (group.length <= 1) {
+      slots[group[0].id] = 0;
+      return;
+    }
+    const sortedPair = [group[0].fromNodeId, group[0].toNodeId].sort();
+    const bidirectionalEdges = group.filter((edge) => edge.direction === 'bidirectional');
+    const directionalEdges = group.filter((edge) => edge.direction !== 'bidirectional');
+    const baseSlots = balancedSlots(group.length, bidirectionalEdges.length > 0 || group.length % 2 === 1);
+    const availableSlots = [...baseSlots];
+
+    const takeSpecificSlot = (value: number) => {
+      const index = availableSlots.findIndex((slot) => slot === value);
+      if (index >= 0) {
+        const [slot] = availableSlots.splice(index, 1);
+        return slot;
+      }
+      return null;
+    };
+
+    const takePreferredSlot = (wantPositive: boolean) => {
+      const preferredIndex = availableSlots.findIndex((slot) => (wantPositive ? slot > 0 : slot < 0));
+      if (preferredIndex >= 0) {
+        const [slot] = availableSlots.splice(preferredIndex, 1);
+        return slot;
+      }
+      const fallbackIndex = availableSlots.findIndex((slot) => slot === 0);
+      if (fallbackIndex >= 0) {
+        const [slot] = availableSlots.splice(fallbackIndex, 1);
+        return slot;
+      }
+      const [slot] = availableSlots.splice(0, 1);
+      return slot ?? 0;
+    };
+
+    bidirectionalEdges.forEach((edge) => {
+      const centered = takeSpecificSlot(0);
+      if (centered !== null) {
+        slots[edge.id] = centered;
+        return;
+      }
+      const [nearest] = availableSlots.splice(0, 1);
+      slots[edge.id] = nearest ?? 0;
+    });
+
+    directionalEdges.forEach((edge) => {
+      const alignedWithSortedPair =
+        edge.fromNodeId === sortedPair[0] && edge.toNodeId === sortedPair[1];
+      slots[edge.id] = takePreferredSlot(alignedWithSortedPair);
+    });
+  });
+
+  return slots;
+};
+
+const buildEdgeGeometry = (
+  from: RelationGraphNode,
+  to: RelationGraphNode,
+  curveSlot: number
+) => {
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  const len = Math.sqrt(dx * dx + dy * dy) || 1;
+  const ux = dx / len;
+  const uy = dy / len;
+  const endPadding = NODE_RADIUS + 10;
+  const normalX = -uy;
+  const normalY = ux;
+  const endpointOffset = curveSlot * EDGE_ENDPOINT_OFFSET_STEP;
+  const startX = from.x + ux * endPadding + normalX * endpointOffset;
+  const startY = from.y + uy * endPadding + normalY * endpointOffset;
+  const endX = to.x - ux * endPadding + normalX * endpointOffset;
+  const endY = to.y - uy * endPadding + normalY * endpointOffset;
+  const mx = (startX + endX) / 2;
+  const my = (startY + endY) / 2;
+  const curveAmount = curveSlot * EDGE_CURVE_STEP;
+  if (curveAmount === 0) {
+    return {
+      path: `M ${startX} ${startY} L ${endX} ${endY}`,
+      labelX: mx,
+      labelY: my,
+      startX,
+      startY,
+      endX,
+      endY,
+    };
+  }
+  const controlX = mx + normalX * curveAmount;
+  const controlY = my + normalY * curveAmount;
+  return {
+    path: `M ${startX} ${startY} Q ${controlX} ${controlY} ${endX} ${endY}`,
+    labelX: 0.25 * startX + 0.5 * controlX + 0.25 * endX,
+    labelY: 0.25 * startY + 0.5 * controlY + 0.25 * endY,
+    startX,
+    startY,
+    endX,
+    endY,
+  };
+};
 
 const RelationGraphs: React.FC = () => {
   const { campaignData, setCampaignData, openInTab } = useCampaign();
@@ -118,6 +247,10 @@ const RelationGraphs: React.FC = () => {
   const activeGraph = useMemo(
     () => graphs.find((g) => g.id === activeGraphId) || null,
     [graphs, activeGraphId]
+  );
+  const edgeCurveSlots = useMemo(
+    () => computeEdgeCurveSlots(activeGraph?.edges || []),
+    [activeGraph]
   );
 
   const persistGraph = useCallback(
@@ -676,40 +809,24 @@ const RelationGraphs: React.FC = () => {
                 const from = activeGraph?.nodes.find((n) => n.id === edge.fromNodeId);
                 const to = activeGraph?.nodes.find((n) => n.id === edge.toNodeId);
                 if (!from || !to) return null;
-                const dx = to.x - from.x;
-                const dy = to.y - from.y;
-                const len = Math.sqrt(dx * dx + dy * dy) || 1;
-                const ux = dx / len;
-                const uy = dy / len;
-                const endPadding = NODE_RADIUS + 10;
-                const startX = from.x + ux * endPadding;
-                const startY = from.y + uy * endPadding;
-                const endX = to.x - ux * endPadding;
-                const endY = to.y - uy * endPadding;
-                const mx = (startX + endX) / 2;
-                const my = (startY + endY) / 2;
+                const geometry = buildEdgeGeometry(from, to, edgeCurveSlots[edge.id] || 0);
                 const selected = selectedEdgeId === edge.id;
                 const markerStart = edge.direction === 'backward' || edge.direction === 'bidirectional' ? 'url(#arrow-start)' : undefined;
                 const markerEnd = edge.direction === 'forward' || edge.direction === 'bidirectional' ? 'url(#arrow-end)' : undefined;
                 const metrics = edgeLabelMetrics(edge);
                 return (
                   <g key={edge.id}>
-                    <line
-                      x1={startX}
-                      y1={startY}
-                      x2={endX}
-                      y2={endY}
+                    <path
+                      d={geometry.path}
                       stroke={selected ? '#7c3aed' : '#94a3b8'}
                       strokeWidth={selected ? edge.lineWidth + 0.8 : edge.lineWidth}
                       markerStart={markerStart}
                       markerEnd={markerEnd}
                       strokeDasharray={edge.lineStyle === 'dashed' ? '7 5' : undefined}
+                      fill="none"
                     />
-                    <line
-                      x1={startX}
-                      y1={startY}
-                      x2={endX}
-                      y2={endY}
+                    <path
+                      d={geometry.path}
                       stroke="transparent"
                       strokeWidth={Math.max(14, edge.lineWidth + 10)}
                       onClick={() => {
@@ -721,19 +838,20 @@ const RelationGraphs: React.FC = () => {
                         setEdgeEditorId(edge.id);
                       }}
                       style={{ cursor: 'pointer' }}
+                      fill="none"
                     />
                     {edge.label && (
                       <>
                         <rect
-                          x={mx - metrics.width / 2}
-                          y={my - metrics.height / 2}
+                          x={geometry.labelX - metrics.width / 2}
+                          y={geometry.labelY - metrics.height / 2}
                           width={metrics.width}
                           height={metrics.height}
                           rx={4}
                           fill={edge.labelBgColor}
                           fillOpacity={edge.labelBgOpacity}
                         />
-                        <text x={mx} y={my + edge.labelFontSize * 0.35} textAnchor="middle" style={{ fontSize: `${edge.labelFontSize}px`, fill: edge.labelColor, userSelect: 'none' }}>
+                        <text x={geometry.labelX} y={geometry.labelY + edge.labelFontSize * 0.35} textAnchor="middle" style={{ fontSize: `${edge.labelFontSize}px`, fill: edge.labelColor, userSelect: 'none' }}>
                           {edge.label}
                         </text>
                       </>
@@ -854,7 +972,7 @@ const RelationGraphs: React.FC = () => {
                     className={`w-full text-left border rounded p-2 transition ${active ? 'border-primary ring-2 ring-primary/30' : 'border-theme hover:bg-primary-light/30'}`}
                   >
                     <div className="flex items-center gap-3">
-                      <img src={item.url} alt={item.displayName} className="w-10 h-10 rounded object-cover border border-theme shrink-0" />
+                      <img src={item.url} alt={item.displayName} className="w-16 h-16 rounded object-cover border border-theme shrink-0" />
                       <div className="min-w-0">
                         <div className="text-sm font-medium truncate" title={item.displayName}>{item.displayName}</div>
                         <div className="text-[11px] theme-text-secondary truncate" title={item.ref}>{item.ref}</div>

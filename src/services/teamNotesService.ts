@@ -1,10 +1,12 @@
 import { CampaignConfig, CampaignMemberRole, CampaignVisibility, PublicCampaignSummary, TeamNoteDocument, UserProfile } from '../types';
 import { VersionConflictError } from './conflictError';
+import { campaignAccessService } from './campaignAccessService';
 
-const jsonHeaders = (user: UserProfile | null) => ({
+const jsonHeaders = (user: UserProfile | null, campaignId?: string) => ({
   'Content-Type': 'application/json',
   'X-TRPG-User-Id': user?.id || '',
   'X-TRPG-Username': encodeURIComponent(user?.username || ''),
+  ...campaignAccessService.buildHeaders(campaignId),
 });
 
 class TeamNotesService {
@@ -47,6 +49,9 @@ class TeamNotesService {
       if (payload.error === 'forbidden') {
         return '你没有权限执行这个操作';
       }
+      if (payload.error === 'join_password_required') {
+        return '进入密码错误或未提供，请重新输入。';
+      }
       if (payload.error === 'not_found') {
         return '目标团队笔记不存在或已被删除';
       }
@@ -84,7 +89,7 @@ class TeamNotesService {
 
   async getConfig(campaignId: string, user: UserProfile | null): Promise<CampaignConfig> {
     const response = await fetch(`/api/campaigns/${campaignId}/config`, {
-      headers: jsonHeaders(user),
+      headers: jsonHeaders(user, campaignId),
     });
     return this.parseResponse<CampaignConfig>(response);
   }
@@ -92,19 +97,34 @@ class TeamNotesService {
   async updateConfig(
     campaignId: string,
     user: UserProfile | null,
-    payload: { visibility?: CampaignVisibility; name?: string; description?: string; lastModified?: number }
+    payload: {
+      visibility?: CampaignVisibility;
+      name?: string;
+      description?: string;
+      lastModified?: number;
+      joinPassword?: string;
+      clearJoinPassword?: boolean;
+    }
   ): Promise<CampaignConfig> {
     const response = await fetch(`/api/campaigns/${campaignId}/config`, {
       method: 'PUT',
-      headers: jsonHeaders(user),
+      headers: jsonHeaders(user, campaignId),
       body: JSON.stringify(payload),
+    });
+    return this.parseResponse<CampaignConfig>(response);
+  }
+
+  async removeMember(campaignId: string, memberUserId: string, user: UserProfile | null): Promise<CampaignConfig> {
+    const response = await fetch(`/api/campaigns/${campaignId}/members/${memberUserId}`, {
+      method: 'DELETE',
+      headers: jsonHeaders(user, campaignId),
     });
     return this.parseResponse<CampaignConfig>(response);
   }
 
   async listTeamNotes(campaignId: string, user: UserProfile | null): Promise<TeamNoteDocument[]> {
     const response = await fetch(`/api/campaigns/${campaignId}/team-notes`, {
-      headers: jsonHeaders(user),
+      headers: jsonHeaders(user, campaignId),
     });
     return this.parseResponse<TeamNoteDocument[]>(response);
   }
@@ -112,7 +132,7 @@ class TeamNotesService {
   async createTeamNote(campaignId: string, user: UserProfile | null, title: string): Promise<TeamNoteDocument> {
     const response = await fetch(`/api/campaigns/${campaignId}/team-notes`, {
       method: 'POST',
-      headers: jsonHeaders(user),
+      headers: jsonHeaders(user, campaignId),
       body: JSON.stringify({ title }),
     });
     return this.parseResponse<TeamNoteDocument>(response);
@@ -126,7 +146,7 @@ class TeamNotesService {
   ): Promise<TeamNoteDocument> {
     const response = await fetch(`/api/campaigns/${campaignId}/team-notes/${noteId}`, {
       method: 'PUT',
-      headers: jsonHeaders(user),
+      headers: jsonHeaders(user, campaignId),
       body: JSON.stringify(payload),
     });
     return this.parseResponse<TeamNoteDocument>(response);
@@ -135,7 +155,7 @@ class TeamNotesService {
   async startLease(campaignId: string, noteId: string, user: UserProfile | null, role: CampaignMemberRole): Promise<TeamNoteDocument> {
     const response = await fetch(`/api/campaigns/${campaignId}/team-notes/${noteId}/lease/start`, {
       method: 'POST',
-      headers: jsonHeaders(user),
+      headers: jsonHeaders(user, campaignId),
       body: JSON.stringify({ role }),
     });
     return this.parseResponse<TeamNoteDocument>(response);
@@ -150,7 +170,7 @@ class TeamNotesService {
   ): Promise<TeamNoteDocument> {
     const response = await fetch(`/api/campaigns/${campaignId}/team-notes/${noteId}/lease/refresh`, {
       method: 'POST',
-      headers: jsonHeaders(user),
+      headers: jsonHeaders(user, campaignId),
       body: JSON.stringify({ role, leaseStartedAt }),
     });
     return this.parseResponse<TeamNoteDocument>(response);
@@ -159,7 +179,7 @@ class TeamNotesService {
   async endLease(campaignId: string, noteId: string, user: UserProfile | null, leaseStartedAt?: number | null): Promise<void> {
     const response = await fetch(`/api/campaigns/${campaignId}/team-notes/${noteId}/lease/end`, {
       method: 'POST',
-      headers: jsonHeaders(user),
+      headers: jsonHeaders(user, campaignId),
       body: JSON.stringify({ leaseStartedAt }),
     });
     if (!response.ok) {
@@ -170,7 +190,7 @@ class TeamNotesService {
   async deleteTeamNote(campaignId: string, noteId: string, user: UserProfile | null): Promise<void> {
     const response = await fetch(`/api/campaigns/${campaignId}/team-notes/${noteId}`, {
       method: 'DELETE',
-      headers: jsonHeaders(user),
+      headers: jsonHeaders(user, campaignId),
     });
     if (!response.ok) {
       throw new Error(await this.readErrorMessage(response));

@@ -16,6 +16,7 @@ export interface CustomSubItem {
 export interface BaseEntity {
   id: string;
   name: string;
+  titleColor?: string;
   details: string;
   tags?: string[];
   customSubItems?: CustomSubItem[];
@@ -245,6 +246,7 @@ export interface UserProfile {
   username: string;
   role: 'GM'; // Simplified to only GM
   lastActive: number;
+  passwordConfigured?: boolean;
 }
 
 export type CampaignVisibility = 'public' | 'private';
@@ -275,6 +277,7 @@ export interface CampaignConfig {
   description?: string;
   lastModified?: number;
   visibility: CampaignVisibility;
+  joinPasswordConfigured?: boolean;
   ownerUserId: string;
   schemaVersion: number;
   members: CampaignMember[];
@@ -290,6 +293,7 @@ export interface PublicCampaignSummary {
   ownerId: string;
   ownerUsername: string;
   visibility: CampaignVisibility;
+  hasJoinPassword?: boolean;
   memberCount: number;
   onlineMemberCount: number;
 }

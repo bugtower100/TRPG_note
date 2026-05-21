@@ -1,10 +1,12 @@
 import { CampaignConfig, GraphEntityType, SharedEntityRecord, SharedPermission, ShareScope, UserProfile, VersionRecord } from '../types';
 import { VersionConflictError } from './conflictError';
+import { campaignAccessService } from './campaignAccessService';
 
-const jsonHeaders = (user: UserProfile | null) => ({
+const jsonHeaders = (user: UserProfile | null, campaignId?: string) => ({
   'Content-Type': 'application/json',
   'X-TRPG-User-Id': user?.id || '',
   'X-TRPG-Username': encodeURIComponent(user?.username || ''),
+  ...campaignAccessService.buildHeaders(campaignId),
 });
 
 class SharingService {
@@ -75,14 +77,14 @@ class SharingService {
 
   async listReceivedShares(campaignId: string, user: UserProfile | null): Promise<SharedEntityRecord[]> {
     const response = await fetch(`/api/campaigns/${campaignId}/shares?view=received`, {
-      headers: jsonHeaders(user),
+      headers: jsonHeaders(user, campaignId),
     });
     return this.parseResponse<SharedEntityRecord[]>(response);
   }
 
   async listManagedShares(campaignId: string, user: UserProfile | null): Promise<SharedEntityRecord[]> {
     const response = await fetch(`/api/campaigns/${campaignId}/shares?view=managed`, {
-      headers: jsonHeaders(user),
+      headers: jsonHeaders(user, campaignId),
     });
     return this.parseResponse<SharedEntityRecord[]>(response);
   }
@@ -103,7 +105,7 @@ class SharingService {
   ): Promise<SharedEntityRecord[]> {
     const response = await fetch(`/api/campaigns/${campaignId}/shares`, {
       method: 'POST',
-      headers: jsonHeaders(user),
+      headers: jsonHeaders(user, campaignId),
       body: JSON.stringify(payload),
     });
     return this.parseResponse<SharedEntityRecord[]>(response);
@@ -112,7 +114,7 @@ class SharingService {
   async revokeShare(campaignId: string, shareId: string, user: UserProfile | null): Promise<void> {
     const response = await fetch(`/api/campaigns/${campaignId}/shares/${shareId}`, {
       method: 'DELETE',
-      headers: jsonHeaders(user),
+      headers: jsonHeaders(user, campaignId),
     });
     if (!response.ok) {
       throw new Error(await this.readErrorMessage(response));
@@ -121,7 +123,7 @@ class SharingService {
 
   async listVersions(campaignId: string, user: UserProfile | null): Promise<VersionRecord[]> {
     const response = await fetch(`/api/campaigns/${campaignId}/versions`, {
-      headers: jsonHeaders(user),
+      headers: jsonHeaders(user, campaignId),
     });
     return this.parseResponse<VersionRecord[]>(response);
   }
@@ -129,14 +131,14 @@ class SharingService {
   async restoreVersionCopy(campaignId: string, versionId: string, user: UserProfile | null): Promise<{ createdId: string }> {
     const response = await fetch(`/api/campaigns/${campaignId}/versions/${versionId}/restore-copy`, {
       method: 'POST',
-      headers: jsonHeaders(user),
+      headers: jsonHeaders(user, campaignId),
     });
     return this.parseResponse<{ createdId: string }>(response);
   }
 
   async getCampaignConfig(campaignId: string, user: UserProfile | null): Promise<CampaignConfig> {
     const response = await fetch(`/api/campaigns/${campaignId}/config`, {
-      headers: jsonHeaders(user),
+      headers: jsonHeaders(user, campaignId),
     });
     return this.parseResponse<CampaignConfig>(response);
   }
@@ -144,7 +146,7 @@ class SharingService {
   async startShareLease(campaignId: string, shareId: string, user: UserProfile | null): Promise<SharedEntityRecord> {
     const response = await fetch(`/api/campaigns/${campaignId}/shares/${shareId}/lease/start`, {
       method: 'POST',
-      headers: jsonHeaders(user),
+      headers: jsonHeaders(user, campaignId),
     });
     return this.parseResponse<SharedEntityRecord>(response);
   }
@@ -157,7 +159,7 @@ class SharingService {
   ): Promise<SharedEntityRecord> {
     const response = await fetch(`/api/campaigns/${campaignId}/shares/${shareId}/lease/refresh`, {
       method: 'POST',
-      headers: jsonHeaders(user),
+      headers: jsonHeaders(user, campaignId),
       body: JSON.stringify({ leaseStartedAt }),
     });
     return this.parseResponse<SharedEntityRecord>(response);
@@ -166,7 +168,7 @@ class SharingService {
   async endShareLease(campaignId: string, shareId: string, user: UserProfile | null, leaseStartedAt?: number | null): Promise<void> {
     const response = await fetch(`/api/campaigns/${campaignId}/shares/${shareId}/lease/end`, {
       method: 'POST',
-      headers: jsonHeaders(user),
+      headers: jsonHeaders(user, campaignId),
       body: JSON.stringify({ leaseStartedAt }),
     });
     if (!response.ok) {
@@ -191,7 +193,7 @@ class SharingService {
   ): Promise<SharedEntityRecord> {
     const response = await fetch(`/api/campaigns/${campaignId}/shares/${shareId}/content`, {
       method: 'PUT',
-      headers: jsonHeaders(user),
+      headers: jsonHeaders(user, campaignId),
       body: JSON.stringify(payload),
     });
     return this.parseResponse<SharedEntityRecord>(response);

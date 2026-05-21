@@ -5,6 +5,7 @@ import { dataService } from '../services/dataService';
 import { GuideHelpButton } from '../components/common/InteractiveGuide';
 import { CampaignConfig, PublicCampaignSummary } from '../types';
 import { teamNotesService } from '../services/teamNotesService';
+import { campaignAccessService } from '../services/campaignAccessService';
 
 const LandingPage: React.FC = () => {
   const { 
@@ -17,6 +18,8 @@ const LandingPage: React.FC = () => {
 
   // Login State
   const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [loginError, setLoginError] = useState('');
   const [latency, setLatency] = useState<number | null>(null);
   const [onlinePreview, setOnlinePreview] = useState<boolean | null>(null);
   const users = useMemo(() => {
@@ -25,6 +28,7 @@ const LandingPage: React.FC = () => {
   }, []);
   const [historyOpen, setHistoryOpen] = useState(false);
   const historyRef = useRef<HTMLDivElement>(null);
+  const passwordMenuRef = useRef<HTMLDivElement>(null);
 
   // Create Campaign State
   const [isCreating, setIsCreating] = useState(false);
@@ -33,6 +37,11 @@ const LandingPage: React.FC = () => {
   const [campaignConfigs, setCampaignConfigs] = useState<Record<string, CampaignConfig>>({});
   const [savingConfigId, setSavingConfigId] = useState<string | null>(null);
   const [publicCampaigns, setPublicCampaigns] = useState<PublicCampaignSummary[]>([]);
+  const [loginPassword, setLoginPassword] = useState('');
+  const [confirmLoginPassword, setConfirmLoginPassword] = useState('');
+  const [passwordConfigured, setPasswordConfigured] = useState(false);
+  const [passwordStatus, setPasswordStatus] = useState('');
+  const [passwordMenuOpen, setPasswordMenuOpen] = useState(false);
 
   // Import State
   const fileInputRef = React.useRef<HTMLInputElement>(null);
@@ -40,7 +49,13 @@ const LandingPage: React.FC = () => {
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
     if (username.trim()) {
-      login(username);
+      const result = login(username.trim(), password);
+      if (!result.success) {
+        setLoginError(result.message || '登录失败');
+        return;
+      }
+      setPassword('');
+      setLoginError('');
     }
   };
 
@@ -96,12 +111,23 @@ const LandingPage: React.FC = () => {
       })
       .catch(() => void 0);
   }, [campaignList, user]);
+
+  useEffect(() => {
+    setPasswordConfigured(Boolean(user?.passwordConfigured));
+    setLoginPassword('');
+    setConfirmLoginPassword('');
+    setPasswordStatus('');
+    setPasswordMenuOpen(false);
+  }, [user]);
   
   useEffect(() => {
     const handler = (e: MouseEvent) => {
-      if (!historyRef.current) return;
-      if (!historyRef.current.contains(e.target as Node)) {
+      const target = e.target as Node;
+      if (historyRef.current && !historyRef.current.contains(target)) {
         setHistoryOpen(false);
+      }
+      if (passwordMenuRef.current && !passwordMenuRef.current.contains(target)) {
+        setPasswordMenuOpen(false);
       }
     };
     window.addEventListener('mousedown', handler);
@@ -133,6 +159,7 @@ const LandingPage: React.FC = () => {
         description: campaignList.find((campaign) => campaign.id === campaignId)?.description,
         lastModified: campaignList.find((campaign) => campaign.id === campaignId)?.lastModified,
         visibility: current.visibility,
+        ...(current.joinPasswordConfigured ? {} : {}),
       });
       setCampaignConfigs((prev) => ({ ...prev, [campaignId]: next }));
     } finally {
@@ -140,7 +167,113 @@ const LandingPage: React.FC = () => {
     }
   };
 
-  const handleEnterCampaign = async (campaign: { id: string; name: string; description: string; lastModified: number; ownerId: string; visibility?: CampaignConfig['visibility'] }) => {
+  const handleUpdateJoinPassword = async (campaignId: string) => {
+    if (!user) return;
+    const current = campaignConfigs[campaignId];
+    const input = window.prompt(
+      current?.joinPasswordConfigured
+        ? '输入新的进入密码。留空并确认后可清除进入密码。'
+        : '输入公开模组进入密码。留空表示不设置密码。',
+      ''
+    );
+    if (input === null) return;
+    const normalized = input.trim();
+    try {
+      const next = await teamNotesService.updateConfig(campaignId, user, {
+        joinPassword: normalized,
+        clearJoinPassword: normalized === '',
+      });
+      setCampaignConfigs((prev) => ({ ...prev, [campaignId]: next }));
+      if (normalized === '') {
+        campaignAccessService.clearPassword(campaignId);
+      }
+      window.alert(normalized ? '进入密码已更新。' : '进入密码已清除。');
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : '进入密码保存失败');
+    }
+  };
+
+  const ensurePublicCampaignAccess = async (campaign: PublicCampaignSummary): Promise<boolean> => {
+    if (!user) return false;
+    let passwordText = campaignAccessService.getPassword(campaign.id);
+    if (campaign.hasJoinPassword && !passwordText) {
+      const input = window.prompt(`"${campaign.name}" 需要进入密码，请输入：`, '');
+      if (input === null) return false;
+      passwordText = input.trim();
+      campaignAccessService.setPassword(campaign.id, passwordText);
+    }
+    try {
+      await teamNotesService.getConfig(campaign.id, user);
+      return true;
+    } catch (error) {
+      campaignAccessService.clearPassword(campaign.id);
+      const message = error instanceof Error ? error.message : '进入模组失败';
+      if (message.includes('进入密码')) {
+        const retry = window.prompt(`"${campaign.name}" 的进入密码不正确，请重新输入：`, '');
+        if (retry === null) return false;
+        campaignAccessService.setPassword(campaign.id, retry.trim());
+        try {
+          await teamNotesService.getConfig(campaign.id, user);
+          return true;
+        } catch (retryError) {
+          campaignAccessService.clearPassword(campaign.id);
+          window.alert(retryError instanceof Error ? retryError.message : '进入模组失败');
+          return false;
+        }
+      }
+      window.alert(message);
+      return false;
+    }
+  };
+
+  const handleRemoveMember = async (campaignId: string, memberUserId: string) => {
+    if (!user) return;
+    if (!window.confirm('确定要将该 PL 从成员列表中移除吗？之后对方再次进入公开模组时会重新加入。')) return;
+    try {
+      const next = await teamNotesService.removeMember(campaignId, memberUserId, user);
+      setCampaignConfigs((prev) => ({ ...prev, [campaignId]: next }));
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : '移除成员失败');
+    }
+  };
+
+  const handleSaveLoginPassword = () => {
+    if (!user) return;
+    if (loginPassword !== confirmLoginPassword) {
+      setPasswordStatus('两次输入的密码不一致。');
+      return;
+    }
+    const updated = dataService.updateUserPassword(user.id, loginPassword);
+    if (!updated) {
+      setPasswordStatus('密码保存失败，请重新登录后再试。');
+      return;
+    }
+    setPasswordConfigured(Boolean(updated.passwordConfigured));
+    setLoginPassword('');
+    setConfirmLoginPassword('');
+    setPasswordStatus(updated.passwordConfigured ? '登录密码已更新。' : '已清除登录密码，后续可直接空密码登录。');
+    setPasswordMenuOpen(false);
+  };
+
+  const handleEnterCampaign = async (
+    campaign: { id: string; name: string; description: string; lastModified: number; ownerId: string; visibility?: CampaignConfig['visibility'] },
+    options?: { requiresJoinPassword?: boolean }
+  ) => {
+    if (options) {
+      const accessGranted = await ensurePublicCampaignAccess({
+        id: campaign.id,
+        name: campaign.name,
+        description: campaign.description,
+        lastModified: campaign.lastModified,
+        ownerId: campaign.ownerId,
+        ownerUsername: '',
+        visibility: campaign.visibility || 'public',
+        memberCount: 0,
+        onlineMemberCount: 0,
+        hasJoinPassword: Boolean(options.requiresJoinPassword),
+      });
+      if (!accessGranted) return;
+    }
     dataService.ensureCampaignSummary({
       id: campaign.id,
       name: campaign.name,
@@ -160,8 +293,8 @@ const LandingPage: React.FC = () => {
     return {
       members,
       onlineMembers,
-      previewMembers: members.slice(0, 4),
-      extraCount: Math.max(0, members.length - 4),
+      previewMembers: members,
+      extraCount: 0,
     };
   };
 
@@ -216,6 +349,16 @@ const LandingPage: React.FC = () => {
                 )}
               </div>
             </div>
+            <div>
+              <label className="block mb-1 text-sm font-medium text-gray-700">登录密码</label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="px-4 py-2 w-full rounded-md border border-gray-300 outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                placeholder="未设置密码时可留空"
+              />
+            </div>
             <div className="text-xs text-gray-600">
               {onlinePreview === null ? '' : (
                 onlinePreview
@@ -230,6 +373,9 @@ const LandingPage: React.FC = () => {
                 重新检测
               </button>
             </div>
+            {loginError && (
+              <div className="text-sm text-red-600">{loginError}</div>
+            )}
             
             <button
               type="submit"
@@ -249,8 +395,8 @@ const LandingPage: React.FC = () => {
       <div className="mx-auto max-w-6xl">
         <div className="flex flex-col gap-4 justify-between items-start mb-8 md:flex-row md:items-center">
           <div>
-            <h1 className="text-3xl font-bold text-gray-800">欢迎, {user.username}</h1>
-            <p className="mt-1 text-gray-500">
+            <h1 className="text-3xl font-bold text-theme-primary">欢迎, {user.username}</h1>
+            <p className="mt-1 theme-text-secondary">
                 准备好开启新的冒险了吗？
             </p>
           </div>
@@ -292,6 +438,56 @@ const LandingPage: React.FC = () => {
 
         {/* Theme Selection for Landing Page */}
         <div className="flex gap-2 justify-end mb-6">
+            <div className="relative" ref={passwordMenuRef}>
+                <button
+                    type="button"
+                    onClick={() => {
+                        setPasswordMenuOpen((prev) => !prev);
+                        setPasswordStatus('');
+                    }}
+                    className="px-3 py-1 text-sm border rounded bg-white text-gray-600 border-gray-300 hover:bg-gray-50 inline-flex items-center gap-1"
+                >
+                    账号
+                    <ChevronDown size={16} className={`transition-transform ${passwordMenuOpen ? 'rotate-180' : ''}`} />
+                </button>
+                {passwordMenuOpen && (
+                    <div className="absolute right-0 z-20 mt-2 w-[300px] rounded-lg border border-theme theme-card shadow-lg p-3">
+                        <div className="mb-2">
+                            <div className="text-sm font-semibold">登录密码</div>
+                            <div className="text-[11px] theme-text-secondary">
+                                {passwordConfigured ? '已设置，可修改或清除' : '未设置，留空即可登录'}
+                            </div>
+                        </div>
+                        <div className="space-y-2">
+                            <input
+                                type="password"
+                                value={loginPassword}
+                                onChange={(e) => setLoginPassword(e.target.value)}
+                                className="w-full px-3 py-2 text-sm border border-theme rounded-md bg-transparent"
+                                placeholder="新密码，留空表示清除"
+                            />
+                            <input
+                                type="password"
+                                value={confirmLoginPassword}
+                                onChange={(e) => setConfirmLoginPassword(e.target.value)}
+                                className="w-full px-3 py-2 text-sm border border-theme rounded-md bg-transparent"
+                                placeholder="再次输入密码"
+                            />
+                            <div className="flex items-center justify-between gap-2 pt-1">
+                                <div className="text-[11px] theme-text-secondary">无需创建模组也可设置</div>
+                                <button
+                                    type="button"
+                                    onClick={handleSaveLoginPassword}
+                                    className="px-3 py-1.5 text-sm bg-primary text-white rounded hover:bg-primary-dark"
+                                >
+                                    保存
+                                </button>
+                            </div>
+                            {passwordStatus && <div className="text-xs theme-text-secondary">{passwordStatus}</div>}
+                        </div>
+                    </div>
+                )}
+            </div>
             {['default', 'scroll', 'archive', 'nature'].map((t) => (
                 <button
                     key={t}
@@ -345,6 +541,11 @@ const LandingPage: React.FC = () => {
                   <span className={`px-2 py-1 rounded border ${config?.visibility === 'public' ? 'border-green-300 text-green-700 bg-green-50' : 'border-theme theme-text-secondary bg-theme-card'}`}>
                     {config?.visibility === 'public' ? '公开模组' : '私密模组'}
                   </span>
+                  {config?.joinPasswordConfigured && (
+                    <span className="px-2 py-1 rounded border border-amber-300 text-amber-700 bg-amber-50">
+                      已设进入密码
+                    </span>
+                  )}
                 </div>
                 <div className="flex items-center justify-between gap-2 text-xs text-gray-400">
                   <span>最后修改: {new Date(campaign.lastModified).toLocaleDateString()}</span>
@@ -353,7 +554,7 @@ const LandingPage: React.FC = () => {
                 <div data-tour="landing-campaign-members" className="mt-3 border border-theme rounded p-2.5 bg-theme-card/60">
                   <div className="flex items-center justify-between gap-2 mb-2">
                     <div className="text-xs font-semibold theme-text-secondary">成员列表</div>
-                    <div className="text-[11px] theme-text-secondary">占位展示</div>
+                    <div className="text-[11px] theme-text-secondary">可移除 PL</div>
                   </div>
                   <div className="flex flex-wrap gap-1.5">
                     {previewMembers.length > 0 ? previewMembers.map((member) => {
@@ -361,13 +562,23 @@ const LandingPage: React.FC = () => {
                       return (
                         <span
                           key={member.userId}
-                          className={`px-2 py-1 rounded-full text-[11px] border ${
+                          className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-[11px] border ${
                             online
                               ? 'border-green-300 text-green-700 bg-green-50'
                               : 'border-theme theme-text-secondary'
                           }`}
                         >
                           {member.username} · {member.role}
+                          {member.role === 'PL' && (
+                            <button
+                              type="button"
+                              onClick={() => void handleRemoveMember(campaign.id, member.userId)}
+                              className="ml-1 text-red-500 hover:text-red-700"
+                              title="移除该 PL"
+                            >
+                              ×
+                            </button>
+                          )}
                         </span>
                       );
                     }) : (
@@ -411,6 +622,13 @@ const LandingPage: React.FC = () => {
                     className="w-full px-3 py-1.5 rounded bg-primary text-white hover:bg-primary-dark disabled:opacity-60 text-sm"
                   >
                     保存公开设置
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void handleUpdateJoinPassword(campaign.id)}
+                    className="w-full px-3 py-1.5 rounded border border-theme hover:bg-primary-light text-sm"
+                  >
+                    {config?.joinPasswordConfigured ? '修改进入密码' : '设置进入密码'}
                   </button>
                 </div>
               </div>
@@ -463,7 +681,12 @@ const LandingPage: React.FC = () => {
                   <div className="flex-1">
                     <div className="flex justify-between items-start mb-1 gap-2">
                       <h3 className="pr-2 text-lg font-bold break-words">{campaign.name || '未命名公开模组'}</h3>
-                      <span className="px-2 py-1 rounded border border-green-300 text-green-700 bg-green-50 text-xs">公开模组</span>
+                      <div className="flex flex-wrap items-center justify-end gap-1">
+                        <span className="px-2 py-1 rounded border border-green-300 text-green-700 bg-green-50 text-xs">公开模组</span>
+                        {campaign.hasJoinPassword && (
+                          <span className="px-2 py-1 rounded border border-amber-300 text-amber-700 bg-amber-50 text-xs">需要密码</span>
+                        )}
+                      </div>
                     </div>
                     <p className="theme-text-secondary text-sm line-clamp-2 mb-3 min-h-[2.5em]">
                       {campaign.description || '暂无描述'}
@@ -476,7 +699,7 @@ const LandingPage: React.FC = () => {
                   </div>
                   <div className="pt-3 mt-4 border-t border-theme">
                     <button
-                      onClick={() => handleEnterCampaign(campaign)}
+                      onClick={() => handleEnterCampaign(campaign, { requiresJoinPassword: Boolean(campaign.hasJoinPassword) })}
                       className="w-full py-2 text-sm font-medium text-white rounded transition-colors bg-primary hover:bg-primary-dark"
                     >
                       进入公开模组

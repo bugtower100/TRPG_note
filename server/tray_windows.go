@@ -110,7 +110,7 @@ var systrayQuited bool = false
 
 func onReady() {
 	log := zap.S()
-	ver := "V1.4"
+	ver := "V1.4.2"
 	systray.SetIcon(trayIcon)
 	systray.SetTitle("跑团笔记")
 	systray.SetTooltip("跑团笔记 " + ver)

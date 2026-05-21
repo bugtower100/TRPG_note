@@ -45,6 +45,18 @@ jobs:
             goarch: arm64
             artifact_name: release-linux-arm64
             package_name: TRPG模组笔记-linux-arm64.tar.gz
+          - os: macos-13
+            platform: macos
+            goos: darwin
+            goarch: amd64
+            artifact_name: release-macos-amd64
+            package_name: TRPG模组笔记-macos-amd64.zip
+          - os: macos-14
+            platform: macos
+            goos: darwin
+            goarch: arm64
+            artifact_name: release-macos-arm64
+            package_name: TRPG模组笔记-macos-arm64.zip
     runs-on: ${{ matrix.os }}
 
     steps:
@@ -104,6 +116,15 @@ jobs:
           GOARCH: ${{ matrix.goarch }}
         run: go build -o release/trpg-note
 
+      - name: Build macOS app binary
+        if: ${{ matrix.platform == 'macos' }}
+        working-directory: server
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: 1
+        run: go build -o release/trpg-note
+
       - name: Create Linux tar.gz
         if: ${{ matrix.platform == 'linux' }}
         shell: bash
@@ -122,6 +143,14 @@ jobs:
           fi
 
           tar -C "$staging" -czf "${{ matrix.package_name }}" .
+
+      - name: Create macOS app package
+        if: ${{ matrix.platform == 'macos' }}
+        shell: bash
+        env:
+          APP_VERSION: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || inputs.release_tag }}
+        run: |
+          bash ./scripts/package-macos-app.sh "server/release/trpg-note" "${{ matrix.package_name }}"
 
       - name: Upload package artifact
         uses: actions/upload-artifact@v4
@@ -161,12 +190,20 @@ jobs:
           make_latest: true
           body: |
             ## ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || inputs.release_name }} 更新内容
-            - 提供 Windows amd64、Linux amd64 和 Linux arm64 发布包
+            - 提供 Windows amd64、Linux amd64、Linux arm64、macOS amd64 和 macOS arm64 发布包
             - 新增了 docker 镜像
+            - 新增 登录可选密码 功能，未设置密码时仍可空密码登录，兼容旧数据。
+            - 新增 公开模组进入密码 ，GM 可设置/清除，PL 进入公开模组时需要密码，旧模组未设置时可直接进入。
+            - 新增 主页模组卡片移除 PL 功能，可把中途跳车或长期不再进入的 PL 从成员列表移除。
+            - 新增 图片上传自动压缩 ，上传时转为 webp ，资源缩略图统一调整为 64px 。
+            - 新增 实体标题颜色自定义 ，角色、怪物、地点、组织、事件、线索、时间线等卡片标题支持自行选色。
+            - 修复 未来科技主题 下主页欢迎文字过暗、看不见的问题。
           files: |
             TRPG模组笔记-windows-amd64.zip
             TRPG模组笔记-linux-amd64.tar.gz
             TRPG模组笔记-linux-arm64.tar.gz
+            TRPG模组笔记-macos-amd64.zip
+            TRPG模组笔记-macos-arm64.zip
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

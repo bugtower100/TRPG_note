@@ -64,7 +64,9 @@ TRPG_note 是一款面向主持人（GM）的模组管理工具。
 2. Windows 下载最新版本 `TRPG模组笔记-windows-amd64.zip`
 3. x86_64 Linux 下载 `TRPG模组笔记-linux-amd64.tar.gz`
 4. ARM64 Linux 下载 `TRPG模组笔记-linux-arm64.tar.gz`
-5. 解压到你常用目录后启动对应程序
+5. Intel Mac 下载 `TRPG模组笔记-macos-amd64.zip`
+6. Apple Silicon Mac 下载 `TRPG模组笔记-macos-arm64.zip`
+7. 解压到你常用目录后启动对应程序
 
 ### 便携建议
 - 建议把 EXE 与备份文件放在同一个专用目录
@@ -115,7 +117,7 @@ http://localhost:8080/web
 ### 环境要求
 - Node.js 18+、npm 9+（前端构建）
 - Go 1.21+（后端服务）
-- Windows / Linux（当前发布目标：windows/amd64、linux/amd64、linux/arm64）
+- Windows / Linux / macOS（当前发布目标：windows/amd64、linux/amd64、linux/arm64、darwin/amd64、darwin/arm64）
 
 ### 常用命令
 
@@ -149,7 +151,17 @@ cd server && GOOS=linux GOARCH=arm64 go build -o release/trpg-note
 ```
 
 ```bash
-# 5) 构建 Docker/headless 版
+# 5) 构建 macOS Intel 版
+cd server && GOOS=darwin GOARCH=amd64 go build -o release/trpg-note
+```
+
+```bash
+# 6) 构建 macOS Apple Silicon 版
+cd server && GOOS=darwin GOARCH=arm64 go build -o release/trpg-note
+```
+
+```bash
+# 7) 构建 Docker/headless 版
 cd server && GOOS=linux GOARCH=amd64 go build -tags headless -o release/trpg-note-headless
 ```
 

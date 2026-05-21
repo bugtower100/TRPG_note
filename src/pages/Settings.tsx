@@ -19,7 +19,6 @@ const Settings: React.FC = () => {
   const [resourceCollapsed, setResourceCollapsed] = useState(false);
   const [importCollapsed, setImportCollapsed] = useState(true);
   const [versionCollapsed, setVersionCollapsed] = useState(true);
-
   const themes: { id: CampaignTheme; label: string; icon: React.ReactNode; desc: string }[] = [
     { id: 'default', label: '默认风格', icon: <Monitor size={20} />, desc: '淡雅的紫色调，柔和且适合现代阅读。' },
     { id: 'scroll', label: '复古羊皮纸', icon: <Scroll size={20} />, desc: '温暖的黄色调，带来经典 TRPG 氛围。' },
@@ -200,7 +199,7 @@ const Settings: React.FC = () => {
                   <img
                     src={item.url}
                     alt={item.ref}
-                    className="w-10 h-10 rounded object-cover border border-theme"
+                    className="w-16 h-16 rounded object-cover border border-theme"
                   />
                   <div className="min-w-0 flex-1">
                     <div className="text-sm truncate">{item.displayName || item.ref}</div>

@@ -1,10 +1,12 @@
 import { CampaignMemberRole, SessionTask, SessionTaskBoardDocument, UserProfile } from '../types';
 import { VersionConflictError } from './conflictError';
+import { campaignAccessService } from './campaignAccessService';
 
-const jsonHeaders = (user: UserProfile | null) => ({
+const jsonHeaders = (user: UserProfile | null, campaignId?: string) => ({
   'Content-Type': 'application/json',
   'X-TRPG-User-Id': user?.id || '',
   'X-TRPG-Username': encodeURIComponent(user?.username || ''),
+  ...campaignAccessService.buildHeaders(campaignId),
 });
 
 class SessionTaskBoardService {
@@ -88,7 +90,7 @@ class SessionTaskBoardService {
 
   async getTaskBoard(campaignId: string, user: UserProfile | null): Promise<SessionTaskBoardDocument> {
     const response = await fetch(`/api/campaigns/${campaignId}/session-tasks`, {
-      headers: jsonHeaders(user),
+      headers: jsonHeaders(user, campaignId),
     });
     return this.parseResponse<SessionTaskBoardDocument>(response);
   }
@@ -106,7 +108,7 @@ class SessionTaskBoardService {
   ): Promise<SessionTaskBoardDocument> {
     const response = await fetch(`/api/campaigns/${campaignId}/session-tasks`, {
       method: 'PUT',
-      headers: jsonHeaders(user),
+      headers: jsonHeaders(user, campaignId),
       body: JSON.stringify(payload),
     });
     return this.parseResponse<SessionTaskBoardDocument>(response);
@@ -115,7 +117,7 @@ class SessionTaskBoardService {
   async startLease(campaignId: string, user: UserProfile | null, role: CampaignMemberRole): Promise<SessionTaskBoardDocument> {
     const response = await fetch(`/api/campaigns/${campaignId}/session-tasks/lease/start`, {
       method: 'POST',
-      headers: jsonHeaders(user),
+      headers: jsonHeaders(user, campaignId),
       body: JSON.stringify({ role }),
     });
     return this.parseResponse<SessionTaskBoardDocument>(response);
@@ -129,7 +131,7 @@ class SessionTaskBoardService {
   ): Promise<SessionTaskBoardDocument> {
     const response = await fetch(`/api/campaigns/${campaignId}/session-tasks/lease/refresh`, {
       method: 'POST',
-      headers: jsonHeaders(user),
+      headers: jsonHeaders(user, campaignId),
       body: JSON.stringify({ role, leaseStartedAt }),
     });
     return this.parseResponse<SessionTaskBoardDocument>(response);
@@ -138,7 +140,7 @@ class SessionTaskBoardService {
   async endLease(campaignId: string, user: UserProfile | null, leaseStartedAt?: number | null): Promise<void> {
     const response = await fetch(`/api/campaigns/${campaignId}/session-tasks/lease/end`, {
       method: 'POST',
-      headers: jsonHeaders(user),
+      headers: jsonHeaders(user, campaignId),
       body: JSON.stringify({ leaseStartedAt }),
     });
     if (!response.ok) {

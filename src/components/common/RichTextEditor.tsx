@@ -1024,7 +1024,7 @@ const MilkdownEditorInner: React.FC<MilkdownEditorInnerProps> = ({
                     className="w-full text-left border rounded p-2 transition border-theme hover:bg-primary-light/30"
                   >
                     <div className="flex items-center gap-3">
-                      <img src={item.url} alt={item.displayName} className="w-10 h-10 rounded object-cover border border-theme shrink-0" />
+                      <img src={item.url} alt={item.displayName} className="w-16 h-16 rounded object-cover border border-theme shrink-0" />
                       <div className="min-w-0">
                         <div className="text-sm font-medium truncate" title={item.displayName}>{item.displayName}</div>
                         <div className="text-[11px] theme-text-secondary truncate" title={item.ref}>{item.ref}</div>
