@@ -66,6 +66,8 @@ cat > "${CONTENTS_DIR}/Info.plist" <<EOF
   <string>11.0</string>
   <key>NSHighResolutionCapable</key>
   <true/>
+ </dict>
+ </plist>
 EOF
 
 if [[ -f "${ICON_SOURCE}" ]] && command -v sips >/dev/null 2>&1 && command -v iconutil >/dev/null 2>&1; then
