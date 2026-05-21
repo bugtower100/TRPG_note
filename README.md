@@ -64,8 +64,7 @@ TRPG_note 是一款面向主持人（GM）的模组管理工具。
 2. Windows 下载最新版本 `TRPG模组笔记-windows-amd64.zip`
 3. x86_64 Linux 下载 `TRPG模组笔记-linux-amd64.tar.gz`
 4. ARM64 Linux 下载 `TRPG模组笔记-linux-arm64.tar.gz`
-5. Apple Silicon Mac 下载 `TRPG模组笔记-macos-arm64.zip`
-6. 解压到你常用目录后启动对应程序
+5. 解压到你常用目录后启动对应程序
 
 ### 便携建议
 - 建议把 EXE 与备份文件放在同一个专用目录

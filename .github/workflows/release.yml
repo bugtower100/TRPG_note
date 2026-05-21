@@ -4,6 +4,8 @@ on:
   push:
     tags:
       - "v*"
+    branches:
+      - "macos-runner-test"
   workflow_dispatch:
     inputs:
       release_tag:
@@ -146,6 +148,14 @@ jobs:
         run: |
           bash ./scripts/package-macos-app.sh "server/release/trpg-note" "${{ matrix.package_name }}"
 
+      - name: Verify macOS app bundle
+        if: ${{ matrix.platform == 'macos' }}
+        shell: bash
+        run: |
+          APP_PATH="server/release/TRPG模组笔记.app"
+          codesign --verify --deep --strict --verbose=2 "$APP_PATH"
+          spctl --assess --type execute --verbose=4 "$APP_PATH" || true
+
       - name: Upload package artifact
         uses: actions/upload-artifact@v4
         with:
@@ -154,6 +164,7 @@ jobs:
           if-no-files-found: error
 
   publish-release:
+    if: ${{ startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch' }}
     needs: build-packages
     runs-on: ubuntu-latest
 

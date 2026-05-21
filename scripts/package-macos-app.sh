@@ -16,14 +16,16 @@ MACOS_DIR="${CONTENTS_DIR}/MacOS"
 RESOURCES_DIR="${CONTENTS_DIR}/Resources"
 ICON_SOURCE="${ROOT_DIR}/build/icon-256.png"
 ICON_BASENAME="app-icon"
+MAIN_BINARY_NAME="trpg-note"
+LAUNCHER_NAME="${APP_NAME}"
 
 rm -rf "${APP_DIR}"
 mkdir -p "${MACOS_DIR}" "${RESOURCES_DIR}" "${RESOURCES_DIR}/data"
 
-cp "${BINARY_PATH}" "${RESOURCES_DIR}/trpg-note"
-chmod +x "${RESOURCES_DIR}/trpg-note"
+cp "${BINARY_PATH}" "${MACOS_DIR}/${MAIN_BINARY_NAME}"
+chmod +x "${MACOS_DIR}/${MAIN_BINARY_NAME}"
 
-cat > "${MACOS_DIR}/${APP_NAME}" <<'EOF'
+cat > "${MACOS_DIR}/${LAUNCHER_NAME}" <<EOF
 #!/usr/bin/env bash
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -33,9 +35,9 @@ DATA_DIR="${RESOURCE_DIR}/data"
 mkdir -p "${DATA_DIR}"
 export BTR_DB_PATH="${DATA_DIR}/storage.db"
 cd "${RESOURCE_DIR}"
-exec "${RESOURCE_DIR}/trpg-note" "$@"
+exec "${SCRIPT_DIR}/${MAIN_BINARY_NAME}" "$@"
 EOF
-chmod +x "${MACOS_DIR}/${APP_NAME}"
+chmod +x "${MACOS_DIR}/${LAUNCHER_NAME}"
 
 cat > "${CONTENTS_DIR}/Info.plist" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
@@ -47,7 +49,7 @@ cat > "${CONTENTS_DIR}/Info.plist" <<EOF
   <key>CFBundleDisplayName</key>
   <string>${APP_NAME}</string>
   <key>CFBundleExecutable</key>
-  <string>${APP_NAME}</string>
+  <string>${LAUNCHER_NAME}</string>
   <key>CFBundleIdentifier</key>
   <string>${APP_IDENTIFIER}</string>
   <key>CFBundleInfoDictionaryVersion</key>
@@ -84,6 +86,12 @@ if [[ -f "${ICON_SOURCE}" ]] && command -v sips >/dev/null 2>&1 && command -v ic
   rm -rf "${ICONSET_DIR}"
   /usr/libexec/PlistBuddy -c "Add :CFBundleIconFile string ${ICON_BASENAME}" "${CONTENTS_DIR}/Info.plist" >/dev/null 2>&1 || \
     /usr/libexec/PlistBuddy -c "Set :CFBundleIconFile ${ICON_BASENAME}" "${CONTENTS_DIR}/Info.plist" >/dev/null 2>&1 || true
+fi
+
+if command -v codesign >/dev/null 2>&1; then
+  find "${APP_DIR}" -name ".DS_Store" -delete
+  codesign --force --deep --sign - "${APP_DIR}"
+  codesign --verify --deep --strict --verbose=2 "${APP_DIR}"
 fi
 
 rm -f "${OUTPUT_ZIP}"
