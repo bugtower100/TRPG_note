@@ -1,0 +1,54 @@
+TRPG模组笔记 macOS 终端启动说明
+
+如果双击 .app 后没有成功启动，可以按下面步骤在终端中手动启动。
+
+一、先确认下载了正确版本
+
+1. Apple Silicon 芯片（M1 / M2 / M3 / M4 等）请下载 darwin arm64 版本
+2. Intel 芯片 Mac 请不要使用当前这个包
+3. 若启动时出现 Bad CPU type in executable，通常就是下载了错误架构的版本
+
+二、系统版本要求
+
+1. 建议使用较新的稳定版 macOS
+2. 当前打包配置的最低系统版本为 macOS 11.0
+
+三、在终端中进入解压后的目录
+
+假设你已经把压缩包解压到了当前目录，并且目录里能看到：
+
+- TRPG模组笔记.app
+
+四、移除隔离属性并补可执行权限
+
+依次执行：
+
+chmod +x "./TRPG模组笔记.app/Contents/MacOS/trpg-note"
+chmod +x "./TRPG模组笔记.app/Contents/MacOS/trpg-note-launcher"
+xattr -dr com.apple.quarantine "./TRPG模组笔记.app"
+
+上面这些命令会：
+
+1. 确保主程序和启动器具有执行权限
+2. 移除 macOS 下载文件常见的隔离属性
+
+五、用终端手动启动
+
+执行：
+
+"./TRPG模组笔记.app/Contents/MacOS/trpg-note-launcher"
+
+六、启动后访问页面
+
+在浏览器中打开：
+
+http://localhost:8080/web
+
+七、如果仍然无法启动
+
+可以继续尝试直接运行主程序：
+
+cd "./TRPG模组笔记.app/Contents/Resources"
+BTR_DB_PATH="./data/storage.db" ../MacOS/trpg-note
+
+如果终端里出现报错，请把完整输出发给开发者。

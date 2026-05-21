@@ -9,6 +9,7 @@ APP_IDENTIFIER="${APP_IDENTIFIER:-io.github.trpg-note.desktop}"
 RELEASE_DIR="${ROOT_DIR}/server/release"
 BINARY_PATH="${1:?usage: package-macos-app.sh <binary-path> <output-zip>}"
 OUTPUT_ZIP="${2:?usage: package-macos-app.sh <binary-path> <output-zip>}"
+GUIDE_SOURCE="${ROOT_DIR}/docs/macOS终端启动说明.txt"
 
 APP_DIR="${RELEASE_DIR}/${APP_NAME}.app"
 CONTENTS_DIR="${APP_DIR}/Contents"
@@ -98,6 +99,14 @@ fi
 #   codesign --force --deep --sign - "${APP_DIR}"
 #   codesign --verify --deep --strict --verbose=2 "${APP_DIR}"
 # fi
+PACKAGE_ROOT="${RELEASE_DIR}/${APP_NAME}-macOS"
+rm -rf "${PACKAGE_ROOT}"
+mkdir -p "${PACKAGE_ROOT}"
+cp -R "${APP_DIR}" "${PACKAGE_ROOT}/"
+if [[ -f "${GUIDE_SOURCE}" ]]; then
+  cp "${GUIDE_SOURCE}" "${PACKAGE_ROOT}/"
+fi
 
 rm -f "${OUTPUT_ZIP}"
-ditto -c -k --keepParent "${APP_DIR}" "${OUTPUT_ZIP}"
+ditto -c -k --keepParent "${PACKAGE_ROOT}" "${OUTPUT_ZIP}"
+rm -rf "${PACKAGE_ROOT}"
