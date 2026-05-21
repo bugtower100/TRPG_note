@@ -72,15 +72,29 @@ TRPG_note 是一款面向主持人（GM）的模组管理工具。
 - macOS 压缩包内已附带 `macOS终端启动说明.txt`，可直接照着操作
 - 建议先确认你下载的是 Apple Silicon 对应的 `darwin arm64` 版本
 - 当前 macOS 桌面包最低系统版本要求为 `macOS 11.0`
+- 建议尽量整段复制命令，不要手打；很多问题都来自少空格、大小写写错或打开了错误的文件夹
 
-假设你已经在终端中进入了解压后的目录，且当前目录下能看到 `TRPG模组笔记.app`，可依次执行：
+给完全不熟悉电脑文件夹和命令行的用户，最简单的理解方式是：
+- 先去“下载”文件夹
+- 找到解压后的 `TRPG模组笔记-macOS` 文件夹
+- 打开它，确认里面有 `TRPG模组笔记.app`
+- 再打开终端，整段复制下面的命令
+
+先执行下面这一整段：
 
 ```bash
+cd ~/Downloads
+ls -lah
+cd ~/Downloads/"TRPG模组笔记-macOS"
+ls -lah
+ls -lah "./TRPG模组笔记.app/Contents/MacOS"
 chmod +x "./TRPG模组笔记.app/Contents/MacOS/trpg-note"
 chmod +x "./TRPG模组笔记.app/Contents/MacOS/trpg-note-launcher"
 xattr -dr com.apple.quarantine "./TRPG模组笔记.app"
 ./TRPG模组笔记.app/Contents/MacOS/trpg-note-launcher
 ```
+
+如果中途出现 `No such file or directory`，通常说明用户打开的不是正确的解压文件夹，而不是程序本身已经崩了。
 
 启动成功后访问：
 
@@ -96,6 +110,7 @@ BTR_DB_PATH="./data/storage.db" ../MacOS/trpg-note
 ```
 
 若出现 `Bad CPU type in executable`，通常说明下载了错误架构的版本；Apple Silicon 芯片请使用 `darwin arm64` 包。
+若还是失败，请把 `pwd`、`ls -lah` 和终端完整报错一起发给开发者。
 
 ### 便携建议
 - 建议把 EXE 与备份文件放在同一个专用目录
@@ -223,7 +238,7 @@ cd server && GOOS=linux GOARCH=amd64 go build -tags headless -o release/trpg-not
 
 ### Q6：macOS 双击 `.app` 没反应怎么办？
 - 先确认下载的是 Apple Silicon 对应的 `darwin arm64` 版本
-- 先在终端执行 README 上面的 macOS 手动启动命令
+- 先进入解压后的 `TRPG模组笔记-macOS` 目录，再执行 README 上面的 macOS 手动启动命令
 - 再访问 `http://localhost:8080/web`
 - 如果终端有报错，把完整输出发给开发者排查
 
