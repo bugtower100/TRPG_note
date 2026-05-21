@@ -106,7 +106,7 @@ jobs:
             echo "version_tag=${version_tag}"
             echo "tags<<EOF"
             echo "${image_name}:${version_tag}"
-            if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+            if [[ "${GITHUB_REF}" == refs/tags/* || -n "${manual_tag}" ]]; then
               echo "${image_name}:latest"
             fi
             echo "EOF"
