@@ -337,7 +337,7 @@ const LandingPage: React.FC = () => {
         <div className="p-8 w-full max-w-md bg-white rounded-lg border shadow-md border-stone-200">
           <h1 className="mb-2 text-3xl font-bold text-center text-gray-800">TRPG 模组笔记</h1>
           <p className="mb-2 text-center text-gray-500">{APP_VERSION}</p>
-          <p className="mb-6 text-center text-gray-500">请登录以管理您的模组</p>
+          <p className="mb-3 text-center text-gray-500">请登录以管理您的模组</p>
           <div className="mb-2 flex justify-center">
           </div>
           

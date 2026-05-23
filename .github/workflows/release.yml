@@ -32,12 +32,14 @@ jobs:
             platform: windows
             goos: windows
             goarch: amd64
+            pe_machine: "0x8664"
             artifact_name: release-windows-amd64
             package_name: TRPG模组笔记-windows-amd64.zip
           - os: windows-latest
             platform: windows
             goos: windows
             goarch: arm64
+            pe_machine: "0xAA64"
             artifact_name: release-windows-arm64
             package_name: TRPG模组笔记-windows-arm64.zip
           - os: ubuntu-latest
@@ -104,6 +106,30 @@ jobs:
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
         run: go build -o release/TRPG模组笔记.exe
+
+      - name: Verify Windows EXE architecture
+        if: ${{ matrix.platform == 'windows' }}
+        shell: pwsh
+        run: |
+          $path = "server/release/TRPG模组笔记.exe"
+          $bytes = [System.IO.File]::ReadAllBytes($path)
+          if ($bytes.Length -lt 64) {
+            throw "EXE 文件过小，疑似构建异常。"
+          }
+          $peOffset = [BitConverter]::ToInt32($bytes, 0x3C)
+          if ($bytes.Length -lt ($peOffset + 6)) {
+            throw "EXE 缺少有效 PE 头。"
+          }
+          $signature = [System.Text.Encoding]::ASCII.GetString($bytes, $peOffset, 4)
+          if ($signature -ne "PE`0`0") {
+            throw "EXE 的 PE 签名无效。"
+          }
+          $machine = [BitConverter]::ToUInt16($bytes, $peOffset + 4)
+          $machineHex = ('0x{0:X4}' -f $machine)
+          Write-Host "Detected PE machine: $machineHex"
+          if ($machineHex -ne "${{ matrix.pe_machine }}") {
+            throw "PE 架构不匹配，期望 ${{ matrix.pe_machine }}，实际 $machineHex"
+          }
 
       - name: Create Windows ZIP
         if: ${{ matrix.platform == 'windows' }}

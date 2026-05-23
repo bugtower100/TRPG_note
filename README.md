@@ -53,7 +53,7 @@ TRPG_note 是一款面向主持人（GM）的模组管理工具。
 - 适配长时间备团阅读
 
 ### 8) 数据能力
-- JSON 导入 / 导出
+- zip全量/轻量备份导入导出
 - 本地文件加载与保存
 - 支持坏数据清理与结构修复（维护命令）
 
@@ -61,7 +61,7 @@ TRPG_note 是一款面向主持人（GM）的模组管理工具。
 
 ### 普通用户（推荐）
 1. 打开项目的 GitHub Releases 页面
-2. Windows 下载最新版本 `TRPG模组笔记-windows-amd64.zip`
+2. Windows 下载最新版本 `TRPG模组笔记-windows-amd/arm64.zip`
 3. x86_64 Linux 下载 `TRPG模组笔记-linux-amd64.tar.gz`
 4. ARM64 Linux 下载 `TRPG模组笔记-linux-arm64.tar.gz`
 5. Apple Silicon 芯片的 macOS 下载 `TRPG模组笔记-macos-arm64.zip`
@@ -151,11 +151,6 @@ http://localhost:8080/web
 - 给每个事件补上线索来源
 - 把关键节点放入时间线
 
-### 第四步：跑团前检查
-- 导出一份 JSON 备份
-- 检查角色与组织关系是否完整
-- 检查时间线是否有冲突
-
 ## 开发与维护
 
 ### 环境要求
@@ -223,14 +218,13 @@ cd server && GOOS=linux GOARCH=amd64 go build -tags headless -o release/trpg-not
 
 ### Q3：数据存在哪里？
 - 默认保存在 `server/data/storage.db`（SQLite）
-- 建议定期导出 JSON 做额外备份
+- 建议定期导出 zip 做额外备份
 
 ### Q4：如何迁移到新电脑？
 0. 直接把data目录和server.exe拷贝到新电脑
-1. 在旧电脑导出 JSON
+1. 在旧电脑导出 zip
 2. 新电脑安装并启动应用
 3. 使用导入功能恢复数据
-4. 未来会增加基于云同步的模式！
 
 ### Q5：出现异常或数据损坏怎么办？
 - 先备份当前数据文件
