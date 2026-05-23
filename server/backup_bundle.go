@@ -1127,10 +1127,10 @@ func registerBackupRoutes(group *gin.RouterGroup, db *gorm.DB, cfg Config) {
 		sort.Strings(missingAssets)
 
 		c.JSON(200, gin.H{
-			"importedCount":    len(imported),
-			"addedCount":       addedCount,
-			"overwrittenCount": overwrittenCount,
-			"campaigns":        imported,
+			"importedCount":     len(imported),
+			"addedCount":        addedCount,
+			"overwrittenCount":  overwrittenCount,
+			"campaigns":         imported,
 			"missingAssetCount": len(missingAssets),
 			"missingAssets":     missingAssets,
 		})
