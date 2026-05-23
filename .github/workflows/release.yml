@@ -30,9 +30,16 @@ jobs:
         include:
           - os: windows-latest
             platform: windows
+            goos: windows
             goarch: amd64
             artifact_name: release-windows-amd64
             package_name: TRPG模组笔记-windows-amd64.zip
+          - os: windows-latest
+            platform: windows
+            goos: windows
+            goarch: arm64
+            artifact_name: release-windows-arm64
+            package_name: TRPG模组笔记-windows-arm64.zip
           - os: ubuntu-latest
             platform: linux
             goos: linux
@@ -93,6 +100,9 @@ jobs:
       - name: Build Windows EXE
         if: ${{ matrix.platform == 'windows' }}
         working-directory: server
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
         run: go build -o release/TRPG模组笔记.exe
 
       - name: Create Windows ZIP
@@ -115,7 +125,7 @@ jobs:
 
           Compress-Archive `
             -Path "$staging/*" `
-            -DestinationPath "TRPG模组笔记-windows-amd64.zip" `
+            -DestinationPath "${{ matrix.package_name }}" `
             -Force
 
       - name: Build Linux binary
@@ -242,6 +252,7 @@ jobs:
             - 重做了备份和导出导入功能；实现全量导出和轻量导出
           files: |
             TRPG模组笔记-windows-amd64.zip
+            TRPG模组笔记-windows-arm64.zip
             TRPG模组笔记-linux-amd64.tar.gz
             TRPG模组笔记-linux-arm64.tar.gz
             TRPG模组笔记-macos-arm64.zip
