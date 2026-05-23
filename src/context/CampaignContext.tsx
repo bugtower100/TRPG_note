@@ -23,6 +23,7 @@ interface CampaignContextType {
   updateEntity: (collection: keyof CampaignData, item: any) => void;
   deleteEntity: (collection: keyof CampaignData, id: string) => void;
   addEntity: (collection: keyof CampaignData, item: any) => void;
+  reorderEntities: (collection: keyof CampaignData, orderedIds: string[]) => void;
   
   // Persistence
   saveCampaign: () => void;
@@ -345,6 +346,26 @@ export const CampaignProvider: React.FC<{ children: ReactNode }> = ({ children }
     });
   };
 
+  const reorderEntities = (collection: keyof CampaignData, orderedIds: string[]) => {
+    setCampaignData((prev) => {
+      if (!Array.isArray(prev[collection])) return prev;
+      const list = prev[collection] as any[];
+      const idSet = new Set(orderedIds);
+      const orderedItems = orderedIds
+        .map((id) => list.find((item: any) => item.id === id))
+        .filter(Boolean);
+      const remainingItems = list.filter((item: any) => !idSet.has(item.id));
+      const newList = [...orderedItems, ...remainingItems].map((item: any, index) => ({
+        ...item,
+        updatedAt: item.updatedAt || Date.now(),
+        sortOrder: index,
+      }));
+      const newData = { ...prev, [collection]: newList } as CampaignData;
+      persistCampaign(newData, false);
+      return newData;
+    });
+  };
+
   // --- Tab Management ---
   const openInTab = (
     type: string,
@@ -399,6 +420,7 @@ export const CampaignProvider: React.FC<{ children: ReactNode }> = ({ children }
       updateEntity,
       deleteEntity,
       addEntity,
+    reorderEntities,
       saveCampaign,
       saveToFileSystem,
       user,

@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useCampaign } from '../../context/CampaignContext';
 import { Timeline, TimelineEvent } from '../../types';
 import { v4 as uuidv4 } from 'uuid';
+import { GripVertical } from 'lucide-react';
 import RichTextEditor from '../../components/common/RichTextEditor';
 import RichTextDisplay from '../../components/common/RichTextDisplay';
 import CustomSubItemsEditor from '../../components/common/CustomSubItemsEditor';
@@ -29,6 +30,8 @@ const TimelineDetail: React.FC<TimelineDetailProps> = ({ entityId, embedded = fa
   const [isEditingEvent, setIsEditingEvent] = useState(false);
   const [eventDraft, setEventDraft] = useState<TimelineEvent | null>(null);
   const [isEditingIntro, setIsEditingIntro] = useState(false);
+  const [draggingEventId, setDraggingEventId] = useState<string | null>(null);
+  const [dropTarget, setDropTarget] = useState<{ id: string; position: 'before' | 'after' } | null>(null);
   const sectionDefs = [{ key: 'intro', title: '简介' }];
   const [hasInitializedSelection, setHasInitializedSelection] = useState(false);
 
@@ -126,6 +129,24 @@ const TimelineDetail: React.FC<TimelineDetailProps> = ({ entityId, embedded = fa
     const targetIndex = direction === 'up' ? index - 1 : index + 1;
     [nextEvents[index], nextEvents[targetIndex]] = [nextEvents[targetIndex], nextEvents[index]];
     persistTimeline({ ...timeline, timelineEvents: nextEvents });
+  };
+
+  const reorderEvent = (sourceId: string, targetId: string, position: 'before' | 'after') => {
+    if (!timeline || sourceId === targetId) return;
+    const nextEvents = [...timeline.timelineEvents];
+    const fromIndex = nextEvents.findIndex((event) => event.id === sourceId);
+    if (fromIndex < 0) return;
+    const [draggedEvent] = nextEvents.splice(fromIndex, 1);
+    const targetIndex = nextEvents.findIndex((event) => event.id === targetId);
+    if (targetIndex < 0) return;
+    const insertIndex = position === 'after' ? targetIndex + 1 : targetIndex;
+    nextEvents.splice(insertIndex, 0, draggedEvent);
+    persistTimeline({ ...timeline, timelineEvents: nextEvents });
+  };
+
+  const clearEventDragState = () => {
+    setDraggingEventId(null);
+    setDropTarget(null);
   };
 
   const isSectionVisible = (key: string) => timeline?.sectionVisibility?.[key] !== false;
@@ -371,7 +392,7 @@ const TimelineDetail: React.FC<TimelineDetailProps> = ({ entityId, embedded = fa
           <div>
             <h3 className="text-lg font-semibold">连续时间轴</h3>
             <p className="text-sm theme-text-secondary">
-              点击添加节点，单击节点展开备注。
+              点击添加节点，单击节点展开备注，也可以直接拖拽节点调整顺序。蓝线会提示插入位置。
             </p>
           </div>
           <button
@@ -389,14 +410,45 @@ const TimelineDetail: React.FC<TimelineDetailProps> = ({ entityId, embedded = fa
             <div className="space-y-2">
               {timeline.timelineEvents.map((event) => {
                 const selected = selectedEventId === event.id;
+                const isDropBefore = dropTarget?.id === event.id && dropTarget.position === 'before' && draggingEventId !== event.id;
+                const isDropAfter = dropTarget?.id === event.id && dropTarget.position === 'after' && draggingEventId !== event.id;
                 return (
                   <div key={event.id} className="relative">
+                    {isDropBefore && (
+                      <div className="pointer-events-none absolute left-3 right-0 top-0 z-10 flex items-center">
+                        <span className="h-3 w-3 -translate-x-1/2 rounded-full bg-primary shadow" />
+                        <span className="ml-1 h-1 flex-1 rounded-full bg-primary shadow-[0_0_0_2px_rgba(59,130,246,0.18)]" />
+                      </div>
+                    )}
                     <div className={`absolute left-3 top-5 h-4 w-4 -translate-x-1/2 rounded-full border-2 ${
                       selected ? 'border-primary bg-primary' : 'border-primary bg-theme-card'
                     }`} />
                     <button
                       type="button"
                       data-timeline-node="true"
+                      draggable
+                      onDragStart={(dragEvent) => {
+                        dragEvent.dataTransfer.effectAllowed = 'move';
+                        dragEvent.dataTransfer.setData('text/plain', event.id);
+                        setDraggingEventId(event.id);
+                        setDropTarget(null);
+                      }}
+                      onDragOver={(dragEvent) => {
+                        if (!draggingEventId || draggingEventId === event.id) return;
+                        dragEvent.preventDefault();
+                        dragEvent.dataTransfer.dropEffect = 'move';
+                        const rect = dragEvent.currentTarget.getBoundingClientRect();
+                        const nextPosition = dragEvent.clientY < rect.top + rect.height / 2 ? 'before' : 'after';
+                        setDropTarget({ id: event.id, position: nextPosition });
+                      }}
+                      onDrop={(dragEvent) => {
+                        dragEvent.preventDefault();
+                        if (draggingEventId && dropTarget?.id === event.id) {
+                          reorderEvent(draggingEventId, event.id, dropTarget.position);
+                        }
+                        clearEventDragState();
+                      }}
+                      onDragEnd={() => clearEventDragState()}
                       onClick={() => {
                         setSelectedEventId(event.id);
                         setIsEditingEvent(false);
@@ -405,16 +457,33 @@ const TimelineDetail: React.FC<TimelineDetailProps> = ({ entityId, embedded = fa
                         selected
                           ? 'border-primary bg-primary/10 ring-2 ring-primary/20'
                           : 'border-theme hover:bg-primary-light/30'
-                      }`}
+                      } ${draggingEventId === event.id ? 'opacity-45' : ''}`}
                       title={getEventTitle(event)}
                     >
-                      <div className="text-[11px] font-mono text-primary truncate">
-                        {event.time?.trim() || '未标注时间'}
-                      </div>
-                      <div className="mt-1 text-sm font-semibold truncate">
-                        {getEventTitle(event)}
+                      <div className="flex items-start gap-2">
+                        <span
+                          className="mt-0.5 text-gray-400 shrink-0 cursor-grab active:cursor-grabbing"
+                          title="拖拽排序"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <GripVertical size={14} />
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <div className="text-[11px] font-mono text-primary truncate">
+                            {event.time?.trim() || '未标注时间'}
+                          </div>
+                          <div className="mt-1 text-sm font-semibold truncate">
+                            {getEventTitle(event)}
+                          </div>
+                        </div>
                       </div>
                     </button>
+                    {isDropAfter && (
+                      <div className="pointer-events-none absolute left-3 right-0 bottom-0 z-10 flex items-center">
+                        <span className="h-3 w-3 -translate-x-1/2 rounded-full bg-primary shadow" />
+                        <span className="ml-1 h-1 flex-1 rounded-full bg-primary shadow-[0_0_0_2px_rgba(59,130,246,0.18)]" />
+                      </div>
+                    )}
                   </div>
                 );
               })}

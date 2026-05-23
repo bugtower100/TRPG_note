@@ -17,6 +17,7 @@ export interface BaseEntity {
   id: string;
   name: string;
   titleColor?: string;
+  sortOrder?: number;
   details: string;
   tags?: string[];
   customSubItems?: CustomSubItem[];
@@ -77,10 +78,13 @@ export interface TimelineEvent {
   relations: Relation[];
   relatedImages: string[];
   isRevealed: boolean;
+  workbenchY?: number;
 }
 
 export interface Timeline extends BaseEntity {
   timelineEvents: TimelineEvent[];
+  workbenchVisible?: boolean;
+  workbenchLaneOrder?: number;
 }
 
 export type GraphEntityType =

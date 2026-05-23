@@ -1,17 +1,22 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useCampaign } from '../context/CampaignContext';
-import { Trash2, Download, Upload, FolderOpen, Plus, ChevronDown } from 'lucide-react';
+import { Trash2, Download, Upload, FolderOpen, Plus, ChevronDown, X } from 'lucide-react';
 import { dataService } from '../services/dataService';
 import { GuideHelpButton } from '../components/common/InteractiveGuide';
+import ReleaseUpdateButton from '../components/common/ReleaseUpdateButton';
 import { CampaignConfig, PublicCampaignSummary } from '../types';
 import { teamNotesService } from '../services/teamNotesService';
 import { campaignAccessService } from '../services/campaignAccessService';
+import { APP_VERSION } from '../constants/appVersion';
+import { backupService } from '../services/backupService';
+import ImportAssistant from './ImportAssistant';
+import BackupExportDialog from '../components/common/BackupExportDialog';
 
 const LandingPage: React.FC = () => {
   const { 
     user, login, logout, 
     campaignList, switchCampaign, createNewCampaign, 
-    importData, openFromFileSystem, deleteCampaign
+    openFromFileSystem, deleteCampaign
   } = useCampaign();
   
   const [currentTheme, setCurrentTheme] = useState(localStorage.getItem('trpg_theme') || 'default');
@@ -42,9 +47,8 @@ const LandingPage: React.FC = () => {
   const [passwordConfigured, setPasswordConfigured] = useState(false);
   const [passwordStatus, setPasswordStatus] = useState('');
   const [passwordMenuOpen, setPasswordMenuOpen] = useState(false);
-
-  // Import State
-  const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const [importAssistantOpen, setImportAssistantOpen] = useState(false);
+  const [exportDialogTarget, setExportDialogTarget] = useState<{ type: 'all' } | { type: 'campaign'; campaignId: string } | null>(null);
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -134,6 +138,15 @@ const LandingPage: React.FC = () => {
     return () => window.removeEventListener('mousedown', handler);
   }, []);
 
+  useEffect(() => {
+    if (!importAssistantOpen) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [importAssistantOpen]);
+
   const handleCreate = (e: React.FormEvent) => {
     e.preventDefault();
     if (newCampaignName.trim()) {
@@ -141,11 +154,31 @@ const LandingPage: React.FC = () => {
     }
   };
 
-  const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-       importData(file);
+  const handleExportAllBackups = async (includeAssets: boolean) => {
+    try {
+      await backupService.exportAll(user, includeAssets);
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : '全量备份导出失败');
     }
+  };
+
+  const handleExportCampaignBackup = async (campaignId: string, includeAssets: boolean) => {
+    try {
+      await backupService.exportCampaign(campaignId, user, includeAssets);
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : '单模组备份导出失败');
+    }
+  };
+
+  const handleExportSelection = async (includeAssets: boolean) => {
+    const target = exportDialogTarget;
+    setExportDialogTarget(null);
+    if (!target) return;
+    if (target.type === 'all') {
+      await handleExportAllBackups(includeAssets);
+      return;
+    }
+    await handleExportCampaignBackup(target.campaignId, includeAssets);
   };
 
   const handleSaveCampaignConfig = async (campaignId: string) => {
@@ -303,7 +336,10 @@ const LandingPage: React.FC = () => {
       <div className="flex justify-center items-center min-h-screen bg-stone-50">
         <div className="p-8 w-full max-w-md bg-white rounded-lg border shadow-md border-stone-200">
           <h1 className="mb-2 text-3xl font-bold text-center text-gray-800">TRPG 模组笔记</h1>
-          <p className="mb-8 text-center text-gray-500">请登录以管理您的模组</p>
+          <p className="mb-2 text-center text-gray-500">{APP_VERSION}</p>
+          <p className="mb-6 text-center text-gray-500">请登录以管理您的模组</p>
+          <div className="mb-2 flex justify-center">
+          </div>
           
           <form onSubmit={handleLogin} className="space-y-6">
             <div>
@@ -401,6 +437,7 @@ const LandingPage: React.FC = () => {
             </p>
           </div>
           <div className="flex flex-wrap gap-3 items-center">
+             <ReleaseUpdateButton />
              <GuideHelpButton guideId="landing" />
              {/* Open Local File */}
              <button 
@@ -411,21 +448,21 @@ const LandingPage: React.FC = () => {
                 <FolderOpen size={18} />
                 <span>打开本地文件</span>
             </button>
-
-             {/* Import Button */}
-             <input
-                type="file"
-                accept=".json"
-                ref={fileInputRef}
-                onChange={handleImport}
-                className="hidden"
-              />
             <button 
-                onClick={() => fileInputRef.current?.click()}
+                onClick={() => setImportAssistantOpen(true)}
                 className="flex gap-2 items-center px-4 py-2 text-gray-700 bg-white rounded border border-gray-300 shadow-sm hover:bg-gray-50"
+                title="打开导入助手"
             >
                 <Upload size={18} />
-                <span>导入模组</span>
+                <span>导入助手</span>
+            </button>
+            <button
+                onClick={() => setExportDialogTarget({ type: 'all' })}
+                className="flex gap-2 items-center px-4 py-2 text-gray-700 bg-white rounded border border-gray-300 shadow-sm hover:bg-gray-50"
+                title="导出当前账号下的所有模组备份包"
+            >
+                <Download size={18} />
+                <span>导出所有模组</span>
             </button>
             <button 
                 onClick={logout}
@@ -643,13 +680,12 @@ const LandingPage: React.FC = () => {
                 <button
                   onClick={(e) => {
                       e.stopPropagation();
-                      const data = dataService.loadCampaign(campaign.id);
-                      dataService.exportData(data);
+                      setExportDialogTarget({ type: 'campaign', campaignId: campaign.id });
                   }}
                   className="flex items-center justify-center gap-1 py-1.5 border border-gray-200 text-gray-600 rounded hover:bg-gray-50 text-xs"
-                  title="导出 JSON"
+                  title="导出备份包"
                 >
-                  <Download size={14} /> 导出
+                  <Download size={14} /> 备份
                 </button>
                 <button
                   onClick={(e) => {
@@ -757,6 +793,50 @@ const LandingPage: React.FC = () => {
             </div>
           </div>
         )}
+
+        {importAssistantOpen && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+            onClick={() => setImportAssistantOpen(false)}
+          >
+            <div
+              className="w-full max-w-6xl max-h-[90vh] overflow-y-auto rounded-xl border border-theme theme-card shadow-2xl"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <div className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-theme theme-card px-5 py-4">
+                <div>
+                  <h2 className="text-xl font-bold text-theme-primary">导入助手</h2>
+                  <p className="mt-1 text-sm theme-text-secondary">
+                    可直接从主页导入新版备份包；旧版 JSON 兼容导入仍在设置页中提供。
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setImportAssistantOpen(false)}
+                  className="rounded border border-theme p-2 theme-text-secondary hover:bg-gray-50"
+                  aria-label="关闭导入助手"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+              <div className="p-5">
+                <ImportAssistant allowLegacyJsonImport={false} />
+              </div>
+            </div>
+          </div>
+        )}
+
+        <BackupExportDialog
+          open={Boolean(exportDialogTarget)}
+          title={exportDialogTarget?.type === 'all' ? '选择全量备份方式' : '选择模组备份方式'}
+          description={
+            exportDialogTarget?.type === 'all'
+              ? '完整备份会把图片资源一起打包，轻量备份只保留文字与结构数据。'
+              : '完整备份会把这个模组引用到的图片资源一起打包，轻量备份只保留文字与结构数据。'
+          }
+          onSelect={(includeAssets) => void handleExportSelection(includeAssets)}
+          onCancel={() => setExportDialogTarget(null)}
+        />
       </div>
     </div>
   );

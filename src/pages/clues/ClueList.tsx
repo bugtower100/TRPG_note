@@ -8,7 +8,7 @@ import { useReceivedShares } from '../../hooks/useReceivedShares';
 import ClueBoard from '../ClueBoard';
 
 const ClueList: React.FC = () => {
-  const { campaignData, setCampaignData } = useCampaign();
+  const { campaignData, setCampaignData, reorderEntities } = useCampaign();
   const navigate = useNavigate();
   const sharedEntries = useReceivedShares('clues');
   const [activeTab, setActiveTab] = useState<'list' | 'board'>('list');
@@ -58,6 +58,7 @@ const ClueList: React.FC = () => {
           entities={campaignData.clues}
           entityType="clues"
           onAdd={handleAdd}
+          onReorder={(orderedIds) => reorderEntities('clues', orderedIds)}
           sharedEntries={sharedEntries}
         />
       ) : (

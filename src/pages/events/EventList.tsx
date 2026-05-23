@@ -7,7 +7,7 @@ import { Event } from '../../types';
 import { useReceivedShares } from '../../hooks/useReceivedShares';
 
 const EventList: React.FC = () => {
-  const { campaignData, setCampaignData } = useCampaign();
+  const { campaignData, setCampaignData, reorderEntities } = useCampaign();
   const navigate = useNavigate();
   const sharedEntries = useReceivedShares('events');
 
@@ -34,6 +34,7 @@ const EventList: React.FC = () => {
       entities={campaignData.events}
       entityType="events"
       onAdd={handleAdd}
+      onReorder={(orderedIds) => reorderEntities('events', orderedIds)}
       sharedEntries={sharedEntries}
     />
   );

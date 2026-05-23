@@ -76,6 +76,15 @@ const TimelineList: React.FC = () => {
             </button>
           )}
           <button
+            type="button"
+            onClick={() => navigate('/timelines/workbench', {
+              state: { focusTimelineId: activeTimeline?.id || '' },
+            })}
+            className="px-3 py-2 border border-theme rounded-md hover:bg-primary-light transition-colors whitespace-nowrap"
+          >
+            工作版
+          </button>
+          <button
             onClick={handleAdd}
             className="px-3 py-2 bg-primary text-white rounded-md hover:bg-primary-dark transition-colors whitespace-nowrap"
           >

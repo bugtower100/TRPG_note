@@ -186,7 +186,7 @@ class DataService {
 
     const safeArray = <T>(value: any, fallback: T[] = []): T[] => (Array.isArray(value) ? value : fallback);
 
-    const normalizeBase = (e: any) => {
+    const normalizeBase = (e: any, fallbackIndex: number) => {
       let customSubItems = this.normalizeSubItems(e?.customSubItems);
       const sectionSubItems = this.normalizeSectionSubItems(e?.sectionSubItems);
       const sectionVisibility = this.normalizeRecord(e?.sectionVisibility);
@@ -213,6 +213,7 @@ class DataService {
         id: typeof e?.id === 'string' && e.id ? e.id : uuidv4(),
         name: typeof e?.name === 'string' ? e.name : '未命名',
         titleColor: typeof e?.titleColor === 'string' && e.titleColor.trim() ? e.titleColor : '#111827',
+        sortOrder: typeof e?.sortOrder === 'number' ? e.sortOrder : fallbackIndex,
         details: typeof e?.details === 'string' ? e.details : '',
         tags: this.normalizeTags(e?.tags),
         customSubItems,
@@ -226,8 +227,8 @@ class DataService {
       };
     };
 
-    const characters: Character[] = safeArray<any>(raw?.characters, []).map((c) => ({
-      ...normalizeBase(c),
+    const characters: Character[] = safeArray<any>(raw?.characters, []).map((c, index) => ({
+      ...normalizeBase(c, index),
       identity: typeof c?.identity === 'string' ? c.identity : '',
       appearance: typeof c?.appearance === 'string' ? c.appearance : '',
       desireOrGoal: typeof c?.desireOrGoal === 'string' ? c.desireOrGoal : '',
@@ -235,26 +236,26 @@ class DataService {
       relations: safeArray<any>(c?.relations, []),
     }));
 
-    const locations: Location[] = safeArray<any>(raw?.locations, []).map((l) => ({
-      ...normalizeBase(l),
+    const locations: Location[] = safeArray<any>(raw?.locations, []).map((l, index) => ({
+      ...normalizeBase(l, index),
       environment: typeof l?.environment === 'string' ? l.environment : '',
       relations: safeArray<any>(l?.relations, []),
     }));
 
-    const organizations: Organization[] = safeArray<any>(raw?.organizations, []).map((o) => ({
-      ...normalizeBase(o),
+    const organizations: Organization[] = safeArray<any>(raw?.organizations, []).map((o, index) => ({
+      ...normalizeBase(o, index),
       notes: typeof o?.notes === 'string' ? o.notes : '',
       relations: safeArray<any>(o?.relations, []),
     }));
 
-    const events: Event[] = safeArray<any>(raw?.events, []).map((e) => ({
-      ...normalizeBase(e),
+    const events: Event[] = safeArray<any>(raw?.events, []).map((e, index) => ({
+      ...normalizeBase(e, index),
       time: typeof e?.time === 'string' ? e.time : '',
       relations: safeArray<any>(e?.relations, []),
     }));
 
-    const clues: Clue[] = safeArray<any>(raw?.clues, []).map((c) => ({
-      ...normalizeBase(c),
+    const clues: Clue[] = safeArray<any>(raw?.clues, []).map((c, index) => ({
+      ...normalizeBase(c, index),
       type: typeof c?.type === 'string' ? c.type : '普通',
       relations: safeArray<any>(c?.relations, []),
       revealStatus: this.normalizeClueRevealStatus(c?.revealStatus),
@@ -262,8 +263,10 @@ class DataService {
       revealLogs: this.normalizeClueRevealLogs(c?.revealLogs),
     }));
 
-    const timelines: Timeline[] = safeArray<any>(raw?.timelines, []).map((t) => ({
-      ...normalizeBase(t),
+    const timelines: Timeline[] = safeArray<any>(raw?.timelines, []).map((t, index) => ({
+      ...normalizeBase(t, index),
+      workbenchVisible: Boolean(t?.workbenchVisible),
+      workbenchLaneOrder: typeof t?.workbenchLaneOrder === 'number' ? t.workbenchLaneOrder : index,
       timelineEvents: safeArray<any>(t?.timelineEvents, []).map((event) => ({
         id: typeof event?.id === 'string' && event.id ? event.id : uuidv4(),
         title: timelineEventFallbackTitle(event),
@@ -272,11 +275,12 @@ class DataService {
         relations: safeArray<any>(event?.relations, []),
         relatedImages: safeArray<any>(event?.relatedImages, []),
         isRevealed: Boolean(event?.isRevealed),
+        workbenchY: typeof event?.workbenchY === 'number' ? event.workbenchY : undefined,
       })),
     }));
 
-    const monsters: Monster[] = safeArray<any>(raw?.monsters, []).map((m) => ({
-      ...normalizeBase(m),
+    const monsters: Monster[] = safeArray<any>(raw?.monsters, []).map((m, index) => ({
+      ...normalizeBase(m, index),
       type: typeof m?.type === 'string' ? m.type : '普通',
       stats: typeof m?.stats === 'string' ? m.stats : '',
       abilities: typeof m?.abilities === 'string' ? m.abilities : '',
@@ -699,6 +703,7 @@ class DataService {
     return {
       ...data,
       tags: normalizedTags,
+      sortOrder: typeof (data as any).sortOrder === 'number' ? (data as any).sortOrder : Date.now(),
       id: this.generateId(),
       createdAt: Date.now(),
       updatedAt: Date.now(),

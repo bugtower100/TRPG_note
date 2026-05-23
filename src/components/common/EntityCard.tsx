@@ -1,7 +1,7 @@
 import React from 'react';
 import { BaseEntity } from '../../types';
 import { useNavigate } from 'react-router-dom';
-import { ExternalLink } from 'lucide-react';
+import { ExternalLink, GripVertical } from 'lucide-react';
 import { useCampaign } from '../../context/CampaignContext';
 import { getEntityPrimaryMarkdown, markdownToPreviewText } from './richTextReference';
 import { useGuide } from './InteractiveGuide';
@@ -10,9 +10,26 @@ interface EntityCardProps {
   entity: BaseEntity;
   type: string; // e.g., 'characters', 'locations' used for routing
   icon?: React.ReactNode;
+  draggable?: boolean;
+  isDragging?: boolean;
+  isDropTarget?: boolean;
+  onDragStart?: (event: React.DragEvent<HTMLDivElement>) => void;
+  onDragOver?: (event: React.DragEvent<HTMLDivElement>) => void;
+  onDrop?: (event: React.DragEvent<HTMLDivElement>) => void;
+  onDragEnd?: (event: React.DragEvent<HTMLDivElement>) => void;
 }
 
-const EntityCard: React.FC<EntityCardProps> = ({ entity, type }) => {
+const EntityCard: React.FC<EntityCardProps> = ({
+  entity,
+  type,
+  draggable = false,
+  isDragging = false,
+  isDropTarget = false,
+  onDragStart,
+  onDragOver,
+  onDrop,
+  onDragEnd,
+}) => {
   const navigate = useNavigate();
   const { openInTab } = useCampaign();
   const { currentGuideId, isGuideRunning } = useGuide();
@@ -30,11 +47,29 @@ const EntityCard: React.FC<EntityCardProps> = ({ entity, type }) => {
   return (
     <div
       data-tour="entity-card"
+      draggable={draggable}
+      onDragStart={onDragStart}
+      onDragOver={onDragOver}
+      onDrop={onDrop}
+      onDragEnd={onDragEnd}
       onClick={() => navigate(`/${type}/${entity.id}`)}
-      className="p-4 rounded-lg shadow-sm border theme-card hover:shadow-md transition-shadow cursor-pointer relative group"
+      className={`p-4 rounded-lg shadow-sm border theme-card hover:shadow-md transition-all cursor-pointer relative group ${
+        isDragging ? 'opacity-45 scale-[0.98]' : ''
+      } ${isDropTarget ? 'ring-2 ring-primary/35 border-primary' : ''}`}
     >
       <div className="flex justify-between items-start">
-        <h3 className="text-lg font-bold truncate pr-6" style={{ color: entity.titleColor || '#111827' }}>{entity.name}</h3>
+        <div className="flex items-start gap-2 min-w-0 pr-10">
+          {draggable && (
+            <span
+              className="mt-0.5 text-gray-400 shrink-0 cursor-grab active:cursor-grabbing"
+              title="拖拽排序"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <GripVertical size={16} />
+            </span>
+          )}
+          <h3 className="text-lg font-bold truncate" style={{ color: entity.titleColor || '#111827' }}>{entity.name}</h3>
+        </div>
         <button
           data-tour="entity-card-split"
           onClick={handleOpenInTab}

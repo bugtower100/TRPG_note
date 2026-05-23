@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import EntityCard from './EntityCard';
 import SharedEntityCard from './SharedEntityCard';
-import { BaseEntity, SharedEntityRecord } from '../../types';
+import { BaseEntity, CampaignData, SharedEntityRecord } from '../../types';
 
 interface EntityListLayoutProps<T extends BaseEntity> {
   title: string;
@@ -9,6 +9,8 @@ interface EntityListLayoutProps<T extends BaseEntity> {
   entityType: string; // Used for routing
   onAdd?: () => void;
   sharedEntries?: SharedEntityRecord[];
+  collectionKey?: keyof CampaignData;
+  onReorder?: (orderedIds: string[]) => void;
 }
 
 const EntityListLayout = <T extends BaseEntity>({ 
@@ -17,17 +19,25 @@ const EntityListLayout = <T extends BaseEntity>({
   entityType, 
   onAdd,
   sharedEntries = [],
+  onReorder,
 }: EntityListLayoutProps<T>) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedTag, setSelectedTag] = useState('');
+  const [draggingEntityId, setDraggingEntityId] = useState<string | null>(null);
+  const [dropTargetEntityId, setDropTargetEntityId] = useState<string | null>(null);
   const normalizedSearchTerm = searchTerm.toLowerCase();
 
-  const availableTags = useMemo(() => {
-    const allTags = entities.flatMap((entity) => entity.tags || []);
-    return Array.from(new Set(allTags)).sort((a, b) => a.localeCompare(b, 'zh-Hans-CN'));
-  }, [entities]);
+  const orderedEntities = useMemo(
+    () => [...entities].sort((a, b) => (a.sortOrder ?? Number.MAX_SAFE_INTEGER) - (b.sortOrder ?? Number.MAX_SAFE_INTEGER)),
+    [entities]
+  );
 
-  const filteredEntities = entities.filter((entity) => {
+  const availableTags = useMemo(() => {
+    const allTags = orderedEntities.flatMap((entity) => entity.tags || []);
+    return Array.from(new Set(allTags)).sort((a, b) => a.localeCompare(b, 'zh-Hans-CN'));
+  }, [orderedEntities]);
+
+  const filteredEntities = orderedEntities.filter((entity) => {
     const matchesSearch =
       entity.name.toLowerCase().includes(normalizedSearchTerm) ||
       entity.details.toLowerCase().includes(normalizedSearchTerm);
@@ -47,6 +57,24 @@ const EntityListLayout = <T extends BaseEntity>({
   });
 
   const hasResults = filteredEntities.length > 0 || filteredSharedEntries.length > 0;
+  const canReorder = Boolean(onReorder) && !searchTerm.trim() && !selectedTag;
+
+  const commitReorder = (targetId: string) => {
+    if (!onReorder || !draggingEntityId || draggingEntityId === targetId) return;
+    const orderedIds = filteredEntities.map((entity) => entity.id);
+    const fromIndex = orderedIds.indexOf(draggingEntityId);
+    const toIndex = orderedIds.indexOf(targetId);
+    if (fromIndex < 0 || toIndex < 0) return;
+    const nextIds = [...orderedIds];
+    const [draggedId] = nextIds.splice(fromIndex, 1);
+    nextIds.splice(toIndex, 0, draggedId);
+    onReorder(nextIds);
+  };
+
+  const clearDragState = () => {
+    setDraggingEntityId(null);
+    setDropTargetEntityId(null);
+  };
 
   return (
     <div className="space-y-6">
@@ -102,7 +130,29 @@ const EntityListLayout = <T extends BaseEntity>({
             <EntityCard 
               key={entity.id} 
               entity={entity} 
-              type={entityType} 
+              type={entityType}
+              draggable={canReorder}
+              isDragging={draggingEntityId === entity.id}
+              isDropTarget={dropTargetEntityId === entity.id && draggingEntityId !== entity.id}
+              onDragStart={(event) => {
+                if (!canReorder) return;
+                event.dataTransfer.effectAllowed = 'move';
+                event.dataTransfer.setData('text/plain', entity.id);
+                setDraggingEntityId(entity.id);
+              }}
+              onDragOver={(event) => {
+                if (!canReorder || !draggingEntityId || draggingEntityId === entity.id) return;
+                event.preventDefault();
+                event.dataTransfer.dropEffect = 'move';
+                setDropTargetEntityId(entity.id);
+              }}
+              onDrop={(event) => {
+                if (!canReorder) return;
+                event.preventDefault();
+                commitReorder(entity.id);
+                clearDragState();
+              }}
+              onDragEnd={() => clearDragState()}
             />
           ))}
         </div>

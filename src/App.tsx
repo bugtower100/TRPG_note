@@ -15,6 +15,7 @@ import ClueList from './pages/clues/ClueList';
 import ClueDetail from './pages/clues/ClueDetail';
 import TimelineList from './pages/timelines/TimelineList';
 import TimelineDetail from './pages/timelines/TimelineDetail';
+import TimelineWorkbench from './pages/timelines/TimelineWorkbench';
 import CharacterDetail from './pages/characters/CharacterDetail';
 import MonsterList from './pages/monsters/MonsterList';
 import MonsterDetail from './pages/monsters/MonsterDetail';
@@ -61,6 +62,7 @@ function AppContent() {
             <Route path="clue-board" element={<Navigate to="/clues" replace />} />
             <Route path="session-tasks" element={<SessionTaskBoard />} />
             <Route path="timelines" element={<TimelineList />} />
+            <Route path="timelines/workbench" element={<TimelineWorkbench />} />
             <Route path="timelines/:id" element={<TimelineList />} />
             <Route path="timelines/shared/:shareId" element={<SharedEntityDetailRoute entityType="timelines" />} />
             <Route path="relation-graphs" element={<RelationGraphs />} />

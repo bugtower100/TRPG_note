@@ -7,7 +7,7 @@ import { Location } from '../../types';
 import { useReceivedShares } from '../../hooks/useReceivedShares';
 
 const LocationList: React.FC = () => {
-  const { campaignData, setCampaignData } = useCampaign();
+  const { campaignData, setCampaignData, reorderEntities } = useCampaign();
   const navigate = useNavigate();
   const sharedEntries = useReceivedShares('locations');
 
@@ -34,6 +34,7 @@ const LocationList: React.FC = () => {
       entities={campaignData.locations}
       entityType="locations"
       onAdd={handleAdd}
+      onReorder={(orderedIds) => reorderEntities('locations', orderedIds)}
       sharedEntries={sharedEntries}
     />
   );

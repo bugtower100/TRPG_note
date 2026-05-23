@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useCampaign } from '../context/CampaignContext';
 import { CampaignTheme } from '../types';
-import { FileJson, Upload, Monitor, Scroll, Archive, Trash2, RefreshCw, ChevronDown, ChevronRight, FolderPlus, MoveRight, Pencil, FolderX } from 'lucide-react';
+import { Monitor, Scroll, Archive, Trash2, RefreshCw, ChevronDown, ChevronRight, FolderPlus, MoveRight, Pencil, FolderX, Upload } from 'lucide-react';
+import { APP_VERSION } from '../constants/appVersion';
 import {
   buildResourceTree,
   filterResourceItems,
@@ -15,10 +16,14 @@ import {
 import ImportAssistant from './ImportAssistant';
 import VersionHistory from './VersionHistory';
 import ResourceTreeView from '../components/common/ResourceTreeView';
+import ReleaseUpdatePanel from '../components/common/ReleaseUpdatePanel';
+import { backupService } from '../services/backupService';
+import BackupExportDialog from '../components/common/BackupExportDialog';
 
 const Settings: React.FC = () => {
   const { 
-    exportData,
+    currentCampaignId,
+    user,
     theme, setTheme
   } = useCampaign();
   
@@ -34,6 +39,7 @@ const Settings: React.FC = () => {
   const [expandedFolderPaths, setExpandedFolderPaths] = useState<string[]>([RESOURCE_ROOT_PATH]);
   const [selectedFolderPath, setSelectedFolderPath] = useState(RESOURCE_ROOT_PATH);
   const [moveTargetFolderPath, setMoveTargetFolderPath] = useState(RESOURCE_ROOT_PATH);
+  const [exportDialogOpen, setExportDialogOpen] = useState(false);
   const themes: { id: CampaignTheme; label: string; icon: React.ReactNode; desc: string }[] = [
     { id: 'default', label: '默认风格', icon: <Monitor size={20} />, desc: '淡雅的紫色调，柔和且适合现代阅读。' },
     { id: 'scroll', label: '复古羊皮纸', icon: <Scroll size={20} />, desc: '温暖的黄色调，带来经典 TRPG 氛围。' },
@@ -186,6 +192,15 @@ const Settings: React.FC = () => {
 
   const currentFolderLabel = resourceFolderDisplayName(selectedFolderPath);
 
+  const handleExportCurrentBackup = async (includeAssets: boolean) => {
+    if (!currentCampaignId) return;
+    try {
+      await backupService.exportCampaign(currentCampaignId, user, includeAssets);
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : '单模组备份导出失败');
+    }
+  };
+
   return (
     <div className="space-y-8 max-w-4xl mx-auto px-2 sm:px-0">
       <h2 className="text-xl sm:text-2xl font-bold">数据与设置</h2>
@@ -212,24 +227,38 @@ const Settings: React.FC = () => {
         </div>
       </section>
 
+      <section className="bg-theme-card p-4 sm:p-6 rounded-lg shadow-sm border border-theme">
+        <h3 className="text-lg font-medium mb-2">关于应用</h3>
+        <div className="text-sm theme-text-secondary space-y-1">
+          <div>当前版本：{APP_VERSION}</div>
+        </div>
+        <ReleaseUpdatePanel className="mt-4" />
+      </section>
+
       {/* Data Management */}
       <section data-tour="settings-import-assistant" className="bg-theme-card p-4 sm:p-6 rounded-lg shadow-sm border border-theme">
         <h3 className="text-lg font-medium mb-4">数据管理</h3>
         <div className="space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 border border-theme rounded">
             <div>
-              <h4 className="font-medium">导出 JSON 副本</h4>
-              <p className="text-sm theme-text-secondary">下载当前模组的快照文件。</p>
+              <h4 className="font-medium">新版备份包</h4>
+              <p className="text-sm theme-text-secondary">这里保留当前模组备份导出；数据包导入请使用下方导入助手，导出所有模组请到主页操作。</p>
             </div>
-            <button
-              onClick={exportData}
-              className="px-4 py-2 bg-theme-card border border-theme rounded hover:bg-gray-50 flex items-center gap-2"
-            >
-              <FileJson size={16} />
-              导出
-            </button>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                onClick={() => setExportDialogOpen(true)}
+                disabled={!currentCampaignId}
+                className="px-4 py-2 bg-theme-card border border-theme rounded hover:bg-gray-50 disabled:opacity-50 flex items-center gap-2"
+              >
+                <Archive size={16} />
+                导出当前模组
+              </button>
+            </div>
           </div>
 
+          <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-3 py-2">
+            旧版 `JSON` 存档和新版备份包都请通过下方导入助手导入；其中 `JSON` 仅用于兼容历史数据，不建议再作为完整备份格式。
+          </div>
         </div>
       </section>
 
@@ -248,6 +277,17 @@ const Settings: React.FC = () => {
           </div>
         )}
       </section>
+
+      <BackupExportDialog
+        open={exportDialogOpen}
+        title="选择当前模组备份方式"
+        description="完整备份会把这个模组引用到的图片资源一起打包，轻量备份只保留文字与结构数据。"
+        onSelect={(includeAssets) => {
+          setExportDialogOpen(false);
+          void handleExportCurrentBackup(includeAssets);
+        }}
+        onCancel={() => setExportDialogOpen(false)}
+      />
 
       <section className="bg-theme-card p-4 sm:p-6 rounded-lg shadow-sm border border-theme">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">

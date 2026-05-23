@@ -1,6 +1,7 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
 import { useCampaign } from '../context/CampaignContext';
+import { APP_VERSION } from '../constants/appVersion';
 import { 
   LayoutDashboard, Users, MapPin, Building, Calendar, 
   Search, Clock, Settings, LogOut, Skull, Home, Share2, NotebookPen, Kanban
@@ -35,7 +36,7 @@ const Sidebar: React.FC<SidebarProps> = ({ className = '', onNavigate }) => {
         <h1 className="text-lg font-bold truncate" title={campaignData.meta.projectName}>
             {campaignData.meta.projectName}
         </h1>
-        <p className="text-xs theme-text-secondary mt-1">TRPG 备团工具</p>
+        <p className="text-xs theme-text-secondary mt-1">TRPG 备团工具 {APP_VERSION}</p>
       </div>
       
       <nav className="flex-1 p-3 space-y-1 overflow-hidden" data-tour="sidebar-nav">

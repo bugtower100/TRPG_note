@@ -936,6 +936,9 @@ func main() {
 	api := router.Group("/api/storage")
 	resourceAPI := router.Group("/api/resources")
 	campaignAPI := router.Group("/api/campaigns")
+	backupAPI := router.Group("/api/backups")
+
+	registerBackupRoutes(backupAPI, db, cfg)
 
 	campaignAPI.GET("/public", func(c *gin.Context) {
 		result, err := rebuildPublicCampaignIndex(db)

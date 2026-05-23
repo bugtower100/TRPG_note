@@ -29,6 +29,14 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Resolve app version
+        id: version
+        shell: bash
+        run: |
+          raw="$(tr -d '\r\n' < server/version.txt)"
+          raw="${raw#v}"
+          echo "version_tag=v${raw}" >> "${GITHUB_OUTPUT}"
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
@@ -92,11 +100,14 @@ jobs:
         run: |
           image_name="ghcr.io/${GITHUB_REPOSITORY,,}"
           manual_tag="${{ inputs.image_tag }}"
+          file_tag="${{ steps.version.outputs.version_tag }}"
 
           if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
             version_tag="${GITHUB_REF_NAME}"
           elif [[ -n "${manual_tag}" ]]; then
             version_tag="${manual_tag}"
+          elif [[ -n "${file_tag}" ]]; then
+            version_tag="${file_tag}"
           else
             version_tag="manual-${GITHUB_SHA::7}"
           fi
