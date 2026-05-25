@@ -1,4 +1,8 @@
 type StorageMap = Record<string, string>;
+type StorageMetaMap = Record<string, { version: number; updatedAt: number }>;
+type PendingShadowRecord =
+  | { type: 'set'; value: string; updatedAt: number }
+  | { type: 'delete'; updatedAt: number };
 
 export interface StorageAdapter {
   getItem: (key: string) => string | null;
@@ -53,30 +57,236 @@ const isUserKey = (key: string): boolean => {
   return key.startsWith(prefix);
 };
 
+const PENDING_KEY_PREFIX = '__trpg_pending__';
+
+const getPendingShadowKey = (key: string) => `${PENDING_KEY_PREFIX}${key}`;
+
+const isPendingShadowKey = (key: string) => key.startsWith(PENDING_KEY_PREFIX);
+
+const getSourceKeyFromPendingShadow = (pendingKey: string) =>
+  isPendingShadowKey(pendingKey) ? pendingKey.slice(PENDING_KEY_PREFIX.length) : pendingKey;
+
+type PendingMutation =
+  | { type: 'set'; value: string; opId: number }
+  | { type: 'delete'; opId: number };
+
+const getPayloadLastModified = (value: string | null): number | undefined => getLocalLastModified(value);
+
 const createSmartAdapter = (
   initialRemote: StorageMap,
-  initialMeta?: Record<string, { version: number; updatedAt: number }>,
+  initialMeta?: StorageMetaMap,
   initialOnline: boolean = true
 ): StorageAdapter => {
   const remote = new Map<string, string>(Object.entries(initialRemote));
+  const remoteMeta = new Map<string, { version: number; updatedAt: number }>(
+    Object.entries(initialMeta || {})
+  );
   let online = initialOnline;
-  const pending = new Set<string>();
+  const pending = new Map<string, PendingMutation>();
   let lastLatency: number | undefined = undefined;
+  let opSeq = 0;
 
-  const persistSet = (key: string, value: string) => {
-    if (!online || !isUserKey(key)) return;
-    fetch(`/api/storage/${encodeURIComponent(key)}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ value }),
-    }).catch(() => undefined);
+  const emitStatus = (
+    conflicts: Array<{ key: string; localTime?: number; remoteTime?: number }> = []
+  ) => {
+    if (online) {
+      dispatchStatus({
+        online: true,
+        syncedAt: Date.now(),
+        conflicts,
+        unsyncedCount: pending.size,
+        latencyMs: lastLatency,
+      });
+      return;
+    }
+    dispatchStatus({
+      online: false,
+      offlineSince: Date.now(),
+      unsyncedCount: pending.size,
+      latencyMs: lastLatency,
+    });
   };
 
-  const persistDelete = (key: string) => {
+  const getCurrentPending = (key: string) => pending.get(key);
+
+  const writePendingShadow = (key: string, mutation: PendingMutation) => {
+    const shadow: PendingShadowRecord =
+      mutation.type === 'set'
+        ? { type: 'set', value: mutation.value, updatedAt: Date.now() }
+        : { type: 'delete', updatedAt: Date.now() };
+    window.localStorage.setItem(getPendingShadowKey(key), JSON.stringify(shadow));
+  };
+
+  const removePendingShadow = (key: string) => {
+    window.localStorage.removeItem(getPendingShadowKey(key));
+  };
+
+  const queueMutation = (key: string, mutation: PendingMutation, persistShadow = true) => {
+    if (!isUserKey(key)) return;
+    pending.set(key, mutation);
+    if (persistShadow) {
+      writePendingShadow(key, mutation);
+    }
+    emitStatus();
+  };
+
+  const clearMutationIfCurrent = (key: string, opId: number) => {
+    const current = getCurrentPending(key);
+    if (current?.opId !== opId) return false;
+    pending.delete(key);
+    removePendingShadow(key);
+    return true;
+  };
+
+  const restorePendingFromLocalShadows = () => {
+    const pendingKeys = Object.keys(window.localStorage).filter((key) => isPendingShadowKey(key));
+    for (const pendingKey of pendingKeys) {
+      const sourceKey = getSourceKeyFromPendingShadow(pendingKey);
+      if (!isUserKey(sourceKey)) continue;
+      const raw = window.localStorage.getItem(pendingKey);
+      const parsed = tryParseJson(raw) as PendingShadowRecord | null;
+      if (!parsed || (parsed.type !== 'set' && parsed.type !== 'delete')) {
+        window.localStorage.removeItem(pendingKey);
+        continue;
+      }
+      if (parsed.type === 'set' && typeof parsed.value === 'string') {
+        queueMutation(sourceKey, { type: 'set', value: parsed.value, opId: ++opSeq }, false);
+      } else if (parsed.type === 'delete') {
+        queueMutation(sourceKey, { type: 'delete', opId: ++opSeq }, false);
+      } else {
+        window.localStorage.removeItem(pendingKey);
+      }
+    }
+  };
+
+  const fetchRemoteRecord = async (key: string) => {
+    const response = await fetch(`/api/storage/${encodeURIComponent(key)}`);
+    if (response.status === 404) return null;
+    if (!response.ok) throw new Error('load_remote_failed');
+    const payload = await response.json();
+    return {
+      value: String(payload.value ?? ''),
+      version: Number(payload.version ?? 1),
+      updatedAt: Number(payload.updatedAt ?? Date.now()),
+    };
+  };
+
+  const persistSet = async (key: string, value: string, opId: number) => {
     if (!online || !isUserKey(key)) return;
-    fetch(`/api/storage/${encodeURIComponent(key)}`, {
-      method: 'DELETE',
-    }).catch(() => undefined);
+    const expectedVersion = remoteMeta.get(key)?.version;
+    try {
+      const response = await fetch(`/api/storage/${encodeURIComponent(key)}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          value,
+          ...(expectedVersion !== undefined ? { expectedVersion } : {}),
+        }),
+      });
+      if (response.status === 409) {
+        const remoteRecord = await fetchRemoteRecord(key);
+        if (remoteRecord) {
+          remote.set(key, remoteRecord.value);
+          remoteMeta.set(key, {
+            version: remoteRecord.version,
+            updatedAt: remoteRecord.updatedAt,
+          });
+          if (clearMutationIfCurrent(key, opId)) {
+            window.localStorage.setItem(key, remoteRecord.value);
+          }
+          emitStatus([
+            {
+              key,
+              localTime: getPayloadLastModified(value),
+              remoteTime: remoteRecord.updatedAt,
+            },
+          ]);
+          return;
+        }
+      }
+      if (!response.ok) {
+        throw new Error(`save_failed_${response.status}`);
+      }
+      const payload = await response.json();
+      remote.set(key, value);
+      remoteMeta.set(key, {
+        version: Number(payload.version ?? (expectedVersion || 0) + 1),
+        updatedAt: Number(payload.updatedAt ?? Date.now()),
+      });
+      window.localStorage.setItem(key, value);
+      clearMutationIfCurrent(key, opId);
+      emitStatus();
+    } catch {
+      emitStatus();
+    }
+  };
+
+  const persistDelete = async (key: string, opId: number) => {
+    if (!online || !isUserKey(key)) return;
+    const expectedVersion = remoteMeta.get(key)?.version;
+    try {
+      const response = await fetch(`/api/storage/${encodeURIComponent(key)}`, {
+        method: 'DELETE',
+        headers: expectedVersion !== undefined ? { 'X-TRPG-Expected-Version': String(expectedVersion) } : undefined,
+      });
+      if (response.status === 409) {
+        const remoteRecord = await fetchRemoteRecord(key);
+        if (remoteRecord) {
+          remote.set(key, remoteRecord.value);
+          remoteMeta.set(key, {
+            version: remoteRecord.version,
+            updatedAt: remoteRecord.updatedAt,
+          });
+          if (clearMutationIfCurrent(key, opId)) {
+            window.localStorage.setItem(key, remoteRecord.value);
+          }
+          emitStatus([{ key, remoteTime: remoteRecord.updatedAt }]);
+          return;
+        }
+      }
+      if (!response.ok && response.status !== 204 && response.status !== 404) {
+        throw new Error(`delete_failed_${response.status}`);
+      }
+      remote.delete(key);
+      remoteMeta.delete(key);
+      window.localStorage.removeItem(key);
+      clearMutationIfCurrent(key, opId);
+      emitStatus();
+    } catch {
+      emitStatus();
+    }
+  };
+
+  const flushPending = () => {
+    if (!online || pending.size === 0) return;
+    for (const [key, mutation] of pending.entries()) {
+      if (mutation.type === 'set') {
+        void persistSet(key, mutation.value, mutation.opId);
+      } else {
+        void persistDelete(key, mutation.opId);
+      }
+    }
+  };
+
+  const reloadRemoteState = async () => {
+    const prefix = getUserPrefix();
+    if (!prefix) return;
+    const [allResponse, metaResponse] = await Promise.all([
+      fetch(`/api/storage/all?prefix=${encodeURIComponent(prefix)}`),
+      fetch(`/api/storage/meta?prefix=${encodeURIComponent(prefix)}`),
+    ]);
+    if (!allResponse.ok) {
+      throw new Error('load_all_failed');
+    }
+    const nextRemote = (await allResponse.json()) as StorageMap;
+    remote.clear();
+    Object.entries(nextRemote).forEach(([k, v]) => remote.set(k, v));
+    remoteMeta.clear();
+    if (metaResponse.ok) {
+      const nextMeta = (await metaResponse.json()) as StorageMetaMap;
+      Object.entries(nextMeta).forEach(([k, v]) => remoteMeta.set(k, v));
+    }
+    initialSync();
   };
 
   const initialSync = () => {
@@ -85,52 +295,43 @@ const createSmartAdapter = (
     for (const key of localKeys) {
       const localVal = window.localStorage.getItem(key);
       const remoteVal = remote.has(key) ? remote.get(key)! : null;
+      const pendingMutation = pending.get(key);
       if (remoteVal == null && localVal != null) {
-        remote.set(key, localVal);
-        persistSet(key, localVal);
-        pending.delete(key);
+        if (!pendingMutation) {
+          queueMutation(key, { type: 'set', value: localVal, opId: ++opSeq });
+        }
         continue;
       }
       if (remoteVal != null && localVal == null) {
-        window.localStorage.setItem(key, remoteVal);
+        if (pendingMutation?.type !== 'delete') {
+          window.localStorage.setItem(key, remoteVal);
+        }
         continue;
       }
       if (remoteVal != null && localVal != null) {
-        const lt = getLocalLastModified(localVal);
-        const rt = initialMeta?.[key]?.updatedAt ?? getLocalLastModified(remoteVal);
-        if (lt !== undefined && rt !== undefined) {
-          if (lt > rt) {
-            remote.set(key, localVal);
-            persistSet(key, localVal);
-            pending.delete(key);
-          } else if (rt > lt) {
-            window.localStorage.setItem(key, remoteVal);
-          } else {
-            // equal, do nothing
-          }
-          if (lt !== rt) {
-            conflicts.push({ key, localTime: lt, remoteTime: rt });
-          }
-        } else {
-          if (localVal !== remoteVal) {
-            window.localStorage.setItem(key, remoteVal);
-            conflicts.push({ key });
-          }
+        if (pendingMutation) {
+          continue;
+        }
+        if (localVal !== remoteVal) {
+          const lt = getLocalLastModified(localVal);
+          const rt = remoteMeta.get(key)?.updatedAt ?? getLocalLastModified(remoteVal);
+          window.localStorage.setItem(key, remoteVal);
+          conflicts.push({ key, localTime: lt, remoteTime: rt });
         }
       }
     }
     const remoteOnlyKeys = Array.from(remote.keys()).filter((k) => isUserKey(k) && !localKeys.includes(k));
     for (const key of remoteOnlyKeys) {
-      const val = remote.get(key)!;
-      window.localStorage.setItem(key, val);
+      if (pending.get(key)?.type !== 'delete') {
+        const val = remote.get(key)!;
+        window.localStorage.setItem(key, val);
+      }
     }
-    if (online) {
-      dispatchStatus({ online: true, syncedAt: Date.now(), conflicts, unsyncedCount: pending.size, latencyMs: lastLatency });
-    } else {
-      dispatchStatus({ online: false, offlineSince: Date.now(), unsyncedCount: pending.size, latencyMs: lastLatency });
-    }
+    emitStatus(conflicts);
+    flushPending();
   };
 
+  restorePendingFromLocalShadows();
   initialSync();
 
   const checkHealth = () => {
@@ -151,74 +352,99 @@ const createSmartAdapter = (
         lastLatency = Date.now() - t0;
         if (!online) {
           online = true;
-          const prefix = getUserPrefix();
-          if (prefix) {
-            fetch(`/api/storage/all?prefix=${encodeURIComponent(prefix)}`)
-              .then((r) => r.json())
-              .then((data: StorageMap) => {
-                remote.clear();
-                Object.entries(data).forEach(([k, v]) => remote.set(k, v));
-                fetch(`/api/storage/meta?prefix=${encodeURIComponent(prefix)}`)
-                  .then((m) => m.json())
-                  .then((meta) => {
-                    initialMeta = meta as Record<string, { version: number; updatedAt: number }>;
-                    initialSync();
-                  })
-                  .catch(() => initialSync());
-              })
-              .catch(() => undefined);
-          }
+          void reloadRemoteState().catch(() => undefined);
         } else {
-          dispatchStatus({ online: true, syncedAt: Date.now(), conflicts: [], unsyncedCount: pending.size, latencyMs: lastLatency });
+          emitStatus();
+          flushPending();
         }
       })
       .catch(() => {
         if (online) {
           online = false;
           lastLatency = undefined;
-          dispatchStatus({ online: false, offlineSince: Date.now(), unsyncedCount: pending.size, latencyMs: undefined });
+          emitStatus();
         } else {
-          dispatchStatus({ online: false, offlineSince: Date.now(), unsyncedCount: pending.size, latencyMs: undefined });
+          emitStatus();
         }
       });
   };
 
+  let lastForegroundRefreshAt = 0;
+  const triggerForegroundRefresh = () => {
+    if (!online) {
+      checkHealth();
+      return;
+    }
+    const now = Date.now();
+    if (now - lastForegroundRefreshAt < 1500) return;
+    lastForegroundRefreshAt = now;
+    void reloadRemoteState().catch(() => undefined);
+  };
+
+  const handleVisibilityChange = () => {
+    if (document.visibilityState === 'visible') {
+      triggerForegroundRefresh();
+    }
+  };
+
   const timer = window.setInterval(checkHealth, 10000);
+  window.addEventListener('focus', triggerForegroundRefresh);
+  document.addEventListener('visibilitychange', handleVisibilityChange);
   window.addEventListener('beforeunload', () => {
     window.clearInterval(timer);
+    window.removeEventListener('focus', triggerForegroundRefresh);
+    document.removeEventListener('visibilitychange', handleVisibilityChange);
   });
 
   return {
     getItem: (key) => {
+      const pendingMutation = pending.get(key);
+      if (pendingMutation?.type === 'delete') return null;
+      if (pendingMutation?.type === 'set') return pendingMutation.value;
       if (online && remote.has(key)) return remote.get(key)!;
       return window.localStorage.getItem(key);
     },
     setItem: (key, value) => {
-      window.localStorage.setItem(key, value);
+      if (!isUserKey(key)) {
+        window.localStorage.setItem(key, value);
+      }
       if (online) {
-        remote.set(key, value);
-        persistSet(key, value);
-        pending.delete(key);
-          dispatchStatus({ online: true, syncedAt: Date.now(), conflicts: [], unsyncedCount: pending.size, latencyMs: lastLatency });
+        const opId = ++opSeq;
+        queueMutation(key, { type: 'set', value, opId });
+        void persistSet(key, value, opId);
       } else {
-        if (isUserKey(key)) pending.add(key);
-          dispatchStatus({ online: false, offlineSince: Date.now(), unsyncedCount: pending.size, latencyMs: lastLatency });
+        if (isUserKey(key)) {
+          queueMutation(key, { type: 'set', value, opId: ++opSeq });
+        } else {
+          emitStatus();
+        }
       }
     },
     removeItem: (key) => {
-      window.localStorage.removeItem(key);
+      if (!isUserKey(key)) {
+        window.localStorage.removeItem(key);
+      }
       if (online) {
-        remote.delete(key);
-        persistDelete(key);
-        pending.delete(key);
-          dispatchStatus({ online: true, syncedAt: Date.now(), conflicts: [], unsyncedCount: pending.size, latencyMs: lastLatency });
+        const opId = ++opSeq;
+        queueMutation(key, { type: 'delete', opId });
+        void persistDelete(key, opId);
       } else {
-        if (isUserKey(key)) pending.add(key);
-          dispatchStatus({ online: false, offlineSince: Date.now(), unsyncedCount: pending.size, latencyMs: lastLatency });
+        if (isUserKey(key)) {
+          queueMutation(key, { type: 'delete', opId: ++opSeq });
+        } else {
+          emitStatus();
+        }
       }
     },
     keys: () => {
       const set = new Set<string>(Object.keys(window.localStorage).filter((k) => isUserKey(k)));
+      for (const [key, mutation] of pending.entries()) {
+        if (mutation.type === 'delete') {
+          set.delete(key);
+        } else {
+          set.add(key);
+        }
+      }
       for (const k of remote.keys()) {
         if (isUserKey(k)) set.add(k);
       }

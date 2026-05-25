@@ -2816,6 +2816,7 @@ func main() {
 					c.Status(404)
 					return
 				}
+				c.Header("Cache-Control", "no-cache, must-revalidate")
 				c.Data(200, "text/html; charset=utf-8", indexData)
 				return
 			}
@@ -2825,6 +2826,13 @@ func main() {
 		ctype := mime.TypeByExtension(filepath.Ext(p))
 		if ctype == "" {
 			ctype = "text/plain; charset=utf-8"
+		}
+		if filepath.Ext(p) == ".html" {
+			c.Header("Cache-Control", "no-cache, must-revalidate")
+		} else if strings.HasPrefix(p, "/assets/") {
+			c.Header("Cache-Control", "public, max-age=31536000, immutable")
+		} else {
+			c.Header("Cache-Control", "no-cache, must-revalidate")
 		}
 		c.Data(200, ctype, data)
 	}
