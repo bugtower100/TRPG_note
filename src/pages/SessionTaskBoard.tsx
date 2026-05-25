@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { useCampaign } from '../context/CampaignContext';
+import { useCampaignData, useCampaignSession } from '../context/CampaignContext';
 import { CampaignConfig, SessionTask, SessionTaskBoardDocument, SessionTaskStatus } from '../types';
 import { dataService } from '../services/dataService';
 import { teamNotesService } from '../services/teamNotesService';
@@ -33,7 +33,8 @@ const resolvePermissions = (doc: SessionTaskBoardDocument | null) => ({
 });
 
 const SessionTaskBoard: React.FC = () => {
-  const { campaignData, setCampaignData, currentCampaignId, user } = useCampaign();
+  const { campaignData, setCampaignData } = useCampaignData();
+  const { currentCampaignId, user } = useCampaignSession();
   const navigate = useNavigate();
   const [config, setConfig] = useState<CampaignConfig | null>(null);
   const [boardDoc, setBoardDoc] = useState<SessionTaskBoardDocument | null>(null);

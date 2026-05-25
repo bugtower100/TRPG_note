@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useCampaign } from '../../context/CampaignContext';
+import { useCampaignData } from '../../context/CampaignContext';
 import EntityListLayout from '../../components/common/EntityListLayout';
 import { dataService } from '../../services/dataService';
 import { useNavigate } from 'react-router-dom';
@@ -8,7 +8,7 @@ import { useReceivedShares } from '../../hooks/useReceivedShares';
 import ClueBoard from '../ClueBoard';
 
 const ClueList: React.FC = () => {
-  const { campaignData, setCampaignData, reorderEntities } = useCampaign();
+  const { campaignData, setCampaignData, reorderEntities } = useCampaignData();
   const navigate = useNavigate();
   const sharedEntries = useReceivedShares('clues');
   const [activeTab, setActiveTab] = useState<'list' | 'board'>('list');

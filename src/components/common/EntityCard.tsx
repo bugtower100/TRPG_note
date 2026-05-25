@@ -2,7 +2,7 @@ import React from 'react';
 import { BaseEntity } from '../../types';
 import { useNavigate } from 'react-router-dom';
 import { ExternalLink, GripVertical } from 'lucide-react';
-import { useCampaign } from '../../context/CampaignContext';
+import { useCampaignTabs } from '../../context/CampaignContext';
 import { getEntityPrimaryMarkdown, markdownToPreviewText } from './richTextReference';
 import { useGuide } from './InteractiveGuide';
 
@@ -31,7 +31,7 @@ const EntityCard: React.FC<EntityCardProps> = ({
   onDragEnd,
 }) => {
   const navigate = useNavigate();
-  const { openInTab } = useCampaign();
+  const { openInTab } = useCampaignTabs();
   const { currentGuideId, isGuideRunning } = useGuide();
 
   const previewText = React.useMemo(() => {

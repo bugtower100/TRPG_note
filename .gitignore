@@ -76,6 +76,9 @@ web_modules/
 .cache
 .parcel-cache
 
+# Trae 本地技能配置（不上传）
+.trae/
+
 # Next.js build output
 .next
 out

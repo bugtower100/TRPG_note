@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { useCampaign, Tab } from '../context/CampaignContext';
+import { useCampaignTabs, Tab } from '../context/CampaignContext';
 import { Maximize2, Minimize2, X } from 'lucide-react';
 import EntityDetailView from './common/EntityDetailView';
 
@@ -18,7 +18,7 @@ const TabPanel: React.FC<TabPanelProps> = ({
   mobileOpen = false,
   onCloseMobile,
 }) => {
-  const { tabs, activeTabId, setActiveTabId, closeTab } = useCampaign();
+  const { tabs, activeTabId, setActiveTabId, closeTab } = useCampaignTabs();
   const contentRef = useRef<HTMLDivElement>(null);
 
   const activeTab = tabs.find(t => t.id === activeTabId);

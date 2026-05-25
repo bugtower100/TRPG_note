@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useCampaign } from '../../context/CampaignContext';
-import { Timeline, TimelineEvent } from '../../types';
+import { useCampaignData, useCampaignSession } from '../../context/CampaignContext';
+import { TimelineEvent } from '../../types';
 import { v4 as uuidv4 } from 'uuid';
 import { GripVertical } from 'lucide-react';
 import RichTextEditor from '../../components/common/RichTextEditor';
@@ -10,6 +10,8 @@ import CustomSubItemsEditor from '../../components/common/CustomSubItemsEditor';
 import CollapsibleSection from '../../components/common/CollapsibleSection';
 import EntityShareActions, { ShareSectionAction, ShareSubItemAction } from '../../components/common/EntityShareActions';
 import { markdownToPreviewText } from '../../components/common/richTextReference';
+import EntityDetailHeader from '../../features/entities/components/EntityDetailHeader';
+import { useSectionedEntityDetail } from '../../features/entities/hooks/useSectionedEntityDetail';
 
 interface TimelineDetailProps {
   entityId?: string;
@@ -21,10 +23,35 @@ const TimelineDetail: React.FC<TimelineDetailProps> = ({ entityId, embedded = fa
   const { id: paramId } = useParams<{ id: string }>();
   const id = entityId || paramId;
   const navigate = useNavigate();
-  const { campaignData, updateEntity, deleteEntity, saveCampaign } = useCampaign();
-  const [timeline, setTimeline] = useState<Timeline | null>(null);
-  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({
-    intro: true,
+  const { campaignData, updateEntity, deleteEntity } = useCampaignData();
+  const { saveCampaign } = useCampaignSession();
+  const sectionDefs = [{ key: 'intro', title: '简介' }];
+  const {
+    entity: timeline,
+    collapsed,
+    setCollapsed,
+    commitEntity,
+    handleChange,
+    handleDeleteAndNavigate,
+    getSectionItems,
+    setSectionItems,
+    getSectionTitle,
+    setSectionTitle,
+    isSectionVisible,
+    setSectionVisible,
+    removeCustomSection,
+    allVisibleExpanded,
+    toggleAllSections,
+  } = useSectionedEntityDetail({
+    id,
+    items: campaignData.timelines,
+    navigate,
+    listPath: '/timelines',
+    navigateOnMissing: !embedded,
+    initialCollapsed: { intro: true },
+    sectionDefs,
+    updateItem: (item) => updateEntity('timelines', item),
+    deleteItem: (itemId) => deleteEntity('timelines', itemId),
   });
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const [isEditingEvent, setIsEditingEvent] = useState(false);
@@ -32,17 +59,7 @@ const TimelineDetail: React.FC<TimelineDetailProps> = ({ entityId, embedded = fa
   const [isEditingIntro, setIsEditingIntro] = useState(false);
   const [draggingEventId, setDraggingEventId] = useState<string | null>(null);
   const [dropTarget, setDropTarget] = useState<{ id: string; position: 'before' | 'after' } | null>(null);
-  const sectionDefs = [{ key: 'intro', title: '简介' }];
   const [hasInitializedSelection, setHasInitializedSelection] = useState(false);
-
-  useEffect(() => {
-    const found = campaignData.timelines.find((t) => t.id === id);
-    if (found) {
-      setTimeline(found);
-    } else if (!embedded) {
-      navigate('/timelines');
-    }
-  }, [id, campaignData.timelines, navigate, embedded]);
 
   useEffect(() => {
     const handlePointerDown = (event: MouseEvent) => {
@@ -65,23 +82,12 @@ const TimelineDetail: React.FC<TimelineDetailProps> = ({ entityId, embedded = fa
     return event.time?.trim() || '未命名节点';
   };
 
-  const persistTimeline = (updatedTimeline: Timeline) => {
-    setTimeline(updatedTimeline);
-    updateEntity('timelines', updatedTimeline);
-  };
-
-  const handleChange = (field: keyof Timeline, value: any) => {
-    const updatedTimeline = { ...timeline, [field]: value };
-    persistTimeline(updatedTimeline);
-  };
+  const persistTimeline = commitEntity;
 
   const handleDelete = () => {
     if (confirm('确定要删除这条时间线吗？')) {
-      deleteEntity('timelines', id!);
+      handleDeleteAndNavigate();
       onDeleted?.();
-      if (!embedded) {
-        navigate('/timelines');
-      }
     }
   };
 
@@ -147,50 +153,6 @@ const TimelineDetail: React.FC<TimelineDetailProps> = ({ entityId, embedded = fa
   const clearEventDragState = () => {
     setDraggingEventId(null);
     setDropTarget(null);
-  };
-
-  const isSectionVisible = (key: string) => timeline?.sectionVisibility?.[key] !== false;
-
-  const setSectionVisible = (key: string, visible: boolean) => {
-    handleChange('sectionVisibility' as keyof Timeline, {
-      ...(timeline.sectionVisibility || {}),
-      [key]: visible,
-    });
-  };
-
-  const getSectionItems = (key: string) => timeline.sectionSubItems?.[key] || [];
-
-  const setSectionItems = (key: string, items: any[]) => {
-    handleChange('sectionSubItems' as keyof Timeline, {
-      ...(timeline.sectionSubItems || {}),
-      [key]: items,
-    });
-  };
-
-  const getSectionTitle = (key: string, fallback: string) => timeline.sectionTitles?.[key] || fallback;
-
-  const setSectionTitle = (key: string, title: string) => {
-    handleChange('sectionTitles' as keyof Timeline, {
-      ...(timeline.sectionTitles || {}),
-      [key]: title,
-    });
-  };
-
-  const removeCustomSection = (key: string) => {
-    const nextCustomSections = (timeline.customSections || []).filter((sectionKey) => sectionKey !== key);
-    const nextTitles = { ...(timeline.sectionTitles || {}) };
-    const nextVisibility = { ...(timeline.sectionVisibility || {}) };
-    const nextSubItems = { ...(timeline.sectionSubItems || {}) };
-    delete nextTitles[key];
-    delete nextVisibility[key];
-    delete nextSubItems[key];
-    persistTimeline({
-      ...timeline,
-      customSections: nextCustomSections,
-      sectionTitles: nextTitles,
-      sectionVisibility: nextVisibility,
-      sectionSubItems: nextSubItems,
-    });
   };
 
   const selectedEvent = useMemo(
@@ -262,19 +224,8 @@ const TimelineDetail: React.FC<TimelineDetailProps> = ({ entityId, embedded = fa
     ? (timeline?.timelineEvents.findIndex((event) => event.id === selectedEvent.id) ?? -1)
     : -1;
 
-  const visibleSectionKeys = [
-    ...(isSectionVisible('intro') ? ['intro'] : []),
-    ...(timeline?.customSections || []),
-  ];
-  const allVisibleExpanded = visibleSectionKeys.length > 0 && visibleSectionKeys.every((key) => collapsed[key] === false);
-
   const expandAllPreview = () => {
-    const next: Record<string, boolean> = {};
-    const nextCollapsed = allVisibleExpanded;
-    for (const sectionKey of visibleSectionKeys) {
-      next[sectionKey] = nextCollapsed;
-    }
-    setCollapsed((prev) => ({ ...prev, ...next }));
+    toggleAllSections();
     setIsEditingIntro(false);
   };
 
@@ -282,53 +233,18 @@ const TimelineDetail: React.FC<TimelineDetailProps> = ({ entityId, embedded = fa
 
   return (
     <div className={`${embedded ? 'space-y-6 pb-12' : 'max-w-5xl mx-auto space-y-6 pb-12 px-2 sm:px-0'}`}>
-      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 border-b pb-3">
-        <div className="flex items-center gap-3 sm:gap-4 min-w-0 flex-1">
-          {!embedded && (
-            <button onClick={() => navigate('/timelines')} className="inline-flex items-center whitespace-nowrap shrink-0 text-gray-500 hover:text-gray-700">
-              &larr; 返回
-            </button>
-          )}
-          <input
-            data-tour="entity-detail-name"
-            type="text"
-            value={timeline.name}
-            onChange={(e) => handleChange('name', e.target.value)}
-            className="flex-1 min-w-0 text-xl sm:text-2xl font-bold border-b border-transparent hover:border-gray-300 focus:border-primary focus:outline-none bg-transparent"
-            style={{ color: timeline.titleColor || '#111827' }}
-          />
-          <input
-            type="color"
-            value={timeline.titleColor || '#111827'}
-            onChange={(e) => handleChange('titleColor' as keyof Timeline, e.target.value)}
-            className="w-10 h-10 rounded border border-theme bg-transparent shrink-0"
-            title="标题颜色"
-          />
-        </div>
-        <div className="flex items-center gap-2 sm:gap-3">
-          <button
-            type="button"
-            onClick={expandAllPreview}
-            className="px-3 py-1.5 border border-theme rounded hover:bg-primary-light text-sm"
-          >
-            {allVisibleExpanded ? '收起全部' : '展开全部'}
-          </button>
-          <EntityShareActions entityType="timelines" entity={timeline} scope="entity" label="分享整张卡片" />
-          <button
-            onClick={saveCampaign}
-            className="px-3 py-1.5 bg-green-600 text-white rounded hover:bg-green-700 text-sm flex items-center gap-1"
-          >
-            保存
-          </button>
-          <div className="w-px h-6 bg-gray-300 mx-1"></div>
-          <button
-            onClick={handleDelete}
-            className="text-red-500 hover:text-red-700 text-sm px-3 py-1.5 rounded hover:bg-red-50"
-          >
-            删除时间线
-          </button>
-        </div>
-      </div>
+      <EntityDetailHeader
+        entity={timeline}
+        entityType="timelines"
+        backTo="/timelines"
+        hideBackButton={embedded}
+        deleteLabel="删除时间线"
+        onChange={handleChange}
+        allVisibleExpanded={allVisibleExpanded}
+        onToggleAll={expandAllPreview}
+        onSave={saveCampaign}
+        onDelete={handleDelete}
+      />
 
       {sectionDefs.some((section) => !isSectionVisible(section.key)) && (
         <div className="flex flex-wrap gap-2">

@@ -1,0 +1,345 @@
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Trash2, RefreshCw, FolderPlus, MoveRight, Pencil, FolderX, Upload, ChevronDown, ChevronRight } from 'lucide-react';
+import ResourceTreeView from '../../../components/common/ResourceTreeView';
+import {
+  buildResourceTree,
+  filterResourceItems,
+  flattenResourceFolders,
+  ResourceFolder,
+  ResourceItem,
+  resourceFolderDisplayName,
+  resourceService,
+  RESOURCE_ROOT_PATH,
+} from '../../../services/resourceService';
+
+const ResourceManagementSection: React.FC = () => {
+  const resourceInputRef = useRef<HTMLInputElement>(null);
+  const [resources, setResources] = useState<ResourceItem[]>([]);
+  const [resourceFolders, setResourceFolders] = useState<ResourceFolder[]>([]);
+  const [selectedRefs, setSelectedRefs] = useState<string[]>([]);
+  const [resourceBusy, setResourceBusy] = useState(false);
+  const [resourceCollapsed, setResourceCollapsed] = useState(false);
+  const [resourceKeyword, setResourceKeyword] = useState('');
+  const [expandedFolderPaths, setExpandedFolderPaths] = useState<string[]>([RESOURCE_ROOT_PATH]);
+  const [selectedFolderPath, setSelectedFolderPath] = useState(RESOURCE_ROOT_PATH);
+  const [moveTargetFolderPath, setMoveTargetFolderPath] = useState(RESOURCE_ROOT_PATH);
+
+  const loadResources = async () => {
+    try {
+      const result = await resourceService.list();
+      setResources(result.items);
+      setResourceFolders(result.folders);
+    } catch {
+      setResources([]);
+      setResourceFolders([]);
+    }
+  };
+
+  useEffect(() => {
+    void loadResources();
+  }, []);
+
+  useEffect(() => {
+    const allFolderPaths = [RESOURCE_ROOT_PATH, ...resourceFolders.map((folder) => folder.path)];
+    if (!allFolderPaths.includes(selectedFolderPath)) {
+      setSelectedFolderPath(RESOURCE_ROOT_PATH);
+    }
+    if (!allFolderPaths.includes(moveTargetFolderPath)) {
+      setMoveTargetFolderPath(RESOURCE_ROOT_PATH);
+    }
+  }, [resourceFolders, selectedFolderPath, moveTargetFolderPath]);
+
+  const folderOptions = useMemo(
+    () => flattenResourceFolders(resourceFolders),
+    [resourceFolders]
+  );
+
+  const resourceTree = useMemo(
+    () => buildResourceTree(resourceFolders, resources, resourceKeyword),
+    [resourceFolders, resources, resourceKeyword]
+  );
+
+  const visibleResourceItems = useMemo(
+    () => filterResourceItems(resources, selectedFolderPath, resourceKeyword),
+    [resources, selectedFolderPath, resourceKeyword]
+  );
+
+  const currentFolderLabel = resourceFolderDisplayName(selectedFolderPath);
+
+  const toggleFolder = (path: string) => {
+    if (resourceKeyword.trim()) return;
+    setExpandedFolderPaths((prev) => (
+      prev.includes(path) ? prev.filter((item) => item !== path) : [...prev, path]
+    ));
+  };
+
+  const toggleRef = (ref: string) => {
+    setSelectedRefs((prev) =>
+      prev.includes(ref) ? prev.filter((item) => item !== ref) : [...prev, ref]
+    );
+  };
+
+  const handleBatchUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files || []);
+    if (files.length === 0) return;
+    setResourceBusy(true);
+    try {
+      await Promise.all(files.map((file) => resourceService.upload(file, selectedFolderPath)));
+      await loadResources();
+      if (resourceInputRef.current) resourceInputRef.current.value = '';
+    } finally {
+      setResourceBusy(false);
+    }
+  };
+
+  const handleDeleteSelected = async () => {
+    if (selectedRefs.length === 0) return;
+    if (!window.confirm(`确定删除选中的 ${selectedRefs.length} 个资源吗？`)) return;
+    setResourceBusy(true);
+    try {
+      await resourceService.deleteMany(selectedRefs);
+      setSelectedRefs([]);
+      await loadResources();
+    } finally {
+      setResourceBusy(false);
+    }
+  };
+
+  const handleCreateFolder = async () => {
+    const trimmed = window.prompt('输入新分类名称')?.trim() || '';
+    if (!trimmed) return;
+    setResourceBusy(true);
+    try {
+      await resourceService.createFolder(selectedFolderPath === RESOURCE_ROOT_PATH ? trimmed : `${selectedFolderPath}/${trimmed}`);
+      const folderPath = selectedFolderPath === RESOURCE_ROOT_PATH ? `${RESOURCE_ROOT_PATH}/${trimmed}` : `${selectedFolderPath}/${trimmed}`;
+      setExpandedFolderPaths((prev) => Array.from(new Set([...prev, selectedFolderPath, folderPath])));
+      setSelectedFolderPath(folderPath);
+      setMoveTargetFolderPath(folderPath);
+      await loadResources();
+    } finally {
+      setResourceBusy(false);
+    }
+  };
+
+  const handleRenameFolder = async () => {
+    if (selectedFolderPath === RESOURCE_ROOT_PATH) return;
+    const currentName = selectedFolderPath.split('/').pop() || '';
+    const nextName = window.prompt('输入新的分类名称', currentName)?.trim() || '';
+    if (!nextName || nextName === currentName) return;
+    setResourceBusy(true);
+    try {
+      await resourceService.renameFolder(selectedFolderPath, nextName);
+      const parentPath = selectedFolderPath.split('/').slice(0, -1).join('/') || RESOURCE_ROOT_PATH;
+      const nextPath = `${parentPath}/${nextName}`;
+      setSelectedFolderPath(nextPath);
+      setMoveTargetFolderPath((prev) => (prev === selectedFolderPath ? nextPath : prev));
+      setExpandedFolderPaths((prev) => prev.map((item) => (item === selectedFolderPath ? nextPath : item)));
+      await loadResources();
+    } finally {
+      setResourceBusy(false);
+    }
+  };
+
+  const handleDeleteFolder = async () => {
+    if (selectedFolderPath === RESOURCE_ROOT_PATH) return;
+    if (!window.confirm(`确定删除分类「${resourceFolderDisplayName(selectedFolderPath)}」吗？分类下的子分类和图片也会一起删除。`)) {
+      return;
+    }
+    setResourceBusy(true);
+    try {
+      await resourceService.deleteFolder(selectedFolderPath);
+      setSelectedFolderPath(RESOURCE_ROOT_PATH);
+      setMoveTargetFolderPath(RESOURCE_ROOT_PATH);
+      setExpandedFolderPaths((prev) => prev.filter((item) => item !== selectedFolderPath));
+      setSelectedRefs((prev) => prev.filter((ref) => !ref.startsWith(`${selectedFolderPath}/`)));
+      await loadResources();
+    } finally {
+      setResourceBusy(false);
+    }
+  };
+
+  const handleMoveSelected = async () => {
+    if (selectedRefs.length === 0) return;
+    setResourceBusy(true);
+    try {
+      await resourceService.moveMany(selectedRefs, moveTargetFolderPath);
+      setSelectedRefs([]);
+      await loadResources();
+    } finally {
+      setResourceBusy(false);
+    }
+  };
+
+  return (
+    <section className="bg-theme-card p-4 sm:p-6 rounded-lg shadow-sm border border-theme">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+        <button
+          type="button"
+          onClick={() => setResourceCollapsed((prev) => !prev)}
+          className="text-lg font-medium flex items-center gap-2 text-left"
+        >
+          {resourceCollapsed ? <ChevronRight size={18} /> : <ChevronDown size={18} />}
+          资源管理
+        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={() => void loadResources()}
+            className="px-3 py-2 border border-theme rounded hover:bg-gray-50 flex items-center gap-2"
+            disabled={resourceBusy}
+          >
+            <RefreshCw size={16} />
+            刷新
+          </button>
+          <button
+            onClick={() => void handleDeleteSelected()}
+            disabled={resourceBusy || selectedRefs.length === 0}
+            className="px-3 py-2 border border-red-300 text-red-600 rounded hover:bg-red-50 disabled:opacity-50 flex items-center gap-2"
+          >
+            <Trash2 size={16} />
+            删除选中
+          </button>
+        </div>
+      </div>
+      {!resourceCollapsed && (
+        <div className="space-y-3">
+          <input
+            value={resourceKeyword}
+            onChange={(event) => setResourceKeyword(event.target.value)}
+            placeholder="搜索分类、图片名或路径..."
+            className="w-full px-3 py-2 rounded border border-theme bg-transparent"
+          />
+          <input
+            type="file"
+            accept="image/png,image/jpeg,image/webp"
+            multiple
+            ref={resourceInputRef}
+            className="hidden"
+            onChange={handleBatchUpload}
+          />
+          <div className="grid grid-cols-1 lg:grid-cols-[240px_minmax(0,1fr)] gap-3">
+            <div className="border border-theme rounded overflow-hidden">
+              <div className="px-3 py-2 border-b border-theme bg-theme-card/40 flex flex-wrap items-center gap-1">
+                <button
+                  data-tour="settings-resource-upload"
+                  onClick={() => resourceInputRef.current?.click()}
+                  className="px-2 py-1 text-xs border border-theme rounded hover:bg-gray-50 flex items-center gap-1"
+                  disabled={resourceBusy}
+                >
+                  <Upload size={13} />
+                  上传
+                </button>
+                <button
+                  onClick={() => void handleCreateFolder()}
+                  className="px-2 py-1 text-xs border border-theme rounded hover:bg-gray-50 flex items-center gap-1"
+                  disabled={resourceBusy}
+                >
+                  <FolderPlus size={13} />
+                  新建
+                </button>
+                <button
+                  onClick={() => void handleRenameFolder()}
+                  className="px-2 py-1 text-xs border border-theme rounded hover:bg-gray-50 flex items-center gap-1 disabled:opacity-50"
+                  disabled={resourceBusy || selectedFolderPath === RESOURCE_ROOT_PATH}
+                >
+                  <Pencil size={13} />
+                  重命名
+                </button>
+                <button
+                  onClick={() => void handleDeleteFolder()}
+                  className="px-2 py-1 text-xs border border-red-300 text-red-600 rounded hover:bg-red-50 flex items-center gap-1 disabled:opacity-50"
+                  disabled={resourceBusy || selectedFolderPath === RESOURCE_ROOT_PATH}
+                >
+                  <FolderX size={13} />
+                  删除
+                </button>
+              </div>
+              <div className="max-h-[28rem] overflow-auto">
+                {resources.length === 0 && resourceFolders.length === 0 ? (
+                  <div className="p-4 text-sm theme-text-secondary">暂无资源</div>
+                ) : (
+                  <ResourceTreeView
+                    tree={resourceTree}
+                    expandedPaths={expandedFolderPaths}
+                    onToggleFolder={toggleFolder}
+                    onSelectFolder={setSelectedFolderPath}
+                    selectedFolderPath={selectedFolderPath}
+                    autoExpandAll={Boolean(resourceKeyword.trim())}
+                    hideItems
+                    compact
+                    renderItem={() => null}
+                  />
+                )}
+              </div>
+            </div>
+
+            <div className="border border-theme rounded overflow-hidden">
+              <div className="px-3 py-2 border-b border-theme bg-theme-card/40 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <div className="text-sm truncate">当前分类：{currentFolderLabel}</div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <select
+                    value={moveTargetFolderPath}
+                    onChange={(event) => setMoveTargetFolderPath(event.target.value)}
+                    className="px-2 py-1.5 text-xs rounded border border-theme bg-theme-card max-w-[220px]"
+                  >
+                    {folderOptions.map((folder) => (
+                      <option key={folder.path} value={folder.path}>
+                        {resourceFolderDisplayName(folder.path)}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    onClick={() => void handleMoveSelected()}
+                    disabled={resourceBusy || selectedRefs.length === 0}
+                    className="px-2 py-1.5 text-xs border border-theme rounded hover:bg-gray-50 disabled:opacity-50 flex items-center gap-1"
+                  >
+                    <MoveRight size={13} />
+                    移动
+                  </button>
+                  <button
+                    onClick={() => void handleDeleteSelected()}
+                    disabled={resourceBusy || selectedRefs.length === 0}
+                    className="px-2 py-1.5 text-xs border border-red-300 text-red-600 rounded hover:bg-red-50 disabled:opacity-50 flex items-center gap-1"
+                  >
+                    <Trash2 size={13} />
+                    删除
+                  </button>
+                </div>
+              </div>
+              <div data-tour="settings-resource-list" className="max-h-[28rem] overflow-auto p-3">
+                {visibleResourceItems.length === 0 ? (
+                  <div className="py-10 text-center text-sm theme-text-secondary">当前分类下暂无资源</div>
+                ) : (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+                    {visibleResourceItems.map((item) => (
+                      <label
+                        key={item.ref}
+                        className={`group border rounded-md p-2 cursor-pointer transition hover:bg-gray-50/40 ${selectedRefs.includes(item.ref) ? 'border-primary ring-2 ring-primary/20' : 'border-theme'}`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selectedRefs.includes(item.ref)}
+                          onChange={() => toggleRef(item.ref)}
+                          className="mb-2"
+                        />
+                        <img
+                          src={item.url}
+                          alt={item.ref}
+                          className="w-full aspect-square rounded object-cover border border-theme"
+                        />
+                        <div className="mt-2 text-xs truncate" title={item.displayName || item.ref}>
+                          {item.displayName || item.ref}
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </section>
+  );
+};
+
+export default ResourceManagementSection;

@@ -1,5 +1,5 @@
 import React, { useMemo, useRef, useState } from 'react';
-import { useCampaign } from '../context/CampaignContext';
+import { useCampaignData, useCampaignSession } from '../context/CampaignContext';
 import { CampaignData } from '../types';
 import { dataService } from '../services/dataService';
 import { backupService, type BackupImportMode, type BackupPreviewResult } from '../services/backupService';
@@ -62,7 +62,8 @@ interface ImportAssistantProps {
 }
 
 const ImportAssistant: React.FC<ImportAssistantProps> = ({ allowLegacyJsonImport = true }) => {
-  const { campaignData, setCampaignData, user } = useCampaign();
+  const { campaignData, setCampaignData } = useCampaignData();
+  const { user } = useCampaignSession();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [sourceData, setSourceData] = useState<CampaignData | null>(null);
   const [sourceFileName, setSourceFileName] = useState('');

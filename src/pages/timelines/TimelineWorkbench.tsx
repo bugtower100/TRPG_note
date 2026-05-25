@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { GripVertical, X } from 'lucide-react';
-import { useCampaign } from '../../context/CampaignContext';
+import { useCampaignData } from '../../context/CampaignContext';
 import { Timeline, TimelineEvent } from '../../types';
 import RichTextEditor from '../../components/common/RichTextEditor';
 import RichTextDisplay from '../../components/common/RichTextDisplay';
@@ -39,7 +39,7 @@ const getEventTitle = (event: TimelineEvent) => {
 };
 
 const TimelineWorkbench: React.FC = () => {
-  const { campaignData, updateEntity } = useCampaign();
+  const { campaignData, updateEntity } = useCampaignData();
   const navigate = useNavigate();
   const location = useLocation();
   const boardRef = useRef<HTMLDivElement>(null);

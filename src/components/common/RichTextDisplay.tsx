@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
-import { useCampaign } from '../../context/CampaignContext';
+import { useCampaignData, useCampaignTabs } from '../../context/CampaignContext';
+import { CampaignData } from '../../types';
 import { createPortal } from 'react-dom';
 import {
   TooltipState,
@@ -11,7 +12,7 @@ import {
 } from './richTextReference';
 import KeywordPreviewSheet from './KeywordPreviewSheet';
 
-const getEntityCollection = (campaignData: ReturnType<typeof useCampaign>['campaignData'], entityType: string) =>
+const getEntityCollection = (campaignData: CampaignData, entityType: string) =>
   (campaignData as unknown as Record<string, any[]>)[entityType];
 
 interface RichTextDisplayProps {
@@ -21,7 +22,8 @@ interface RichTextDisplayProps {
 
 const RichTextDisplay: React.FC<RichTextDisplayProps> = ({ content, className = '' }) => {
   const containerRef = useRef<HTMLDivElement>(null);
-  const { campaignData, openInTab } = useCampaign();
+  const { campaignData } = useCampaignData();
+  const { openInTab } = useCampaignTabs();
   const [isMobile, setIsMobile] = useState(false);
   
   const [tooltip, setTooltip] = useState<TooltipState>({

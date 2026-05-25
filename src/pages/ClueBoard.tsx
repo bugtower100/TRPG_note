@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useCampaign } from '../context/CampaignContext';
+import { useCampaignData } from '../context/CampaignContext';
 import { Clue, ClueRevealStatus } from '../types';
 import { dataService } from '../services/dataService';
 
@@ -14,7 +14,7 @@ const statusLabel: Record<ClueRevealStatus, string> = {
 const normalizeStatus = (clue: Clue): ClueRevealStatus => clue.revealStatus || 'untracked';
 
 const ClueBoard: React.FC = () => {
-  const { campaignData, updateEntity } = useCampaign();
+  const { campaignData, updateEntity } = useCampaignData();
   const navigate = useNavigate();
   const [keyword, setKeyword] = useState('');
   const [targetFilter, setTargetFilter] = useState('');

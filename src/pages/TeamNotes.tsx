@@ -4,14 +4,14 @@ import RichTextEditor from '../components/common/RichTextEditor';
 import RichTextDisplay from '../components/common/RichTextDisplay';
 import ConfirmDialog from '../components/common/ConfirmDialog';
 import ConflictResolveDialog from '../components/common/ConflictResolveDialog';
-import { useCampaign } from '../context/CampaignContext';
+import { useCampaignSession } from '../context/CampaignContext';
 import { CampaignConfig, TeamNoteDocument } from '../types';
 import { teamNotesService } from '../services/teamNotesService';
 import { VersionConflictError } from '../services/conflictError';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 
 const TeamNotes: React.FC = () => {
-  const { currentCampaignId, user } = useCampaign();
+  const { currentCampaignId, user } = useCampaignSession();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [config, setConfig] = useState<CampaignConfig | null>(null);

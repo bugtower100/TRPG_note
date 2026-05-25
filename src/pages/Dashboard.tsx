@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useCampaign } from '../context/CampaignContext';
+import { useCampaignData } from '../context/CampaignContext';
 import { useGuide } from '../components/common/InteractiveGuide';
 import { useReceivedShares } from '../hooks/useReceivedShares';
 import { useNavigate } from 'react-router-dom';
@@ -14,7 +14,7 @@ type SearchEntry = {
 };
 
 const Dashboard: React.FC = () => {
-  const { campaignData, setCampaignData } = useCampaign();
+  const { campaignData, setCampaignData } = useCampaignData();
   const navigate = useNavigate();
   const { startGuide } = useGuide();
   const [notes, setNotes] = useState(campaignData.notes || '');

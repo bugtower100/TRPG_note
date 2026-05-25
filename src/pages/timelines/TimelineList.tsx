@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo } from 'react';
-import { useCampaign } from '../../context/CampaignContext';
+import { useCampaignData, useCampaignTabs } from '../../context/CampaignContext';
 import { dataService } from '../../services/dataService';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Timeline } from '../../types';
@@ -8,7 +8,8 @@ import TimelineDetail from './TimelineDetail';
 
 const TimelineList: React.FC = () => {
   const { id: routeTimelineId } = useParams<{ id?: string }>();
-  const { campaignData, setCampaignData, openInTab } = useCampaign();
+  const { campaignData, setCampaignData } = useCampaignData();
+  const { openInTab } = useCampaignTabs();
   const navigate = useNavigate();
 
   const handleAdd = () => {

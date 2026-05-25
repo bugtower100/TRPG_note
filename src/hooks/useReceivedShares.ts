@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
-import { useCampaign } from '../context/CampaignContext';
+import { useCampaignSession } from '../context/CampaignContext';
 import { GraphEntityType, SharedEntityRecord } from '../types';
 import { sharingService } from '../services/sharingService';
 
 export const useReceivedShares = (entityType: GraphEntityType) => {
-  const { currentCampaignId, user } = useCampaign();
+  const { currentCampaignId, user } = useCampaignSession();
   const [shares, setShares] = useState<SharedEntityRecord[]>([]);
 
   const loadShares = useCallback(async () => {

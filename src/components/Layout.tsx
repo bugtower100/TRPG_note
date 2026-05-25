@@ -2,11 +2,12 @@ import React, { useEffect, useState } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import TabPanel from './TabPanel';
-import { useCampaign } from '../context/CampaignContext';
+import { useCampaignSession, useCampaignTabs } from '../context/CampaignContext';
 import { GuideHelpButton, GuideId } from './common/InteractiveGuide';
 
 const Layout: React.FC = () => {
-  const { tabs, exportData, importData } = useCampaign();
+  const { tabs } = useCampaignTabs();
+  const { exportData, importData } = useCampaignSession();
   const location = useLocation();
   const [isTabPanelMaximized, setIsTabPanelMaximized] = useState(false);
   const [isMobile, setIsMobile] = useState(false);

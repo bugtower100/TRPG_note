@@ -1,21 +1,24 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useCampaign } from '../context/CampaignContext';
-import { dataService } from '../services/dataService';
+import { useCampaignData, useCampaignTabs } from '../context/CampaignContext';
 import { relationGraphService } from '../services/relationGraphService';
-import { CampaignData, RelationEdgeDirection, RelationGraph, RelationGraphEdge, RelationGraphNode } from '../types';
-import RichTextEditor from '../components/common/RichTextEditor';
+import { RelationGraphEdge, RelationGraphNode } from '../types';
 import {
-  buildResourceFileUrl,
-  buildResourceTree,
-  filterResourceItems,
-  ResourceFolder,
-  ResourceItem,
-  resourceFolderDisplayName,
-  resourceService,
   RESOURCE_ROOT_PATH,
+  resourceService,
 } from '../services/resourceService';
 import { useReceivedShares } from '../hooks/useReceivedShares';
-import ResourceTreeView from '../components/common/ResourceTreeView';
+import RelationGraphEdgePanel from '../features/relation-graphs/components/RelationGraphEdgePanel';
+import RelationGraphNodePanel from '../features/relation-graphs/components/RelationGraphNodePanel';
+import RelationGraphResourcePickerModal from '../features/relation-graphs/components/RelationGraphResourcePickerModal';
+import { useRelationGraphWorkspace } from '../features/relation-graphs/hooks/useRelationGraphWorkspace';
+import {
+  NODE_RADIUS,
+  buildEdgeGeometry,
+  clamp,
+  edgeLabelMetrics,
+  resolveTokenImage,
+  tokenText,
+} from '../features/relation-graphs/utils/graphGeometry';
 
 type GraphEntity = {
   id: string;
@@ -25,202 +28,24 @@ type GraphEntity = {
   isShared?: boolean;
 };
 
-const NODE_RADIUS = 30;
-const EDGE_CURVE_STEP = 36;
-const EDGE_ENDPOINT_OFFSET_STEP = 10;
-
-const tokenText = (name: string) => (name || '？').trim().slice(0, 1).toUpperCase();
-
-const edgeLabelMetrics = (edge: RelationGraphEdge) => {
-  const width = Math.max(28, edge.label.length * edge.labelFontSize * 0.62 + 12);
-  const height = Math.max(20, edge.labelFontSize + 10);
-  return { width, height };
-};
-
-const resolveTokenImage = (ref?: string) => {
-  if (!ref) return '';
-  if (ref.startsWith('http') || ref.startsWith('data:')) return ref;
-  return buildResourceFileUrl(ref);
-};
-
-const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
-
-const pairKeyForNodes = (a: string, b: string) => [a, b].sort().join('::');
-
-const computeEdgeCurveSlots = (edges: RelationGraphEdge[]): Record<string, number> => {
-  const grouped = new Map<string, RelationGraphEdge[]>();
-  edges.forEach((edge) => {
-    const key = pairKeyForNodes(edge.fromNodeId, edge.toNodeId);
-    const group = grouped.get(key) || [];
-    group.push(edge);
-    grouped.set(key, group);
-  });
-
-  const slots: Record<string, number> = {};
-  const balancedSlots = (count: number, allowCenter: boolean) => {
-    if (count <= 0) return [];
-    if (allowCenter) {
-      return Array.from({ length: count }, (_, index) => {
-        if (index === 0) return 0;
-        const level = Math.ceil(index / 2);
-        return index % 2 === 1 ? level : -level;
-      });
-    }
-    return Array.from({ length: count }, (_, index) => {
-      const level = Math.floor(index / 2) + 0.5;
-      return index % 2 === 0 ? level : -level;
-    });
-  };
-
-  grouped.forEach((group) => {
-    if (group.length <= 1) {
-      slots[group[0].id] = 0;
-      return;
-    }
-    const sortedPair = [group[0].fromNodeId, group[0].toNodeId].sort();
-    const bidirectionalEdges = group.filter((edge) => edge.direction === 'bidirectional');
-    const directionalEdges = group.filter((edge) => edge.direction !== 'bidirectional');
-    const baseSlots = balancedSlots(group.length, bidirectionalEdges.length > 0 || group.length % 2 === 1);
-    const availableSlots = [...baseSlots];
-
-    const takeSpecificSlot = (value: number) => {
-      const index = availableSlots.findIndex((slot) => slot === value);
-      if (index >= 0) {
-        const [slot] = availableSlots.splice(index, 1);
-        return slot;
-      }
-      return null;
-    };
-
-    const takePreferredSlot = (wantPositive: boolean) => {
-      const preferredIndex = availableSlots.findIndex((slot) => (wantPositive ? slot > 0 : slot < 0));
-      if (preferredIndex >= 0) {
-        const [slot] = availableSlots.splice(preferredIndex, 1);
-        return slot;
-      }
-      const fallbackIndex = availableSlots.findIndex((slot) => slot === 0);
-      if (fallbackIndex >= 0) {
-        const [slot] = availableSlots.splice(fallbackIndex, 1);
-        return slot;
-      }
-      const [slot] = availableSlots.splice(0, 1);
-      return slot ?? 0;
-    };
-
-    bidirectionalEdges.forEach((edge) => {
-      const centered = takeSpecificSlot(0);
-      if (centered !== null) {
-        slots[edge.id] = centered;
-        return;
-      }
-      const [nearest] = availableSlots.splice(0, 1);
-      slots[edge.id] = nearest ?? 0;
-    });
-
-    directionalEdges.forEach((edge) => {
-      const alignedWithSortedPair =
-        edge.fromNodeId === sortedPair[0] && edge.toNodeId === sortedPair[1];
-      slots[edge.id] = takePreferredSlot(alignedWithSortedPair);
-    });
-  });
-
-  return slots;
-};
-
-const buildEdgeGeometry = (
-  from: RelationGraphNode,
-  to: RelationGraphNode,
-  curveSlot: number
-) => {
-  const dx = to.x - from.x;
-  const dy = to.y - from.y;
-  const len = Math.sqrt(dx * dx + dy * dy) || 1;
-  const ux = dx / len;
-  const uy = dy / len;
-  const endPadding = NODE_RADIUS + 10;
-  const normalX = -uy;
-  const normalY = ux;
-  const endpointOffset = curveSlot * EDGE_ENDPOINT_OFFSET_STEP;
-  const startX = from.x + ux * endPadding + normalX * endpointOffset;
-  const startY = from.y + uy * endPadding + normalY * endpointOffset;
-  const endX = to.x - ux * endPadding + normalX * endpointOffset;
-  const endY = to.y - uy * endPadding + normalY * endpointOffset;
-  const mx = (startX + endX) / 2;
-  const my = (startY + endY) / 2;
-  const curveAmount = curveSlot * EDGE_CURVE_STEP;
-  if (curveAmount === 0) {
-    return {
-      path: `M ${startX} ${startY} L ${endX} ${endY}`,
-      labelX: mx,
-      labelY: my,
-      startX,
-      startY,
-      endX,
-      endY,
-    };
-  }
-  const controlX = mx + normalX * curveAmount;
-  const controlY = my + normalY * curveAmount;
-  return {
-    path: `M ${startX} ${startY} Q ${controlX} ${controlY} ${endX} ${endY}`,
-    labelX: 0.25 * startX + 0.5 * controlX + 0.25 * endX,
-    labelY: 0.25 * startY + 0.5 * controlY + 0.25 * endY,
-    startX,
-    startY,
-    endX,
-    endY,
-  };
-};
-
 const RelationGraphs: React.FC = () => {
-  const { campaignData, setCampaignData, openInTab } = useCampaign();
+  const { campaignData, setCampaignData } = useCampaignData();
+  const { openInTab } = useCampaignTabs();
   const sharedCharacters = useReceivedShares('characters');
   const sharedMonsters = useReceivedShares('monsters');
   const boardRef = useRef<HTMLDivElement>(null);
-  const [activeGraphId, setActiveGraphId] = useState<string | null>(null);
   const [selectedNodeIds, setSelectedNodeIds] = useState<string[]>([]);
   const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
   const [linkingFromNodeId, setLinkingFromNodeId] = useState<string | null>(null);
   const [edgeEditorId, setEdgeEditorId] = useState<string | null>(null);
   const [dragNode, setDragNode] = useState<{ id: string; dx: number; dy: number } | null>(null);
   const [entityTypeFilter, setEntityTypeFilter] = useState<'characters' | 'monsters'>('characters');
-  const [entityIdToAdd, setEntityIdToAdd] = useState<string>('');
   const [scale, setScale] = useState(1);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
   const [panStart, setPanStart] = useState<{ x: number; y: number; ox: number; oy: number } | null>(null);
   const [boxSelectMode, setBoxSelectMode] = useState(false);
   const [marquee, setMarquee] = useState<{ x0: number; y0: number; x1: number; y1: number } | null>(null);
-  const [historyPast, setHistoryPast] = useState<RelationGraph[]>([]);
-  const [historyFuture, setHistoryFuture] = useState<RelationGraph[]>([]);
-  const [resources, setResources] = useState<ResourceItem[]>([]);
-  const [resourceFolders, setResourceFolders] = useState<ResourceFolder[]>([]);
-  const [resourcePickerOpen, setResourcePickerOpen] = useState(false);
-  const [resourceKeyword, setResourceKeyword] = useState('');
-  const [resourceExpandedFolders, setResourceExpandedFolders] = useState<string[]>([RESOURCE_ROOT_PATH]);
-  const [resourceSelectedFolderPath, setResourceSelectedFolderPath] = useState(RESOURCE_ROOT_PATH);
-  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const pendingSaveRef = useRef<CampaignData | null>(null);
-
-  const scheduleSave = useCallback((nextData: CampaignData, immediate = false) => {
-    pendingSaveRef.current = nextData;
-    if (saveTimerRef.current) {
-      clearTimeout(saveTimerRef.current);
-      saveTimerRef.current = null;
-    }
-    if (immediate) {
-      dataService.saveCampaign(nextData);
-      pendingSaveRef.current = null;
-      return;
-    }
-    saveTimerRef.current = setTimeout(() => {
-      if (pendingSaveRef.current) {
-        dataService.saveCampaign(pendingSaveRef.current);
-        pendingSaveRef.current = null;
-      }
-      saveTimerRef.current = null;
-    }, 280);
-  }, []);
 
   const entities = useMemo<GraphEntity[]>(() => {
     const res: GraphEntity[] = [];
@@ -256,78 +81,38 @@ const RelationGraphs: React.FC = () => {
     [entities, entityTypeFilter]
   );
 
-  const graphs = useMemo(() => relationGraphService.list(campaignData), [campaignData]);
-  const activeGraph = useMemo(
-    () => graphs.find((g) => g.id === activeGraphId) || null,
-    [graphs, activeGraphId]
-  );
-  const edgeCurveSlots = useMemo(
-    () => computeEdgeCurveSlots(activeGraph?.edges || []),
-    [activeGraph]
-  );
-
-  const persistGraph = useCallback(
-    (graph: RelationGraph, withHistory: boolean = true) => {
-      if (withHistory && activeGraph) {
-        setHistoryPast((prev) => [...prev.slice(-59), activeGraph]);
-        setHistoryFuture([]);
-      }
-      const next = relationGraphService.update(campaignData, graph);
-      setCampaignData(next);
-      scheduleSave(next, false);
-    },
-    [campaignData, setCampaignData, activeGraph, scheduleSave]
-  );
-
-  useEffect(() => {
-    if (graphs.length === 0) {
-      const created = relationGraphService.create(campaignData, '主关系图');
-      setCampaignData(created.data);
-      scheduleSave(created.data, true);
-      setActiveGraphId(created.graph.id);
-      return;
-    }
-    if (!activeGraphId || !graphs.some((g) => g.id === activeGraphId)) {
-      setActiveGraphId(graphs[0].id);
-    }
-  }, [graphs, activeGraphId, campaignData, setCampaignData, scheduleSave]);
-
-  useEffect(() => {
-    return () => {
-      if (saveTimerRef.current) {
-        clearTimeout(saveTimerRef.current);
-        saveTimerRef.current = null;
-      }
-      if (pendingSaveRef.current) {
-        dataService.saveCampaign(pendingSaveRef.current);
-        pendingSaveRef.current = null;
-      }
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!entityIdToAdd && filteredEntities.length > 0) {
-      setEntityIdToAdd(filteredEntities[0].id);
-    }
-    if (entityIdToAdd && !filteredEntities.some((e) => e.id === entityIdToAdd)) {
-      setEntityIdToAdd(filteredEntities[0]?.id || '');
-    }
-  }, [filteredEntities, entityIdToAdd]);
-
-  const loadResources = useCallback(async () => {
-    try {
-      const result = await resourceService.list();
-      setResources(result.items);
-      setResourceFolders(result.folders);
-    } catch {
-      setResources([]);
-      setResourceFolders([]);
-    }
-  }, []);
-
-  useEffect(() => {
-    loadResources();
-  }, [loadResources]);
+  const {
+    activeGraphId,
+    entityIdToAdd,
+    setEntityIdToAdd,
+    historyPast,
+    historyFuture,
+    resources,
+    resourceFolders,
+    resourcePickerOpen,
+    setResourcePickerOpen,
+    resourceKeyword,
+    setResourceKeyword,
+    resourceExpandedFolders,
+    setResourceExpandedFolders,
+    resourceSelectedFolderPath,
+    setResourceSelectedFolderPath,
+    graphs,
+    activeGraph,
+    edgeCurveSlots,
+    persistGraph,
+    loadResources,
+    selectGraph,
+    createGraph,
+    renameGraph,
+    deleteGraph,
+    undo,
+    redo,
+  } = useRelationGraphWorkspace({
+    campaignData,
+    setCampaignData,
+    filteredEntities,
+  });
 
   const toWorldPoint = useCallback((clientX: number, clientY: number) => {
     if (!boardRef.current) return { x: 0, y: 0 };
@@ -541,38 +326,6 @@ const RelationGraphs: React.FC = () => {
     persistGraph({ ...activeGraph, nodes: [...activeGraph.nodes, node] });
   };
 
-  const handleCreateGraph = () => {
-    const name = window.prompt('输入关系图名称', '新关系图');
-    if (name === null) return;
-    const created = relationGraphService.create(campaignData, name);
-    setCampaignData(created.data);
-    scheduleSave(created.data, true);
-    setActiveGraphId(created.graph.id);
-    setHistoryPast([]);
-    setHistoryFuture([]);
-  };
-
-  const handleRenameGraph = () => {
-    if (!activeGraph) return;
-    const name = window.prompt('输入新的关系图名称', activeGraph.name);
-    if (name === null) return;
-    persistGraph({ ...activeGraph, name: name.trim() || '未命名关系图' });
-  };
-
-  const handleDeleteGraph = () => {
-    if (!activeGraph) return;
-    if (!window.confirm('确定删除当前关系图吗？')) return;
-    const next = relationGraphService.remove(campaignData, activeGraph.id);
-    setCampaignData(next);
-    scheduleSave(next, true);
-    setActiveGraphId(next.relationGraphs?.[0]?.id || null);
-    setSelectedNodeIds([]);
-    setSelectedEdgeId(null);
-    setEdgeEditorId(null);
-    setHistoryPast([]);
-    setHistoryFuture([]);
-  };
-
   const removeSelectedNodes = () => {
     if (!activeGraph || selectedNodeIds.length === 0) return;
     const nextNodes = activeGraph.nodes.filter((n) => !selectedNodeIds.includes(n.id));
@@ -621,14 +374,6 @@ const RelationGraphs: React.FC = () => {
   const selectedEdge = activeGraph?.edges.find((e) => e.id === edgeEditorId);
   const selectedResourceRef = selectedPrimaryNode?.tokenImageRef || '';
   const selectedResourceMeta = resources.find((r) => r.ref === selectedResourceRef) || null;
-  const filteredResourceTree = useMemo(
-    () => buildResourceTree(resourceFolders, resources, resourceKeyword),
-    [resourceFolders, resources, resourceKeyword]
-  );
-  const filteredResourceItems = useMemo(
-    () => filterResourceItems(resources, resourceSelectedFolderPath, resourceKeyword),
-    [resources, resourceSelectedFolderPath, resourceKeyword]
-  );
 
   const updateNode = (nodeId: string, patch: Partial<RelationGraphNode>) => {
     if (!activeGraph) return;
@@ -657,22 +402,6 @@ const RelationGraphs: React.FC = () => {
     }
   };
 
-  const undo = () => {
-    if (!activeGraph || historyPast.length === 0) return;
-    const prev = historyPast[historyPast.length - 1];
-    setHistoryPast((p) => p.slice(0, -1));
-    setHistoryFuture((f) => [activeGraph, ...f].slice(0, 60));
-    persistGraph(prev, false);
-  };
-
-  const redo = () => {
-    if (!activeGraph || historyFuture.length === 0) return;
-    const nextGraph = historyFuture[0];
-    setHistoryFuture((f) => f.slice(1));
-    setHistoryPast((p) => [...p.slice(-59), activeGraph]);
-    persistGraph(nextGraph, false);
-  };
-
   const autoLayout = () => {
     if (!activeGraph || !boardRef.current) return;
     const n = activeGraph.nodes.length;
@@ -693,6 +422,14 @@ const RelationGraphs: React.FC = () => {
     persistGraph({ ...activeGraph, nodes: nextNodes });
   };
 
+  const handleDeleteGraph = () => {
+    deleteGraph();
+    setSelectedNodeIds([]);
+    setSelectedEdgeId(null);
+    setEdgeEditorId(null);
+    setLinkingFromNodeId(null);
+  };
+
   return (
     <div className="min-h-[60vh] md:h-[calc(100vh-3.75rem)] md:-mt-6 flex flex-col gap-2 overflow-hidden px-2 md:px-0">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 shrink-0">
@@ -701,9 +438,7 @@ const RelationGraphs: React.FC = () => {
           <select
             value={activeGraphId || ''}
             onChange={(e) => {
-              setActiveGraphId(e.target.value);
-              setHistoryPast([]);
-              setHistoryFuture([]);
+              selectGraph(e.target.value);
             }}
             className="px-3 py-2 rounded border border-theme bg-theme-card"
           >
@@ -713,8 +448,8 @@ const RelationGraphs: React.FC = () => {
               </option>
             ))}
           </select>
-          <button onClick={handleRenameGraph} className="px-3 py-2 rounded border border-theme bg-theme-card hover:bg-primary-light">改名</button>
-          <button onClick={handleCreateGraph} className="px-3 py-2 rounded border border-theme bg-theme-card hover:bg-primary-light">新建关系图</button>
+          <button onClick={renameGraph} className="px-3 py-2 rounded border border-theme bg-theme-card hover:bg-primary-light">改名</button>
+          <button onClick={createGraph} className="px-3 py-2 rounded border border-theme bg-theme-card hover:bg-primary-light">新建关系图</button>
           <button onClick={handleDeleteGraph} className="px-3 py-2 rounded border border-red-300 text-red-600 hover:bg-red-50">删除当前</button>
         </div>
       </div>
@@ -923,192 +658,45 @@ const RelationGraphs: React.FC = () => {
         </div>
       </div>
 
-      {selectedPrimaryNode && (
-        <div className="fixed inset-x-0 bottom-0 w-full md:inset-auto md:right-6 md:bottom-6 md:w-[360px] bg-theme-card border border-theme rounded-t-xl md:rounded-lg shadow-xl p-3 z-50">
-          <div className="font-semibold mb-2">节点备注</div>
-          <RichTextEditor value={selectedPrimaryNode.note || ''} onChange={(val) => updateNode(selectedPrimaryNode.id, { note: val })} minHeight="130px" />
-          <div className="mt-2 flex items-center gap-2">
-            <label className="text-sm px-2 py-1 rounded border border-theme cursor-pointer hover:bg-primary-light">
-              上传头像
-              <input type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={(e) => uploadTokenImage(selectedPrimaryNode.id, e.target.files?.[0])} />
-            </label>
-            <button
-              onClick={() => {
-                setResourceKeyword('');
-                setResourceSelectedFolderPath(RESOURCE_ROOT_PATH);
-                setResourcePickerOpen(true);
-              }}
-              className="text-sm px-2 py-1 rounded border border-theme hover:bg-primary-light"
-            >
-              从资源库选择
-            </button>
-            {selectedResourceMeta && (
-              <span className="text-xs theme-text-secondary truncate max-w-[150px]" title={selectedResourceMeta.displayName}>
-                已选：{selectedResourceMeta.displayName}
-              </span>
-            )}
-            {(selectedPrimaryNode.tokenImageRef || selectedPrimaryNode.tokenImage) && (
-              <button onClick={() => updateNode(selectedPrimaryNode.id, { tokenImageRef: '', tokenImage: '' })} className="text-sm px-2 py-1 rounded border border-red-300 text-red-600 hover:bg-red-50">
-                清除头像
-              </button>
-            )}
-          </div>
-        </div>
-      )}
+      <RelationGraphNodePanel
+        node={selectedPrimaryNode || null}
+        selectedResourceMeta={selectedResourceMeta}
+        onChangeNote={(nodeId, note) => updateNode(nodeId, { note })}
+        onUploadImage={uploadTokenImage}
+        onOpenResourcePicker={() => {
+          setResourceKeyword('');
+          setResourceSelectedFolderPath(RESOURCE_ROOT_PATH);
+          setResourcePickerOpen(true);
+        }}
+        onClearImage={(nodeId) => updateNode(nodeId, { tokenImageRef: '', tokenImage: '' })}
+      />
 
-      {resourcePickerOpen && selectedPrimaryNode && (
-        <div className="fixed inset-0 z-50 bg-black/35 flex items-center justify-center p-4">
-          <div className="w-full max-w-5xl max-h-[82vh] bg-theme-card border border-theme rounded-lg shadow-xl flex flex-col">
-            <div className="px-4 py-3 border-b border-theme flex items-center justify-between">
-              <h3 className="font-semibold">选择资源图片</h3>
-              <button onClick={() => setResourcePickerOpen(false)} className="px-3 py-1 rounded border border-theme hover:bg-primary-light text-sm">关闭</button>
-            </div>
-            <div className="p-3 border-b border-theme">
-              <input
-                value={resourceKeyword}
-                onChange={(e) => setResourceKeyword(e.target.value)}
-                placeholder="按图片名或资源ID搜索..."
-                className="w-full px-3 py-2 rounded border border-theme bg-transparent"
-              />
-            </div>
-            <div className="min-h-0 flex-1 grid grid-cols-1 md:grid-cols-[220px_minmax(0,1fr)]">
-              <div className="border-r border-theme overflow-auto p-2">
-                {resources.length === 0 && resourceFolders.length === 0 ? (
-                  <div className="text-sm theme-text-secondary py-8 text-center">暂无资源</div>
-                ) : (
-                  <ResourceTreeView
-                    tree={filteredResourceTree}
-                    expandedPaths={resourceExpandedFolders}
-                    onToggleFolder={(path) => setResourceExpandedFolders((prev) => (
-                      prev.includes(path) ? prev.filter((item) => item !== path) : [...prev, path]
-                    ))}
-                    onSelectFolder={setResourceSelectedFolderPath}
-                    selectedFolderPath={resourceSelectedFolderPath}
-                    autoExpandAll={Boolean(resourceKeyword.trim())}
-                    hideItems
-                    compact
-                    renderItem={() => null}
-                  />
-                )}
-              </div>
-              <div className="overflow-auto p-3">
-                <div className="text-xs theme-text-secondary mb-3">
-                  当前分类：{resourceFolderDisplayName(resourceSelectedFolderPath)}
-                </div>
-                {filteredResourceItems.length === 0 ? (
-                  <div className="text-sm theme-text-secondary py-8 text-center">没有匹配的资源</div>
-                ) : (
-                  <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 gap-3">
-                    {filteredResourceItems.map((item) => {
-                      const active = selectedPrimaryNode.tokenImageRef === item.ref;
-                      return (
-                        <button
-                          key={item.ref}
-                          onClick={() => {
-                            updateNode(selectedPrimaryNode.id, { tokenImageRef: item.ref });
-                            setResourcePickerOpen(false);
-                          }}
-                          className={`text-left border rounded-md p-2 transition hover:bg-primary-light/30 ${active ? 'border-primary ring-2 ring-primary/30 bg-primary/5' : 'border-theme'}`}
-                        >
-                          <img src={item.url} alt={item.displayName} className="w-full aspect-square rounded object-cover border border-theme" />
-                          <div className="mt-2 text-[11px] leading-4 truncate" title={item.displayName}>{item.displayName}</div>
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <RelationGraphResourcePickerModal
+        open={resourcePickerOpen && Boolean(selectedPrimaryNode)}
+        resources={resources}
+        resourceFolders={resourceFolders}
+        keyword={resourceKeyword}
+        selectedFolderPath={resourceSelectedFolderPath}
+        expandedFolders={resourceExpandedFolders}
+        selectedRef={selectedPrimaryNode?.tokenImageRef}
+        onKeywordChange={setResourceKeyword}
+        onSelectFolder={setResourceSelectedFolderPath}
+        onToggleFolder={(path) => setResourceExpandedFolders((prev) => (
+          prev.includes(path) ? prev.filter((item) => item !== path) : [...prev, path]
+        ))}
+        onClose={() => setResourcePickerOpen(false)}
+        onSelectResource={(ref) => {
+          if (!selectedPrimaryNode) return;
+          updateNode(selectedPrimaryNode.id, { tokenImageRef: ref });
+          setResourcePickerOpen(false);
+        }}
+      />
 
-      {selectedEdge && (
-        <div className="fixed inset-x-0 bottom-0 md:right-6 md:top-24 md:inset-auto md:bottom-auto w-full md:w-80 bg-theme-card border border-theme rounded-t-xl md:rounded-lg shadow-xl p-3 z-50">
-          <div className="font-semibold mb-2">关系线编辑</div>
-          <div className="space-y-3">
-            <div>
-              <label className="text-sm block mb-1">方向</label>
-              <select value={selectedEdge.direction} onChange={(e) => updateEdge(selectedEdge.id, { direction: e.target.value as RelationEdgeDirection })} className="w-full px-2 py-2 rounded border border-theme bg-transparent">
-                <option value="none">无箭头</option>
-                <option value="forward">单向（起点→终点）</option>
-                <option value="backward">单向（终点→起点）</option>
-                <option value="bidirectional">双向</option>
-              </select>
-            </div>
-            <div>
-              <label className="text-sm block mb-1">文字</label>
-              <input type="text" value={selectedEdge.label} onChange={(e) => updateEdge(selectedEdge.id, { label: e.target.value })} className="w-full px-2 py-2 rounded border border-theme bg-transparent" placeholder="如：盟友、敌对、怀疑" />
-            </div>
-            <div>
-              <label className="text-sm block mb-1">线条样式</label>
-              <select
-                value={selectedEdge.lineStyle}
-                onChange={(e) => updateEdge(selectedEdge.id, { lineStyle: e.target.value as 'solid' | 'dashed' })}
-                className="w-full px-2 py-2 rounded border border-theme bg-transparent"
-              >
-                <option value="solid">实线</option>
-                <option value="dashed">虚线</option>
-              </select>
-            </div>
-            <div>
-              <label className="text-sm block mb-1">线条粗细（1~6px）</label>
-              <input
-                type="range"
-                min={1}
-                max={6}
-                step={1}
-                value={selectedEdge.lineWidth}
-                onChange={(e) =>
-                  updateEdge(selectedEdge.id, {
-                    lineWidth: Math.max(1, Math.min(6, Number(e.target.value) || 2)),
-                  })
-                }
-                className="w-full"
-              />
-              <div className="text-xs theme-text-secondary">{selectedEdge.lineWidth}px</div>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <label className="text-sm block mb-1">字体大小</label>
-                <input type="number" min={10} max={30} value={selectedEdge.labelFontSize} onChange={(e) => updateEdge(selectedEdge.id, { labelFontSize: Number(e.target.value) || 12 })} className="w-full px-2 py-2 rounded border border-theme bg-transparent" />
-              </div>
-              <div>
-                <label className="text-sm block mb-1">字体颜色</label>
-                <input type="color" value={selectedEdge.labelColor} onChange={(e) => updateEdge(selectedEdge.id, { labelColor: e.target.value })} className="w-full h-10 rounded border border-theme bg-transparent" />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <label className="text-sm block mb-1">文字底色</label>
-                <input
-                  type="color"
-                  value={selectedEdge.labelBgColor}
-                  onChange={(e) => updateEdge(selectedEdge.id, { labelBgColor: e.target.value })}
-                  className="w-full h-10 rounded border border-theme bg-transparent"
-                />
-              </div>
-              <div>
-                <label className="text-sm block mb-1">底色透明度</label>
-                <input
-                  type="range"
-                  min={0}
-                  max={100}
-                  value={Math.round(selectedEdge.labelBgOpacity * 100)}
-                  onChange={(e) =>
-                    updateEdge(selectedEdge.id, {
-                      labelBgOpacity: Math.max(0, Math.min(1, Number(e.target.value) / 100)),
-                    })
-                  }
-                  className="w-full"
-                />
-                <div className="text-xs theme-text-secondary">{Math.round(selectedEdge.labelBgOpacity * 100)}%</div>
-              </div>
-            </div>
-            <button onClick={() => setEdgeEditorId(null)} className="w-full px-3 py-2 rounded border border-theme hover:bg-primary-light">完成编辑</button>
-          </div>
-        </div>
-      )}
+      <RelationGraphEdgePanel
+        edge={selectedEdge || null}
+        onChange={updateEdge}
+        onClose={() => setEdgeEditorId(null)}
+      />
     </div>
   );
 };

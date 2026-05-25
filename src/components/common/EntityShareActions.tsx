@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { MoreHorizontal, Share2 } from 'lucide-react';
 import ShareDialog from './ShareDialog';
-import { useCampaign } from '../../context/CampaignContext';
+import { useCampaignSession } from '../../context/CampaignContext';
 import { BaseEntity, CampaignConfig, CustomSubItem, GraphEntityType, ShareScope, SharedPermission } from '../../types';
 import { sharingService } from '../../services/sharingService';
 import { buildSharedSnapshot } from '../../utils/shareSnapshot';
@@ -25,7 +25,7 @@ const EntityShareActions: React.FC<EntityShareActionsProps> = ({
   compact = false,
   menu = false,
 }) => {
-  const { currentCampaignId, user } = useCampaign();
+  const { currentCampaignId, user } = useCampaignSession();
   const [open, setOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [config, setConfig] = useState<CampaignConfig | null>(null);

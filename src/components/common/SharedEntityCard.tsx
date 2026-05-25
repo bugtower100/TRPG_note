@@ -1,13 +1,13 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ExternalLink } from 'lucide-react';
-import { useCampaign } from '../../context/CampaignContext';
+import { useCampaignTabs } from '../../context/CampaignContext';
 import { SharedEntityRecord } from '../../types';
 import { markdownToPreviewText } from './richTextReference';
 
 const SharedEntityCard: React.FC<{ share: SharedEntityRecord }> = ({ share }) => {
   const navigate = useNavigate();
-  const { openInTab } = useCampaign();
+  const { openInTab } = useCampaignTabs();
 
   const previewText = React.useMemo(() => {
     const rawPreview = share.scope === 'entity'

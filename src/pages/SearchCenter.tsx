@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useCampaign } from '../context/CampaignContext';
+import { useCampaignData } from '../context/CampaignContext';
 
 type SearchEntry = {
   id: string;
@@ -12,7 +12,7 @@ type SearchEntry = {
 };
 
 const SearchCenter: React.FC = () => {
-  const { campaignData } = useCampaign();
+  const { campaignData } = useCampaignData();
   const navigate = useNavigate();
   const [query, setQuery] = useState('');
   const [entries, setEntries] = useState<SearchEntry[]>([]);

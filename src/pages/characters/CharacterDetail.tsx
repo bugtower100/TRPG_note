@@ -1,12 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useCampaign } from '../../context/CampaignContext';
-import { Character } from '../../types';
-import CustomSubItemsEditor from '../../components/common/CustomSubItemsEditor';
-import CollapsibleSection from '../../components/common/CollapsibleSection';
-import SectionAddBar from '../../components/common/SectionAddBar';
-import EntityShareActions, { ShareSectionAction, ShareSubItemAction } from '../../components/common/EntityShareActions';
-import EntityTagEditor from '../../components/common/EntityTagEditor';
+import { useCampaignData, useCampaignSession } from '../../context/CampaignContext';
+import EntityDetailHeader from '../../features/entities/components/EntityDetailHeader';
+import SectionedEntityContent from '../../features/entities/components/SectionedEntityContent';
+import { useSectionedEntityDetail } from '../../features/entities/hooks/useSectionedEntityDetail';
+import { Character, CustomSubItem } from '../../types';
 
 interface CharacterDetailProps {
   entityId?: string;
@@ -16,57 +14,44 @@ const CharacterDetail: React.FC<CharacterDetailProps> = ({ entityId }) => {
   const { id: paramId } = useParams<{ id: string }>();
   const id = entityId || paramId;
   const navigate = useNavigate();
-  const { campaignData, saveCampaign, deleteEntity, updateEntity } = useCampaign();
-  const [character, setCharacter] = useState<Character | null>(null);
-  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({
-    basic: true,
-    goals: true,
-  });
+  const { campaignData, deleteEntity, updateEntity } = useCampaignData();
+  const { saveCampaign } = useCampaignSession();
   const sectionDefs = [
     { key: 'basic', title: '基本信息' },
     { key: 'goals', title: '属性与目标' },
   ];
-
-  useEffect(() => {
-    // campaignData is the source of truth, 'data' was used in previous context but now it is 'campaignData'
-    const found = campaignData.characters.find(c => c.id === id);
-    if (found) {
-      setCharacter(found);
-    } else {
-      navigate('/characters');
-    }
-  }, [id, campaignData.characters, navigate]);
+  const {
+    entity: character,
+    collapsed,
+    setCollapsed,
+    commitEntity,
+    handleChange,
+    handleDeleteAndNavigate,
+    getSectionItems,
+    setSectionItems,
+    getSectionTitle,
+    setSectionTitle,
+    isSectionVisible,
+    setSectionVisible,
+    addCustomSection,
+    removeCustomSection,
+    allVisibleExpanded,
+    toggleAllSections,
+  } = useSectionedEntityDetail({
+    id,
+    items: campaignData.characters,
+    navigate,
+    listPath: '/characters',
+    initialCollapsed: { basic: true, goals: true },
+    sectionDefs,
+    updateItem: (item) => updateEntity('characters', item),
+    deleteItem: (itemId) => deleteEntity('characters', itemId),
+  });
 
   if (!character) return <div>加载中...</div>;
 
-  const handleChange = (field: keyof Character, value: any) => {
-    const updatedCharacter = { ...character, [field]: value };
-    // Optimistic update
-    setCharacter(updatedCharacter);
-    updateEntity('characters', updatedCharacter);
-  };
-
-  const handleDelete = () => {
-      deleteEntity('characters', id!);
-      navigate('/characters');
-  };
-
-  const getSectionItems = (key: string) => character.sectionSubItems?.[key] || [];
-
-  const setSectionItems = (key: string, items: any[]) => {
-    const updatedCharacter = {
-      ...character,
-      sectionSubItems: {
-        ...(character.sectionSubItems || {}),
-        [key]: items,
-      },
-    };
-    setCharacter(updatedCharacter);
-    updateEntity('characters', updatedCharacter);
-  };
-
-  const setSectionItemsWithDefault = (key: string, items: any[]) => {
-    const updatedCharacter = {
+  const setSectionItemsWithDefault = useCallback((key: string, items: CustomSubItem[]) => {
+    const updatedCharacter: Character = {
       ...character,
       sectionSubItems: {
         ...(character.sectionSubItems || {}),
@@ -75,210 +60,50 @@ const CharacterDetail: React.FC<CharacterDetailProps> = ({ entityId }) => {
       details: key === 'basic' ? (items[0]?.content || '') : character.details,
       desireOrGoal: key === 'goals' ? (items[0]?.content || '') : character.desireOrGoal,
     };
-    setCharacter(updatedCharacter);
-    updateEntity('characters', updatedCharacter);
-  };
+    commitEntity(updatedCharacter);
+  }, [character, commitEntity]);
 
-  const getSectionTitle = (key: string, fallback: string) => character.sectionTitles?.[key] || fallback;
-
-  const setSectionTitle = (key: string, title: string) => {
-    handleChange('sectionTitles' as keyof Character, {
-      ...(character.sectionTitles || {}),
-      [key]: title,
-    });
-  };
-
-  const isSectionVisible = (key: string) => character.sectionVisibility?.[key] !== false;
-
-  const setSectionVisible = (key: string, visible: boolean) => {
-    handleChange('sectionVisibility' as keyof Character, {
-      ...(character.sectionVisibility || {}),
-      [key]: visible,
-    });
-  };
-
-  const addCustomSection = () => {
-    const name = window.prompt('请输入新内置区块名称', '新内置区块');
-    if (!name || !name.trim()) return;
-    const key = `custom_${Date.now()}`;
-    const nextCustomSections = [...(character.customSections || []), key];
-    const nextTitles = { ...(character.sectionTitles || {}), [key]: name.trim() };
-    const nextVisibility = { ...(character.sectionVisibility || {}), [key]: true };
-    const nextSubItems = { ...(character.sectionSubItems || {}), [key]: [] };
-    const updated = {
-      ...character,
-      customSections: nextCustomSections,
-      sectionTitles: nextTitles,
-      sectionVisibility: nextVisibility,
-      sectionSubItems: nextSubItems,
-    };
-    setCharacter(updated);
-    updateEntity('characters', updated);
-    setCollapsed((prev) => ({ ...prev, [key]: true }));
-  };
-
-  const removeCustomSection = (key: string) => {
-    const nextCustomSections = (character.customSections || []).filter((k) => k !== key);
-    const nextTitles = { ...(character.sectionTitles || {}) };
-    const nextVisibility = { ...(character.sectionVisibility || {}) };
-    const nextSubItems = { ...(character.sectionSubItems || {}) };
-    delete nextTitles[key];
-    delete nextVisibility[key];
-    delete nextSubItems[key];
-    const updated = {
-      ...character,
-      customSections: nextCustomSections,
-      sectionTitles: nextTitles,
-      sectionVisibility: nextVisibility,
-      sectionSubItems: nextSubItems,
-    };
-    setCharacter(updated);
-    updateEntity('characters', updated);
-  };
-
-  const visibleSectionKeys = [
-    ...sectionDefs.filter((section) => isSectionVisible(section.key)).map((section) => section.key),
-    ...(character.customSections || []),
-  ];
-  const allVisibleExpanded = visibleSectionKeys.length > 0 && visibleSectionKeys.every((key) => collapsed[key] === false);
-
-  const expandAllPreview = () => {
-    const next: Record<string, boolean> = {};
-    const nextCollapsed = allVisibleExpanded;
-    for (const sectionKey of visibleSectionKeys) {
-      next[sectionKey] = nextCollapsed;
+  const handleSectionItemsChange = useCallback((key: string, items: CustomSubItem[]) => {
+    if (key === 'basic' || key === 'goals') {
+      setSectionItemsWithDefault(key, items);
+      return;
     }
-    setCollapsed((prev) => ({ ...prev, ...next }));
-  };
+    setSectionItems(key, items);
+  }, [setSectionItems, setSectionItemsWithDefault]);
 
   return (
     <div className="max-w-4xl mx-auto space-y-6 pb-12 px-2 sm:px-0">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 border-b pb-3">
-        <div className="flex items-center gap-3 sm:gap-4 min-w-0 flex-1">
-          <button onClick={() => navigate('/characters')} className="inline-flex items-center whitespace-nowrap shrink-0 text-gray-500 hover:text-gray-700">
-            &larr; 返回
-          </button>
-          <input
-            data-tour="entity-detail-name"
-            type="text"
-            value={character.name}
-            onChange={(e) => handleChange('name', e.target.value)}
-            className="flex-1 min-w-0 text-xl sm:text-2xl font-bold border-b border-transparent hover:border-gray-300 focus:border-primary focus:outline-none bg-transparent"
-            style={{ color: character.titleColor || '#111827' }}
-          />
-          <input
-            type="color"
-            value={character.titleColor || '#111827'}
-            onChange={(e) => handleChange('titleColor' as keyof Character, e.target.value)}
-            className="w-10 h-10 rounded border border-theme bg-transparent shrink-0"
-            title="标题颜色"
-          />
-        </div>
-        
-        <div className="flex items-center gap-2 sm:gap-3">
-            <button
-                type="button"
-                onClick={expandAllPreview}
-                className="px-3 py-1.5 border border-theme rounded hover:bg-primary-light text-sm"
-            >
-                {allVisibleExpanded ? '收起全部' : '展开全部'}
-            </button>
-            <EntityShareActions entityType="characters" entity={character} scope="entity" label="分享整张卡片" />
-            <button
-                onClick={saveCampaign}
-                className="px-3 py-1.5 bg-green-600 text-white rounded hover:bg-green-700 text-sm flex items-center gap-1"
-            >
-                保存
-            </button>
-            <div className="w-px h-6 bg-gray-300 mx-1"></div>
-            <button 
-              onClick={handleDelete}
-              className="text-red-500 hover:text-red-700 text-sm px-3 py-1.5 rounded hover:bg-red-50"
-            >
-              删除
-            </button>
-        </div>
-      </div>
+      <EntityDetailHeader
+        entity={character}
+        entityType="characters"
+        backTo="/characters"
+        onChange={handleChange}
+        allVisibleExpanded={allVisibleExpanded}
+        onToggleAll={toggleAllSections}
+        onSave={saveCampaign}
+        onDelete={() => {
+          if (window.confirm('确定要删除这个角色吗？')) {
+            handleDeleteAndNavigate();
+          }
+        }}
+      />
 
-      <div className="space-y-6">
-        <EntityTagEditor
-          tags={character.tags}
-          onChange={(tags) => handleChange('tags', tags)}
-        />
-        <SectionAddBar
-          hiddenSections={sectionDefs.filter((s) => !isSectionVisible(s.key))}
-          onAddSection={(key) => setSectionVisible(key, true)}
-          onAddCustomSection={addCustomSection}
-        />
-
-        {isSectionVisible('basic') && (
-        <CollapsibleSection
-          title={getSectionTitle('basic', '基本信息')}
-          collapsed={collapsed.basic}
-          onToggle={() => setCollapsed((prev) => ({ ...prev, basic: !prev.basic }))}
-          removable
-          onRemove={() => setSectionVisible('basic', false)}
-          editableTitle
-          onRenameTitle={(title) => setSectionTitle('basic', title)}
-          headerActions={<ShareSectionAction entityType="characters" entity={character} sectionKey="basic" />}
-        >
-          <CustomSubItemsEditor
-            title={getSectionTitle('basic', '基本信息') + ' / 子项目'}
-            items={getSectionItems('basic')}
-            onChange={(items) => setSectionItemsWithDefault('basic', items)}
-            ensureOneItem
-            defaultFirstItemTitle="详细情况"
-            renderItemActions={(item) => <ShareSubItemAction entityType="characters" entity={character} item={item} />}
-          />
-        </CollapsibleSection>
-        )}
-
-        {isSectionVisible('goals') && (
-        <CollapsibleSection
-          title={getSectionTitle('goals', '属性与目标')}
-          collapsed={collapsed.goals}
-          onToggle={() => setCollapsed((prev) => ({ ...prev, goals: !prev.goals }))}
-          removable
-          onRemove={() => setSectionVisible('goals', false)}
-          editableTitle
-          onRenameTitle={(title) => setSectionTitle('goals', title)}
-          headerActions={<ShareSectionAction entityType="characters" entity={character} sectionKey="goals" />}
-        >
-          <CustomSubItemsEditor
-            title={getSectionTitle('goals', '属性与目标') + ' / 子项目'}
-            items={getSectionItems('goals')}
-            onChange={(items) => setSectionItemsWithDefault('goals', items)}
-            ensureOneItem
-            defaultFirstItemTitle="详细情况"
-            renderItemActions={(item) => <ShareSubItemAction entityType="characters" entity={character} item={item} />}
-          />
-        </CollapsibleSection>
-        )}
-
-        {(character.customSections || []).map((sectionKey) => (
-          <CollapsibleSection
-            key={sectionKey}
-            title={getSectionTitle(sectionKey, '自定义区块')}
-            collapsed={Boolean(collapsed[sectionKey])}
-            onToggle={() => setCollapsed((prev) => ({ ...prev, [sectionKey]: !prev[sectionKey] }))}
-            removable
-            onRemove={() => removeCustomSection(sectionKey)}
-            editableTitle
-            onRenameTitle={(title) => setSectionTitle(sectionKey, title)}
-            headerActions={<ShareSectionAction entityType="characters" entity={character} sectionKey={sectionKey} />}
-          >
-            <CustomSubItemsEditor
-              title={getSectionTitle(sectionKey, '自定义区块') + ' / 子项目'}
-              items={getSectionItems(sectionKey)}
-              onChange={(items) => setSectionItems(sectionKey, items)}
-              ensureOneItem
-              defaultFirstItemTitle="详细情况"
-              renderItemActions={(item) => <ShareSubItemAction entityType="characters" entity={character} item={item} />}
-            />
-          </CollapsibleSection>
-        ))}
-      </div>
+      <SectionedEntityContent
+        entity={character}
+        entityType="characters"
+        sectionDefs={sectionDefs}
+        collapsed={collapsed}
+        setCollapsed={setCollapsed}
+        onTagsChange={(tags) => handleChange('tags', tags)}
+        getSectionTitle={getSectionTitle}
+        getSectionItems={getSectionItems}
+        onSectionItemsChange={handleSectionItemsChange}
+        isSectionVisible={isSectionVisible}
+        setSectionVisible={setSectionVisible}
+        addCustomSection={addCustomSection}
+        removeCustomSection={removeCustomSection}
+        setSectionTitle={setSectionTitle}
+      />
     </div>
   );
 };

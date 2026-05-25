@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { useCampaign } from '../context/CampaignContext';
+import { useCampaignData, useCampaignSession } from '../context/CampaignContext';
 import { APP_VERSION } from '../constants/appVersion';
 import { 
   LayoutDashboard, Users, MapPin, Building, Calendar, 
@@ -13,7 +13,8 @@ interface SidebarProps {
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ className = '', onNavigate }) => {
-  const { campaignData, logout, exitCampaign } = useCampaign();
+  const { campaignData } = useCampaignData();
+  const { logout, exitCampaign } = useCampaignSession();
 
   const navItems = [
     { to: '/', icon: <LayoutDashboard size={20} />, label: '概览' },

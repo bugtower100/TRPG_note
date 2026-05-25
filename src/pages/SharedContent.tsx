@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { AlertCircle, ChevronDown, ChevronRight, ChevronUp, History, Plus, Trash2 } from 'lucide-react';
-import { useCampaign } from '../context/CampaignContext';
+import { useCampaignSession } from '../context/CampaignContext';
 import CustomSubItemsEditor from '../components/common/CustomSubItemsEditor';
 import RichTextEditor from '../components/common/RichTextEditor';
 import RichTextDisplay from '../components/common/RichTextDisplay';
@@ -23,7 +23,7 @@ interface SharedContentProps {
 }
 
 const SharedContent: React.FC<SharedContentProps> = ({ embedded = false, shareId, entityType }) => {
-  const { currentCampaignId, user } = useCampaign();
+  const { currentCampaignId, user } = useCampaignSession();
   const navigate = useNavigate();
   const [shares, setShares] = useState<SharedEntityRecord[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);

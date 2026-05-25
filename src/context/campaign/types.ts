@@ -1,0 +1,61 @@
+import { CampaignData, CampaignSummary, CampaignTheme, UserProfile } from '../../types';
+
+export interface Tab {
+  id: string;
+  type: string;
+  entityId: string;
+  title: string;
+  targetSectionTitleLower?: string;
+  targetSubItemId?: string;
+}
+
+export interface CampaignDataContextValue {
+  campaignData: CampaignData;
+  setCampaignData: (data: CampaignData) => void;
+  updateEntity: (collection: keyof CampaignData, item: any) => void;
+  deleteEntity: (collection: keyof CampaignData, id: string) => void;
+  addEntity: (collection: keyof CampaignData, item: any) => void;
+  reorderEntities: (collection: keyof CampaignData, orderedIds: string[]) => void;
+}
+
+export interface CampaignSessionContextValue {
+  saveCampaign: () => Promise<void>;
+  saveToFileSystem: () => Promise<void>;
+  user: UserProfile | null;
+  login: (username: string, password?: string) => { success: boolean; message?: string };
+  logout: () => void;
+  currentCampaignId: string | null;
+  campaignList: CampaignSummary[];
+  switchCampaign: (id: string) => void;
+  createNewCampaign: (name: string, description: string) => void;
+  deleteCampaign: (id: string) => void;
+  exitCampaign: () => void;
+  exportData: () => void;
+  importData: (file: File) => Promise<void>;
+  openFromFileSystem: () => Promise<void>;
+}
+
+export interface CampaignThemeContextValue {
+  theme: CampaignTheme;
+  setTheme: (theme: CampaignTheme) => void;
+}
+
+export interface CampaignTabsContextValue {
+  tabs: Tab[];
+  activeTabId: string | null;
+  openInTab: (
+    type: string,
+    entityId: string,
+    title: string,
+    targetSectionTitleLower?: string,
+    targetSubItemId?: string
+  ) => void;
+  closeTab: (tabId: string) => void;
+  setActiveTabId: (tabId: string | null) => void;
+}
+
+export interface CampaignContextType
+  extends CampaignDataContextValue,
+    CampaignSessionContextValue,
+    CampaignThemeContextValue,
+    CampaignTabsContextValue {}

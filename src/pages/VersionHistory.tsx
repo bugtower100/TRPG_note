@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { RotateCcw } from 'lucide-react';
-import { useCampaign } from '../context/CampaignContext';
+import { useCampaignSession } from '../context/CampaignContext';
 import { VersionRecord } from '../types';
 import { sharingService } from '../services/sharingService';
 import RichTextDisplay from '../components/common/RichTextDisplay';
@@ -128,7 +128,7 @@ const buildSummaryRows = (snapshot: Record<string, unknown>) => Object.entries(f
   }));
 
 const VersionHistory: React.FC = () => {
-  const { currentCampaignId, user } = useCampaign();
+  const { currentCampaignId, user } = useCampaignSession();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [versions, setVersions] = useState<VersionRecord[]>([]);
