@@ -46,6 +46,7 @@ const SessionTaskBoard: React.FC = () => {
   const [tagDraft, setTagDraft] = useState('');
   const [tagFilter, setTagFilter] = useState('');
   const [taskDrafts, setTaskDrafts] = useState<SessionTask[]>([]);
+  const [expandedTaskIds, setExpandedTaskIds] = useState<string[]>([]);
   const [permissionDraft, setPermissionDraft] = useState({ plCanView: true, plCanEdit: true });
   const saveTimerRef = useRef<number | null>(null);
   const cleanupStateRef = useRef<{
@@ -195,6 +196,18 @@ const SessionTaskBoard: React.FC = () => {
     [filteredTasks]
   );
 
+  useEffect(() => {
+    if (editing) {
+      setExpandedTaskIds(taskDrafts.map((task) => task.id));
+      return;
+    }
+    setExpandedTaskIds([]);
+  }, [editing]);
+
+  useEffect(() => {
+    setExpandedTaskIds((prev) => prev.filter((taskId) => taskDrafts.some((task) => task.id === taskId)));
+  }, [taskDrafts]);
+
   const updateTasks = (updater: (tasks: SessionTask[]) => SessionTask[]) => {
     if (!editing) return;
     setTaskDrafts((prev) => updater(prev));
@@ -214,6 +227,7 @@ const SessionTaskBoard: React.FC = () => {
       updatedAt: now,
     };
     updateTasks((tasks) => [...tasks, newTask]);
+    setExpandedTaskIds((prev) => (prev.includes(newTask.id) ? prev : [...prev, newTask.id]));
     setTitleDraft('');
     setTagDraft('');
   };
@@ -240,6 +254,13 @@ const SessionTaskBoard: React.FC = () => {
     }
     if (!window.confirm('确定删除这条任务吗？')) return;
     updateTasks((tasks) => tasks.filter((task) => task.id !== taskId));
+    setExpandedTaskIds((prev) => prev.filter((id) => id !== taskId));
+  };
+
+  const toggleTaskExpanded = (taskId: string) => {
+    setExpandedTaskIds((prev) =>
+      prev.includes(taskId) ? prev.filter((id) => id !== taskId) : [...prev, taskId]
+    );
   };
 
   const handleStartEdit = async () => {
@@ -506,27 +527,61 @@ const SessionTaskBoard: React.FC = () => {
             ) : (
               tasksByStatus[status].map((task) => (
                 <article key={task.id} className="border border-theme rounded p-3 space-y-2">
-                  <input
-                    type="text"
-                    value={task.title}
-                    onChange={(event) => patchTask(task.id, { title: event.target.value })}
-                    disabled={!editing}
-                    className="w-full px-2 py-1.5 border border-theme rounded bg-transparent font-medium"
-                  />
-                  <textarea
-                    value={task.description}
-                    onChange={(event) => patchTask(task.id, { description: event.target.value })}
-                    placeholder="任务说明（可选）"
-                    disabled={!editing}
-                    className="w-full min-h-20 px-2 py-1.5 border border-theme rounded bg-transparent text-sm"
-                  />
-                  <div className="grid grid-cols-1 gap-2">
-                    <EntityTagEditor
-                      tags={task.tags || []}
+                  <div className="flex items-start gap-2">
+                    <input
+                      type="text"
+                      value={task.title}
+                      onChange={(event) => patchTask(task.id, { title: event.target.value })}
                       disabled={!editing}
-                      onChange={(nextTags) => patchTask(task.id, { tags: nextTags })}
+                      className="flex-1 min-w-0 px-2 py-1.5 border border-theme rounded bg-transparent font-medium"
                     />
+                    <button
+                      type="button"
+                      onClick={() => toggleTaskExpanded(task.id)}
+                      className="shrink-0 px-2 py-1 text-xs rounded border border-theme hover:bg-primary-light"
+                    >
+                      {expandedTaskIds.includes(task.id) ? '收起详情' : editing ? '展开编辑' : '展开详情'}
+                    </button>
                   </div>
+                  {!expandedTaskIds.includes(task.id) && (
+                    <div className="space-y-1">
+                      {task.description.trim() ? (
+                        <p className="text-xs theme-text-secondary line-clamp-2 whitespace-pre-wrap break-words">
+                          {task.description}
+                        </p>
+                      ) : null}
+                      {(task.tags || []).length > 0 ? (
+                        <div className="flex flex-wrap gap-1">
+                          {(task.tags || []).map((tag) => (
+                            <span key={tag} className="px-2 py-0.5 text-[11px] rounded border border-theme theme-text-secondary">
+                              {tag}
+                            </span>
+                          ))}
+                        </div>
+                      ) : null}
+                      {!task.description.trim() && (task.tags || []).length === 0 }
+                    </div>
+                  )}
+                  {expandedTaskIds.includes(task.id) && (
+                    <div className="space-y-2">
+                      <textarea
+                        value={task.description}
+                        onChange={(event) => patchTask(task.id, { description: event.target.value })}
+                        placeholder="任务说明（可选）"
+                        disabled={!editing}
+                        className="w-full min-h-20 px-2 py-1.5 border border-theme rounded bg-transparent text-sm"
+                      />
+                      <div className="grid grid-cols-1 gap-2">
+                        <EntityTagEditor
+                          tags={task.tags || []}
+                          disabled={!editing}
+                          compact
+                          hideLabel
+                          onChange={(nextTags) => patchTask(task.id, { tags: nextTags })}
+                        />
+                      </div>
+                    </div>
+                  )}
                   <div className="grid grid-cols-3 gap-1">
                     {statusOrder.map((nextStatus) => (
                       <button

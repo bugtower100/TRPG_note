@@ -326,4 +326,4 @@ export interface TeamNoteDocument {
   activeLease?: TeamNoteLease | null;
 }
 
-export type CampaignTheme = 'default' | 'scroll' | 'archive' | 'nature';
+export type CampaignTheme = 'default' | 'scroll' | 'archive' | 'nature' | 'custom';

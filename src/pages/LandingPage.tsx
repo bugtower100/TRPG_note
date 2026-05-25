@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useCampaignSession } from '../context/CampaignContext';
+import { useCampaignSession, useCampaignTheme } from '../context/CampaignContext';
 import { Download, Upload, FolderOpen, Plus, ChevronDown } from 'lucide-react';
 import { dataService } from '../services/dataService';
 import { GuideHelpButton } from '../components/common/InteractiveGuide';
@@ -13,6 +13,7 @@ import LandingImportAssistantModal from '../features/landing/components/LandingI
 import OwnedCampaignCard from '../features/landing/components/OwnedCampaignCard';
 import PublicCampaignCard from '../features/landing/components/PublicCampaignCard';
 import { useLandingCampaigns } from '../features/landing/hooks/useLandingCampaigns';
+import { BUILTIN_THEME_OPTIONS } from '../features/themes/themeService';
 
 const LandingPage: React.FC = () => {
   const { 
@@ -20,8 +21,13 @@ const LandingPage: React.FC = () => {
     campaignList, switchCampaign, createNewCampaign, 
     openFromFileSystem, deleteCampaign
   } = useCampaignSession();
-  
-  const [currentTheme, setCurrentTheme] = useState(localStorage.getItem('trpg_theme') || 'default');
+  const {
+    theme: currentTheme,
+    setTheme,
+    customThemes,
+    selectedCustomThemeName,
+    selectCustomTheme,
+  } = useCampaignTheme();
 
   // Login State
   const [username, setUsername] = useState('');
@@ -283,7 +289,7 @@ const LandingPage: React.FC = () => {
         </div>
 
         {/* Theme Selection for Landing Page */}
-        <div className="flex gap-2 justify-end mb-6">
+        <div className="flex flex-wrap gap-2 justify-end mb-6">
             <div className="relative" ref={passwordMenuRef}>
                 <button
                     type="button"
@@ -334,23 +340,42 @@ const LandingPage: React.FC = () => {
                     </div>
                 )}
             </div>
-            {['default', 'scroll', 'archive', 'nature'].map((t) => (
+            {BUILTIN_THEME_OPTIONS.filter((item) => item.id !== 'custom').map((t) => (
                 <button
-                    key={t}
+                    key={t.id}
                     onClick={() => {
-                        localStorage.setItem('trpg_theme', t);
-                        document.documentElement.setAttribute('data-theme', t);
-                        setCurrentTheme(t);
+                        setTheme(t.id);
                     }}
                     className={`px-3 py-1 text-sm border rounded ${
-                        currentTheme === t 
+                        currentTheme === t.id 
                             ? 'bg-primary text-white border-primary' 
                             : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
                     }`}
                 >
-                    {t === 'default' ? '默认' : t === 'scroll' ? '羊皮纸' : t === 'archive' ? '未来' : '薄巧'}
+                    {t.id === 'default' ? '默认' : t.id === 'scroll' ? '羊皮纸' : t.id === 'archive' ? '未来' : t.id === 'nature' ? '薄巧' : '自定义'}
                 </button>
             ))}
+            {customThemes.length > 0 && (
+                <select
+                    value={selectedCustomThemeName || ''}
+                    onChange={(event) => {
+                        const nextName = event.target.value || null;
+                        selectCustomTheme(nextName);
+                        if (nextName) {
+                          setTheme('custom');
+                        }
+                    }}
+                    className="px-3 py-1 text-sm border rounded bg-white text-gray-600 border-gray-300 hover:bg-gray-50 max-w-[180px]"
+                    title="切换已上传的自定义主题"
+                >
+                    <option value="">选择自定义主题</option>
+                    {customThemes.map((item) => (
+                        <option key={item.name} value={item.name}>
+                            {item.name}
+                        </option>
+                    ))}
+                </select>
+            )}
         </div>
 
         {/* Campaign List */}

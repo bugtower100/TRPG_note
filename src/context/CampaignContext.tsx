@@ -5,6 +5,15 @@ import { dataService, DEFAULT_CAMPAIGN_DATA } from '../services/dataService';
 import { initializeStorageAdapter } from '../services/storageAdapter';
 import { teamNotesService } from '../services/teamNotesService';
 import {
+  applyThemeToDocument,
+  loadStoredCustomThemes,
+  removeCustomTheme as removeStoredCustomTheme,
+  resolveSelectedCustomTheme,
+  saveCustomThemes,
+  type CustomThemeConfig,
+  upsertCustomTheme as upsertStoredCustomTheme,
+} from '../features/themes/themeService';
+import {
   CampaignContextType,
   CampaignDataContextValue,
   CampaignSessionContextValue,
@@ -32,6 +41,8 @@ export const CampaignProvider: React.FC<{ children: ReactNode }> = ({ children }
   const [campaignData, setCampaignData] = useState<CampaignData>(DEFAULT_CAMPAIGN_DATA);
   const [campaignList, setCampaignList] = useState<CampaignSessionContextValue['campaignList']>([]);
   const [theme, setTheme] = useState<CampaignTheme>('default');
+  const [customThemes, setCustomThemes] = useState<CustomThemeConfig[]>([]);
+  const [selectedCustomThemeName, setSelectedCustomThemeName] = useState<string | null>(null);
   const [fileHandle, setFileHandle] = useState<any>(null);
   const [tabs, setTabs] = useState<Tab[]>([]);
   const [activeTabId, setActiveTabId] = useState<string | null>(null);
@@ -76,12 +87,19 @@ export const CampaignProvider: React.FC<{ children: ReactNode }> = ({ children }
   }, [refreshCampaignList]);
 
   useEffect(() => {
+    const storedCustomThemes = loadStoredCustomThemes();
+    setCustomThemes(storedCustomThemes.themes);
+    setSelectedCustomThemeName(storedCustomThemes.selectedName);
     const storedTheme = localStorage.getItem('trpg_theme') as CampaignTheme;
     if (storedTheme) {
       setTheme(storedTheme);
-      document.documentElement.setAttribute('data-theme', storedTheme);
     }
   }, []);
+
+  const activeCustomTheme = useMemo(
+    () => resolveSelectedCustomTheme(customThemes, selectedCustomThemeName),
+    [customThemes, selectedCustomThemeName]
+  );
 
   useEffect(() => {
     if (currentCampaignId) {
@@ -93,8 +111,37 @@ export const CampaignProvider: React.FC<{ children: ReactNode }> = ({ children }
 
   useEffect(() => {
     localStorage.setItem('trpg_theme', theme);
-    document.documentElement.setAttribute('data-theme', theme);
-  }, [theme]);
+    applyThemeToDocument(theme, activeCustomTheme);
+  }, [activeCustomTheme, theme]);
+
+  useEffect(() => {
+    if (theme === 'custom' && !activeCustomTheme) {
+      setTheme('default');
+    }
+  }, [activeCustomTheme, theme]);
+
+  const selectCustomTheme = useCallback((name: string | null) => {
+    setSelectedCustomThemeName(name);
+    saveCustomThemes(customThemes, name);
+  }, [customThemes]);
+
+  const upsertCustomTheme = useCallback((nextTheme: CustomThemeConfig) => {
+    setCustomThemes((prev) => {
+      const nextThemes = upsertStoredCustomTheme(prev, nextTheme);
+      saveCustomThemes(nextThemes, nextTheme.name);
+      return nextThemes;
+    });
+    setSelectedCustomThemeName(nextTheme.name);
+  }, []);
+
+  const removeCustomTheme = useCallback((name: string) => {
+    const nextThemes = removeStoredCustomTheme(customThemes, name);
+    const nextSelectedName =
+      selectedCustomThemeName === name ? nextThemes[0]?.name || null : selectedCustomThemeName;
+    setCustomThemes(nextThemes);
+    setSelectedCustomThemeName(nextSelectedName);
+    saveCustomThemes(nextThemes, nextSelectedName);
+  }, [customThemes, selectedCustomThemeName]);
 
   useEffect(() => {
     setTabs((prevTabs) =>
@@ -377,7 +424,13 @@ export const CampaignProvider: React.FC<{ children: ReactNode }> = ({ children }
   const themeValue = useMemo<CampaignThemeContextValue>(() => ({
     theme,
     setTheme,
-  }), [theme]);
+    customThemes,
+    activeCustomTheme,
+    selectedCustomThemeName,
+    upsertCustomTheme,
+    removeCustomTheme,
+    selectCustomTheme,
+  }), [activeCustomTheme, customThemes, selectCustomTheme, selectedCustomThemeName, theme, upsertCustomTheme, removeCustomTheme]);
 
   const tabsValue = useMemo<CampaignTabsContextValue>(() => ({
     tabs,

@@ -4,6 +4,8 @@ interface EntityTagEditorProps {
   tags?: string[];
   onChange: (nextTags: string[]) => void;
   disabled?: boolean;
+  compact?: boolean;
+  hideLabel?: boolean;
 }
 
 const normalizeTag = (raw: string): string => raw.trim().replace(/\s+/g, ' ');
@@ -22,7 +24,13 @@ const uniqTags = (input: string[]): string[] => {
   return result;
 };
 
-const EntityTagEditor: React.FC<EntityTagEditorProps> = ({ tags = [], onChange, disabled = false }) => {
+const EntityTagEditor: React.FC<EntityTagEditorProps> = ({
+  tags = [],
+  onChange,
+  disabled = false,
+  compact = false,
+  hideLabel = false,
+}) => {
   const [draft, setDraft] = useState('');
   const normalizedTags = useMemo(() => uniqTags(tags), [tags]);
 
@@ -46,8 +54,8 @@ const EntityTagEditor: React.FC<EntityTagEditorProps> = ({ tags = [], onChange, 
 
   return (
     <div className="space-y-2">
-      <label className="text-sm font-medium theme-text-secondary">标签</label>
-      <div className="flex flex-col sm:flex-row gap-2">
+      {!hideLabel && <label className="text-sm font-medium theme-text-secondary">标签</label>}
+      <div className={`flex ${compact ? 'flex-col gap-1.5' : 'flex-col sm:flex-row gap-2'}`}>
         <input
           type="text"
           value={draft}
@@ -60,13 +68,17 @@ const EntityTagEditor: React.FC<EntityTagEditorProps> = ({ tags = [], onChange, 
           }}
           placeholder="输入标签后回车，可用逗号批量添加"
           disabled={disabled}
-          className="flex-1 px-3 py-2 border border-theme rounded-md bg-transparent focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+          className={`flex-1 border border-theme rounded-md bg-transparent focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent ${
+            compact ? 'px-2.5 py-1.5 text-xs' : 'px-3 py-2'
+          }`}
         />
         <button
           type="button"
           onClick={commitDraft}
           disabled={disabled}
-          className="px-3 py-2 bg-primary text-white rounded-md hover:bg-primary-dark transition-colors whitespace-nowrap"
+          className={`bg-primary text-white rounded-md hover:bg-primary-dark transition-colors whitespace-nowrap ${
+            compact ? 'self-start px-2.5 py-1.5 text-xs' : 'px-3 py-2'
+          }`}
         >
           添加标签
         </button>

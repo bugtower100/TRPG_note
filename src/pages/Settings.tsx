@@ -1,11 +1,16 @@
-import React, { lazy, Suspense, useState } from 'react';
+import React, { lazy, Suspense, useMemo, useState } from 'react';
 import { useCampaignSession, useCampaignTheme } from '../context/CampaignContext';
 import { CampaignTheme } from '../types';
-import { Monitor, Scroll, Archive, ChevronDown, ChevronRight } from 'lucide-react';
+import { Monitor, Scroll, Archive, ChevronDown, ChevronRight, Upload, Download, Trash2 } from 'lucide-react';
 import { APP_VERSION } from '../constants/appVersion';
 import { backupService } from '../services/backupService';
 import BackupExportDialog from '../components/common/BackupExportDialog';
 import ResourceManagementSection from '../features/resources/components/ResourceManagementSection';
+import {
+  BUILTIN_THEME_OPTIONS,
+  downloadCustomThemeTemplate,
+  parseCustomThemeFile,
+} from '../features/themes/themeService';
 
 const ImportAssistant = lazy(() => import('./ImportAssistant'));
 const VersionHistory = lazy(() => import('./VersionHistory'));
@@ -17,16 +22,40 @@ const sectionFallback = (
 
 const Settings: React.FC = () => {
   const { currentCampaignId, user } = useCampaignSession();
-  const { theme, setTheme } = useCampaignTheme();
+  const {
+    theme,
+    setTheme,
+    customThemes,
+    activeCustomTheme,
+    selectedCustomThemeName,
+    upsertCustomTheme,
+    removeCustomTheme,
+    selectCustomTheme,
+  } = useCampaignTheme();
   const [importCollapsed, setImportCollapsed] = useState(true);
   const [versionCollapsed, setVersionCollapsed] = useState(true);
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
-  const themes: { id: CampaignTheme; label: string; icon: React.ReactNode; desc: string }[] = [
-    { id: 'default', label: '默认风格', icon: <Monitor size={20} />, desc: '淡雅的紫色调，柔和且适合现代阅读。' },
-    { id: 'scroll', label: '复古羊皮纸', icon: <Scroll size={20} />, desc: '温暖的黄色调，带来经典 TRPG 氛围。' },
-    { id: 'archive', label: '未来科技', icon: <Archive size={20} />, desc: '高对比度深色调，适合科幻或调查模组。' },
-    { id: 'nature', label: '薄巧清新', icon: <Monitor size={20} />, desc: '薄荷绿主调搭配棕色文字与边框，清新耐看。' },
-  ];
+  const [themeStatus, setThemeStatus] = useState('');
+  const themes: { id: CampaignTheme; label: string; icon: React.ReactNode; desc: string }[] = useMemo(() => BUILTIN_THEME_OPTIONS.filter((item) => item.id !== 'custom').map((item) => ({
+    ...item,
+    icon:
+      item.id === 'scroll' ? <Scroll size={20} /> :
+      item.id === 'archive' ? <Archive size={20} /> :
+      <Monitor size={20} />,
+  })), []);
+
+  const handleImportCustomTheme = async (file?: File) => {
+    if (!file) return;
+    try {
+      const parsed = await parseCustomThemeFile(file);
+      const exists = customThemes.some((item) => item.name === parsed.name);
+      upsertCustomTheme(parsed);
+      setTheme('custom');
+      setThemeStatus(exists ? `已覆盖同名主题：${parsed.name}` : `已导入自定义主题：${parsed.name}`);
+    } catch (error) {
+      setThemeStatus(error instanceof Error ? error.message : '自定义主题导入失败');
+    }
+  };
 
   const handleExportCurrentBackup = async (includeAssets: boolean) => {
     if (!currentCampaignId) return;
@@ -60,6 +89,96 @@ const Settings: React.FC = () => {
                     <div className="text-xs text-center mt-1 theme-text-secondary">{t.desc}</div>
                 </button>
             ))}
+        </div>
+        <div className="mt-4 rounded-lg border border-theme p-4 space-y-3">
+          <div>
+            <div className="font-medium">自定义主题库</div>
+            <div className="text-sm theme-text-secondary mt-1">
+              上传的主题会按 `name` 保存到本地。你可以保留多份主题，并通过下拉框切换当前使用的主题。
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_auto] gap-3 items-start">
+            <div className="space-y-2">
+              <label className="text-sm theme-text-secondary">当前自定义主题</label>
+              <select
+                value={selectedCustomThemeName || ''}
+                onChange={(event) => {
+                  const nextName = event.target.value || null;
+                  selectCustomTheme(nextName);
+                  if (nextName) {
+                    setTheme('custom');
+                    setThemeStatus(`已切换到自定义主题：${nextName}`);
+                  }
+                }}
+                disabled={customThemes.length === 0}
+                className="w-full px-3 py-2 rounded border border-theme bg-transparent"
+              >
+                <option value="">{customThemes.length === 0 ? '暂无已上传主题' : '请选择已上传主题'}</option>
+                {customThemes.map((item) => (
+                  <option key={item.name} value={item.name}>
+                    {item.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                if (!selectedCustomThemeName) {
+                  setThemeStatus('请先从下拉框选择一个自定义主题。');
+                  return;
+                }
+                setTheme('custom');
+                setThemeStatus(`已应用自定义主题：${selectedCustomThemeName}`);
+              }}
+              disabled={!selectedCustomThemeName}
+              className="px-3 py-2 rounded border border-theme hover:bg-primary-light text-sm disabled:opacity-50"
+            >
+              使用当前主题
+            </button>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <label className="inline-flex items-center gap-2 px-3 py-2 rounded border border-theme hover:bg-primary-light cursor-pointer text-sm">
+              <Upload size={16} />
+              上传主题 JSON
+              <input
+                type="file"
+                accept="application/json,.json"
+                className="hidden"
+                onChange={(event) => void handleImportCustomTheme(event.target.files?.[0])}
+              />
+            </label>
+            <button
+              type="button"
+              onClick={downloadCustomThemeTemplate}
+              className="inline-flex items-center gap-2 px-3 py-2 rounded border border-theme hover:bg-primary-light text-sm"
+            >
+              <Download size={16} />
+              下载模板
+            </button>
+            {selectedCustomThemeName && (
+              <button
+                type="button"
+                onClick={() => {
+                  removeCustomTheme(selectedCustomThemeName);
+                  if (theme === 'custom' && selectedCustomThemeName === activeCustomTheme?.name) {
+                    setTheme('default');
+                  }
+                  setThemeStatus(`已删除自定义主题：${selectedCustomThemeName}`);
+                }}
+                className="inline-flex items-center gap-2 px-3 py-2 rounded border border-red-300 text-red-600 hover:bg-red-50 text-sm"
+              >
+                <Trash2 size={16} />
+                清除自定义主题
+              </button>
+            )}
+          </div>
+          {activeCustomTheme && (
+            <div className="text-sm theme-text-secondary">
+              当前选中：`{activeCustomTheme.name}`
+            </div>
+          )}
+          {themeStatus && <div className="text-sm theme-text-secondary">{themeStatus}</div>}
         </div>
       </section>
 

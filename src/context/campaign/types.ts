@@ -1,4 +1,5 @@
 import { CampaignData, CampaignSummary, CampaignTheme, UserProfile } from '../../types';
+import { CustomThemeConfig } from '../../features/themes/themeService';
 
 export interface Tab {
   id: string;
@@ -38,6 +39,12 @@ export interface CampaignSessionContextValue {
 export interface CampaignThemeContextValue {
   theme: CampaignTheme;
   setTheme: (theme: CampaignTheme) => void;
+  customThemes: CustomThemeConfig[];
+  activeCustomTheme: CustomThemeConfig | null;
+  selectedCustomThemeName: string | null;
+  upsertCustomTheme: (theme: CustomThemeConfig) => void;
+  removeCustomTheme: (name: string) => void;
+  selectCustomTheme: (name: string | null) => void;
 }
 
 export interface CampaignTabsContextValue {
