@@ -673,8 +673,11 @@ func openDB(cfg Config) *gorm.DB {
 	if err != nil {
 		log.Fatalf("failed to open database: %v", err)
 	}
-	if err := db.AutoMigrate(&KV{}); err != nil {
+	if err := db.AutoMigrate(&KV{}, &AppMeta{}, &SchemaMigration{}); err != nil {
 		log.Fatalf("failed to migrate database: %v", err)
+	}
+	if err := ensureMigrationFoundation(db); err != nil {
+		log.Fatalf("failed to initialize migration foundation: %v", err)
 	}
 	return db
 }
@@ -914,10 +917,27 @@ func main() {
 	// flags
 	showConsole := flag.Bool("show-console", false, "Windows上显示控制台界面")
 	hideUI := flag.Bool("hide-ui", false, "启动时不弹出UI")
+	exportOpenAPI := flag.String("export-openapi", "", "导出 OpenAPI JSON 到指定文件后退出")
 	// multi-instance flag is ignored to enforce single instance
 	_ = flag.Bool("multi-instance", false, "允许在Windows上运行多个实例（已禁用）")
 	_ = flag.Bool("m", false, "multi-instance 的短旗（已禁用）")
 	flag.Parse()
+
+	if strings.TrimSpace(*exportOpenAPI) != "" {
+		openAPIBytes, err := buildPhase1OpenAPISpec()
+		if err != nil {
+			log.Fatalf("failed to build OpenAPI spec: %v", err)
+		}
+		targetPath := filepath.Clean(strings.TrimSpace(*exportOpenAPI))
+		if err := os.MkdirAll(filepath.Dir(targetPath), 0o755); err != nil {
+			log.Fatalf("failed to create OpenAPI output dir: %v", err)
+		}
+		if err := os.WriteFile(targetPath, openAPIBytes, 0o644); err != nil {
+			log.Fatalf("failed to export OpenAPI spec: %v", err)
+		}
+		log.Printf("OpenAPI spec exported to %s", targetPath)
+		return
+	}
 
 	cfg := loadConfig()
 	db := openDB(cfg)
@@ -927,6 +947,9 @@ func main() {
 	}
 
 	router := gin.Default()
+	if err := registerOpenAPISpecRoutes(router); err != nil {
+		log.Fatalf("failed to register OpenAPI spec routes: %v", err)
+	}
 	webRouter := router.Group("/web")
 	router.GET("/", func(c *gin.Context) {
 		// 跳转到/web
@@ -934,11 +957,34 @@ func main() {
 	})
 
 	api := router.Group("/api/storage")
+	systemAPI := router.Group("/api/system")
 	resourceAPI := router.Group("/api/resources")
 	campaignAPI := router.Group("/api/campaigns")
+	v2CampaignAPI := router.Group("/api/v2/campaigns")
 	backupAPI := router.Group("/api/backups")
 
 	registerBackupRoutes(backupAPI, db, cfg)
+
+	systemAPI.GET("/migration/status", func(c *gin.Context) {
+		status, err := buildMigrationStatus(db)
+		if err != nil {
+			c.JSON(500, gin.H{"error": "migration_status_failed"})
+			return
+		}
+		c.JSON(200, status)
+	})
+	systemAPI.POST("/migration/start", func(c *gin.Context) {
+		result, err := startMigration(cfg, db)
+		if err != nil {
+			statusCode := 500
+			if err.Error() == "migration_already_running" {
+				statusCode = 409
+			}
+			c.JSON(statusCode, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(200, result)
+	})
 
 	campaignAPI.GET("/public", func(c *gin.Context) {
 		result, err := rebuildPublicCampaignIndex(db)
@@ -2360,6 +2406,113 @@ func main() {
 				c.JSON(500, gin.H{"error": "database_error"})
 				return
 			}
+		}
+		c.Status(204)
+	})
+
+	v2CampaignAPI.GET("/:campaignId/bundle", func(c *gin.Context) {
+		campaignID := strings.TrimSpace(c.Param("campaignId"))
+		userID, username := requestUser(c)
+		if campaignID == "" || userID == "" || username == "" {
+			c.JSON(400, gin.H{"error": "missing_identity"})
+			return
+		}
+		if _, accessOK := loadCampaignConfigForRequest(c, db, campaignID, userID, username); !accessOK {
+			return
+		}
+
+		bundle, err := loadV2CampaignBundle(db, campaignID)
+		if err != nil {
+			c.JSON(500, gin.H{"error": "database_error"})
+			return
+		}
+		c.JSON(200, bundle)
+	})
+
+	v2CampaignAPI.GET("", func(c *gin.Context) {
+		userID, username := requestUser(c)
+		if userID == "" || username == "" {
+			c.JSON(400, gin.H{"error": "missing_identity"})
+			return
+		}
+		items, err := listV2Campaigns(db, userID)
+		if err != nil {
+			c.JSON(500, gin.H{"error": "database_error"})
+			return
+		}
+		c.JSON(200, items)
+	})
+
+	v2CampaignAPI.POST("", func(c *gin.Context) {
+		userID, username := requestUser(c)
+		if userID == "" || username == "" {
+			c.JSON(400, gin.H{"error": "missing_identity"})
+			return
+		}
+		var req V2CreateCampaignRequest
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(400, gin.H{"error": "invalid_body"})
+			return
+		}
+		result, err := createV2Campaign(db, userID, username, req.Name, req.Description)
+		if err != nil {
+			c.JSON(500, gin.H{"error": "database_error"})
+			return
+		}
+		c.JSON(200, result)
+	})
+
+	v2CampaignAPI.PUT("/:campaignId/bundle", func(c *gin.Context) {
+		campaignID := strings.TrimSpace(c.Param("campaignId"))
+		userID, username := requestUser(c)
+		if campaignID == "" || userID == "" || username == "" {
+			c.JSON(400, gin.H{"error": "missing_identity"})
+			return
+		}
+		if _, accessOK := loadCampaignConfigForRequest(c, db, campaignID, userID, username); !accessOK {
+			return
+		}
+
+		var req V2CampaignBundleUpdateRequest
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(400, gin.H{"error": "invalid_body"})
+			return
+		}
+		result, err := saveV2CampaignBundle(db, campaignID, req)
+		if err != nil {
+			var conflictErr *V2BundleConflictError
+			if errors.As(err, &conflictErr) {
+				c.JSON(409, gin.H{
+					"error":   "conflict",
+					"version": conflictErr.Current.Version,
+					"bundle":  conflictErr.Current.Bundle,
+				})
+				return
+			}
+			c.JSON(500, gin.H{"error": "database_error"})
+			return
+		}
+		c.JSON(200, result)
+	})
+
+	v2CampaignAPI.DELETE("/:campaignId", func(c *gin.Context) {
+		campaignID := strings.TrimSpace(c.Param("campaignId"))
+		userID, username := requestUser(c)
+		if campaignID == "" || userID == "" || username == "" {
+			c.JSON(400, gin.H{"error": "missing_identity"})
+			return
+		}
+		cfg, accessOK := loadCampaignConfigForRequest(c, db, campaignID, userID, username)
+		if !accessOK {
+			return
+		}
+		if cfg.OwnerUserID != userID {
+			c.JSON(403, gin.H{"error": "forbidden"})
+			return
+		}
+		if err := deleteV2Campaign(db, campaignID); err != nil {
+			c.JSON(500, gin.H{"error": "database_error"})
+			return
 		}
 		c.Status(204)
 	})

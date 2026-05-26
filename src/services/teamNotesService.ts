@@ -1,39 +1,26 @@
+import {
+  getCampaignConfig as getGeneratedCampaignConfig,
+  listPublicCampaigns as listGeneratedPublicCampaigns,
+  listTeamNotes as listGeneratedTeamNotes,
+} from '../generated/api';
 import { CampaignConfig, CampaignMemberRole, CampaignVisibility, PublicCampaignSummary, TeamNoteDocument, UserProfile } from '../types';
-import { VersionConflictError } from './conflictError';
-import { campaignAccessService } from './campaignAccessService';
-
-const jsonHeaders = (user: UserProfile | null, campaignId?: string) => ({
-  'Content-Type': 'application/json',
-  'X-TRPG-User-Id': user?.id || '',
-  'X-TRPG-Username': encodeURIComponent(user?.username || ''),
-  ...campaignAccessService.buildHeaders(campaignId),
-});
+import { buildUserHeaders } from './apiClient';
+import {
+  buildCollaborationHeaders,
+  parseCollaborationResponse,
+  readCollaborationErrorMessage,
+  rethrowGeneratedCollaborationError,
+  unwrapGeneratedResponse,
+  type CollaborationErrorPayload,
+} from './collaborationApi';
+import { getGeneratedApiClient } from './generatedApiClient';
 
 class TeamNotesService {
-  private parseErrorPayload(text: string): {
-    error?: string;
-    activeLease?: { username?: string; expiresAt?: number | null };
-    version?: number;
-    remoteNote?: TeamNoteDocument;
-  } | null {
-    if (!text) return null;
-    try {
-      return JSON.parse(text) as {
-        error?: string;
-        activeLease?: { username?: string; expiresAt?: number | null };
-        version?: number;
-        remoteNote?: TeamNoteDocument;
-      };
-    } catch {
-      return null;
-    }
-  }
-
-  private messageFromPayload(payload: {
-    error?: string;
-    activeLease?: { username?: string; expiresAt?: number | null };
-    version?: number;
-  } | null, fallbackText: string, status: number): string {
+  private messageFromPayload(
+    payload: CollaborationErrorPayload<TeamNoteDocument> | null,
+    fallbackText: string,
+    status: number
+  ): string {
     if (!payload) return fallbackText || `HTTP ${status}`;
     if (payload) {
       if (payload.error === 'lease_conflict') {
@@ -65,33 +52,26 @@ class TeamNotesService {
     return fallbackText || `HTTP ${status}`;
   }
 
-  private async readErrorMessage(response: Response): Promise<string> {
-    const text = await response.text();
-    const payload = this.parseErrorPayload(text);
-    return this.messageFromPayload(payload, text, response.status);
-  }
-
   private async parseResponse<T>(response: Response): Promise<T> {
-    if (!response.ok) {
-      const text = await response.text();
-      const payload = this.parseErrorPayload(text);
-      const message = this.messageFromPayload(payload, text, response.status);
-      if (payload?.error === 'version_conflict') {
-        throw new VersionConflictError<TeamNoteDocument>(message, {
-          version: payload.version,
-          remote: payload.remoteNote ?? null,
-        });
-      }
-      throw new Error(message);
-    }
-    return response.json() as Promise<T>;
+    return parseCollaborationResponse<T, TeamNoteDocument>(response, {
+      remoteFieldNames: ['remoteNote'],
+      messageFromPayload: this.messageFromPayload.bind(this),
+    });
   }
 
   async getConfig(campaignId: string, user: UserProfile | null): Promise<CampaignConfig> {
-    const response = await fetch(`/api/campaigns/${campaignId}/config`, {
-      headers: jsonHeaders(user, campaignId),
-    });
-    return this.parseResponse<CampaignConfig>(response);
+    try {
+      return unwrapGeneratedResponse(await getGeneratedCampaignConfig({
+        client: getGeneratedApiClient(),
+        headers: buildUserHeaders(user, { campaignId }),
+        path: { campaignId },
+      })) as CampaignConfig;
+    } catch (error) {
+      rethrowGeneratedCollaborationError<TeamNoteDocument>(error, {
+        remoteFieldNames: ['remoteNote'],
+        messageFromPayload: this.messageFromPayload.bind(this),
+      });
+    }
   }
 
   async updateConfig(
@@ -108,7 +88,7 @@ class TeamNotesService {
   ): Promise<CampaignConfig> {
     const response = await fetch(`/api/campaigns/${campaignId}/config`, {
       method: 'PUT',
-      headers: jsonHeaders(user, campaignId),
+      headers: buildCollaborationHeaders(user, campaignId),
       body: JSON.stringify(payload),
     });
     return this.parseResponse<CampaignConfig>(response);
@@ -117,22 +97,30 @@ class TeamNotesService {
   async removeMember(campaignId: string, memberUserId: string, user: UserProfile | null): Promise<CampaignConfig> {
     const response = await fetch(`/api/campaigns/${campaignId}/members/${memberUserId}`, {
       method: 'DELETE',
-      headers: jsonHeaders(user, campaignId),
+      headers: buildCollaborationHeaders(user, campaignId),
     });
     return this.parseResponse<CampaignConfig>(response);
   }
 
   async listTeamNotes(campaignId: string, user: UserProfile | null): Promise<TeamNoteDocument[]> {
-    const response = await fetch(`/api/campaigns/${campaignId}/team-notes`, {
-      headers: jsonHeaders(user, campaignId),
-    });
-    return this.parseResponse<TeamNoteDocument[]>(response);
+    try {
+      return (unwrapGeneratedResponse(await listGeneratedTeamNotes({
+        client: getGeneratedApiClient(),
+        headers: buildUserHeaders(user, { campaignId }),
+        path: { campaignId },
+      })) ?? []) as TeamNoteDocument[];
+    } catch (error) {
+      rethrowGeneratedCollaborationError<TeamNoteDocument>(error, {
+        remoteFieldNames: ['remoteNote'],
+        messageFromPayload: this.messageFromPayload.bind(this),
+      });
+    }
   }
 
   async createTeamNote(campaignId: string, user: UserProfile | null, title: string): Promise<TeamNoteDocument> {
     const response = await fetch(`/api/campaigns/${campaignId}/team-notes`, {
       method: 'POST',
-      headers: jsonHeaders(user, campaignId),
+      headers: buildCollaborationHeaders(user, campaignId),
       body: JSON.stringify({ title }),
     });
     return this.parseResponse<TeamNoteDocument>(response);
@@ -146,7 +134,7 @@ class TeamNotesService {
   ): Promise<TeamNoteDocument> {
     const response = await fetch(`/api/campaigns/${campaignId}/team-notes/${noteId}`, {
       method: 'PUT',
-      headers: jsonHeaders(user, campaignId),
+      headers: buildCollaborationHeaders(user, campaignId),
       body: JSON.stringify(payload),
     });
     return this.parseResponse<TeamNoteDocument>(response);
@@ -155,7 +143,7 @@ class TeamNotesService {
   async startLease(campaignId: string, noteId: string, user: UserProfile | null, role: CampaignMemberRole): Promise<TeamNoteDocument> {
     const response = await fetch(`/api/campaigns/${campaignId}/team-notes/${noteId}/lease/start`, {
       method: 'POST',
-      headers: jsonHeaders(user, campaignId),
+      headers: buildCollaborationHeaders(user, campaignId),
       body: JSON.stringify({ role }),
     });
     return this.parseResponse<TeamNoteDocument>(response);
@@ -170,7 +158,7 @@ class TeamNotesService {
   ): Promise<TeamNoteDocument> {
     const response = await fetch(`/api/campaigns/${campaignId}/team-notes/${noteId}/lease/refresh`, {
       method: 'POST',
-      headers: jsonHeaders(user, campaignId),
+      headers: buildCollaborationHeaders(user, campaignId),
       body: JSON.stringify({ role, leaseStartedAt }),
     });
     return this.parseResponse<TeamNoteDocument>(response);
@@ -179,29 +167,42 @@ class TeamNotesService {
   async endLease(campaignId: string, noteId: string, user: UserProfile | null, leaseStartedAt?: number | null): Promise<void> {
     const response = await fetch(`/api/campaigns/${campaignId}/team-notes/${noteId}/lease/end`, {
       method: 'POST',
-      headers: jsonHeaders(user, campaignId),
+      headers: buildCollaborationHeaders(user, campaignId),
       body: JSON.stringify({ leaseStartedAt }),
     });
     if (!response.ok) {
-      throw new Error(await this.readErrorMessage(response));
+      throw new Error(await readCollaborationErrorMessage<TeamNoteDocument>(response, {
+        remoteFieldNames: ['remoteNote'],
+        messageFromPayload: this.messageFromPayload.bind(this),
+      }));
     }
   }
 
   async deleteTeamNote(campaignId: string, noteId: string, user: UserProfile | null): Promise<void> {
     const response = await fetch(`/api/campaigns/${campaignId}/team-notes/${noteId}`, {
       method: 'DELETE',
-      headers: jsonHeaders(user, campaignId),
+      headers: buildCollaborationHeaders(user, campaignId),
     });
     if (!response.ok) {
-      throw new Error(await this.readErrorMessage(response));
+      throw new Error(await readCollaborationErrorMessage<TeamNoteDocument>(response, {
+        remoteFieldNames: ['remoteNote'],
+        messageFromPayload: this.messageFromPayload.bind(this),
+      }));
     }
   }
 
   async listPublicCampaigns(user: UserProfile | null): Promise<PublicCampaignSummary[]> {
-    const response = await fetch('/api/campaigns/public', {
-      headers: jsonHeaders(user),
-    });
-    return this.parseResponse<PublicCampaignSummary[]>(response);
+    try {
+      return (unwrapGeneratedResponse(await listGeneratedPublicCampaigns({
+        client: getGeneratedApiClient(),
+        headers: buildUserHeaders(user),
+      })) ?? []) as PublicCampaignSummary[];
+    } catch (error) {
+      rethrowGeneratedCollaborationError<TeamNoteDocument>(error, {
+        remoteFieldNames: ['remoteNote'],
+        messageFromPayload: this.messageFromPayload.bind(this),
+      });
+    }
   }
 }
 

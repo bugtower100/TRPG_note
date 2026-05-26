@@ -7,15 +7,13 @@ import { GuideHelpButton, GuideId } from './common/InteractiveGuide';
 
 const Layout: React.FC = () => {
   const { tabs } = useCampaignTabs();
-  const { exportData, importData } = useCampaignSession();
+  const { currentCampaignId, isCampaignSaving, hasUnsavedChanges, sessionError, clearSessionError, reloadCurrentCampaign } = useCampaignSession();
   const location = useLocation();
   const [isTabPanelMaximized, setIsTabPanelMaximized] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [mobileTabsOpen, setMobileTabsOpen] = useState(false);
   const [backendStatus, setBackendStatus] = useState<{ online: boolean; offlineSince?: number; syncedAt?: number; conflicts?: Array<{ key: string; localTime?: number; remoteTime?: number }>; unsyncedCount?: number; latencyMs?: number } | null>(null);
-  const [showConflicts, setShowConflicts] = useState(false);
-  const fileInputRef = React.useRef<HTMLInputElement>(null);
   const mobileSidebarRef = React.useRef<HTMLDivElement>(null);
   const mobileTabsRef = React.useRef<HTMLDivElement>(null);
 
@@ -154,61 +152,49 @@ const Layout: React.FC = () => {
       )}
       <main className={`flex-1 flex overflow-hidden ${!isMobile ? 'ml-56' : ''}`}>
         <div className={`absolute ${!isMobile ? 'left-56' : 'left-0'} right-0 top-0 z-50`}>
-          {backendStatus?.online === false ? (
+          {sessionError ? (
             <div className="bg-red-600 text-white px-4 py-2 text-sm flex items-center justify-between">
               <span>
-                当前无法连接后端，正在使用浏览器缓存。本地修改将保存在浏览器中，连接恢复后会自动同步。
-                {typeof backendStatus?.unsyncedCount === 'number' ? ` 离线未同步键数：${backendStatus.unsyncedCount}` : ''}
+                {sessionError}
               </span>
               <div className="flex items-center gap-2">
-                <input
-                  type="file"
-                  ref={fileInputRef}
-                  accept=".json"
-                  className="hidden"
-                  onChange={async (e) => {
-                    const file = e.target.files?.[0];
-                    if (file) await importData(file);
-                    e.currentTarget.value = '';
-                  }}
-                />
-                <button className="px-2 py-1 bg-white text-red-700 rounded text-xs" onClick={() => exportData()}>
-                  导出当前模组
-                </button>
-                <button className="px-2 py-1 bg-white text-red-700 rounded text-xs" onClick={() => fileInputRef.current?.click()}>
-                  导入 JSON
+                {currentCampaignId && (
+                  <button
+                    className="px-2 py-1 bg-white text-red-700 rounded text-xs"
+                    onClick={() => {
+                      void reloadCurrentCampaign().catch(() => void 0);
+                    }}
+                  >
+                    重新加载远端版本
+                  </button>
+                )}
+                <button className="px-2 py-1 bg-white text-red-700 rounded text-xs" onClick={clearSessionError}>
+                  关闭
                 </button>
               </div>
             </div>
-          ) : backendStatus?.online === true && backendStatus?.conflicts && backendStatus.conflicts.length > 0 ? (
-            <div className="bg-yellow-500 text-black px-4 py-2 text-sm flex items-center justify-between">
-              <span>检测到存档版本差异，条目数：{backendStatus.conflicts.length}。最近同步时间：{backendStatus.syncedAt ? new Date(backendStatus.syncedAt).toLocaleString() : ''}</span>
-              <button className="px-2 py-1 border border-black/20 rounded bg-white text-black text-xs" onClick={() => setShowConflicts((v) => !v)}>
-                {showConflicts ? '收起' : '查看详情'}
-              </button>
+          ) : backendStatus?.online === false && currentCampaignId ? (
+            <div className="bg-red-600 text-white px-4 py-2 text-sm">
+              当前无法连接后端。正式数据不会静默保存到浏览器缓存，请在连接恢复后再继续保存；当前页面中的未保存修改在刷新或关闭后可能丢失。
+            </div>
+          ) : currentCampaignId && isCampaignSaving ? (
+            <div className="bg-blue-600 text-white px-4 py-2 text-sm">
+              正在将当前模组写入后端，请不要立即关闭页面。
+            </div>
+          ) : currentCampaignId && hasUnsavedChanges ? (
+            <div className="bg-amber-500 text-black px-4 py-2 text-sm">
+              当前模组存在未保存修改。系统会尝试自动保存，但在看到保存成功前请不要刷新或关闭页面。
             </div>
           ) : null}
         </div>
         <div className={`fixed z-40 ${isMobile ? 'right-3 bottom-4' : 'right-4 bottom-3'}`}>
           <span className={`px-2 py-1 rounded text-xs shadow-sm ${backendStatus?.online ? 'bg-green-600 text-white' : 'bg-gray-700 text-white'}`}>
             {backendStatus?.online ? '在线' : '离线'}{backendStatus?.online && typeof backendStatus?.latencyMs === 'number' ? ` ${backendStatus.latencyMs}ms` : ''}
-            {backendStatus?.online ? '' : (typeof backendStatus?.unsyncedCount === 'number' ? `（未同步${backendStatus.unsyncedCount}）` : '')}
           </span>
         </div>
         {currentGuideId && (
           <div className={`absolute z-50 ${isMobile ? 'right-3 top-14' : 'right-4 top-2'}`}>
             <GuideHelpButton guideId={currentGuideId} />
-          </div>
-        )}
-        {showConflicts && backendStatus?.conflicts && backendStatus.conflicts.length > 0 && (
-          <div className={`absolute ${!isMobile ? 'left-56' : 'left-0'} right-0 top-10 z-40 bg-white border border-yellow-500 rounded shadow p-3 text-xs`}>
-            {backendStatus.conflicts.map((c) => (
-              <div key={c.key} className="py-1 flex items-center justify-between">
-                <span className="font-medium break-all">{c.key}</span>
-                <span className="ml-2">云端：{c.remoteTime ? new Date(c.remoteTime).toLocaleString() : '未知'}</span>
-                <span className="ml-2">本地：{c.localTime ? new Date(c.localTime).toLocaleString() : '未知'}</span>
-              </div>
-            ))}
           </div>
         )}
         {isMobile && (

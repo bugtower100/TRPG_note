@@ -1,3 +1,4 @@
+import type { Dispatch, SetStateAction } from 'react';
 import { CampaignData, CampaignSummary, CampaignTheme, UserProfile } from '../../types';
 import { CustomThemeConfig } from '../../features/themes/themeService';
 
@@ -12,7 +13,7 @@ export interface Tab {
 
 export interface CampaignDataContextValue {
   campaignData: CampaignData;
-  setCampaignData: (data: CampaignData) => void;
+  setCampaignData: Dispatch<SetStateAction<CampaignData>>;
   updateEntity: (collection: keyof CampaignData, item: any) => void;
   deleteEntity: (collection: keyof CampaignData, id: string) => void;
   addEntity: (collection: keyof CampaignData, item: any) => void;
@@ -27,9 +28,15 @@ export interface CampaignSessionContextValue {
   logout: () => void;
   currentCampaignId: string | null;
   campaignList: CampaignSummary[];
-  switchCampaign: (id: string) => void;
-  createNewCampaign: (name: string, description: string) => void;
-  deleteCampaign: (id: string) => void;
+  isCampaignLoading: boolean;
+  isCampaignSaving: boolean;
+  hasUnsavedChanges: boolean;
+  sessionError: string | null;
+  clearSessionError: () => void;
+  reloadCurrentCampaign: () => Promise<void>;
+  switchCampaign: (id: string) => Promise<void>;
+  createNewCampaign: (name: string, description: string) => Promise<void>;
+  deleteCampaign: (id: string) => Promise<void>;
   exitCampaign: () => void;
   exportData: () => void;
   importData: (file: File) => Promise<void>;

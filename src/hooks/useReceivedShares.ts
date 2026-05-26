@@ -1,32 +1,32 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useCampaignSession } from '../context/CampaignContext';
+import { queryKeys } from '../query/queryKeys';
 import { GraphEntityType, SharedEntityRecord } from '../types';
 import { sharingService } from '../services/sharingService';
 
 export const useReceivedShares = (entityType: GraphEntityType) => {
   const { currentCampaignId, user } = useCampaignSession();
-  const [shares, setShares] = useState<SharedEntityRecord[]>([]);
 
-  const loadShares = useCallback(async () => {
-    if (!currentCampaignId || !user) {
-      setShares([]);
-      return;
-    }
-    const items = await sharingService.listReceivedShares(currentCampaignId, user);
-    setShares(items.filter((item) => item.targetUserId === user.id && item.entityType === entityType));
-  }, [currentCampaignId, entityType, user]);
+  const sharesQuery = useQuery({
+    queryKey: currentCampaignId
+      ? queryKeys.campaigns.shares(currentCampaignId, 'received', user?.id)
+      : ['campaigns', 'shares', 'received', 'disabled'] as const,
+    queryFn: async () => {
+      if (!currentCampaignId || !user) {
+        return [] as SharedEntityRecord[];
+      }
+      return sharingService.listReceivedShares(currentCampaignId, user);
+    },
+    enabled: Boolean(currentCampaignId && user),
+    refetchInterval: 15_000,
+  });
 
-  useEffect(() => {
-    loadShares().catch(() => setShares([]));
-  }, [loadShares]);
-
-  useEffect(() => {
-    if (!currentCampaignId || !user) return;
-    const timer = window.setInterval(() => {
-      loadShares().catch(() => void 0);
-    }, 15000);
-    return () => window.clearInterval(timer);
-  }, [currentCampaignId, loadShares, user]);
-
-  return shares;
+  return useMemo(
+    () =>
+      (sharesQuery.data ?? []).filter(
+        (item) => item.targetUserId === user?.id && item.entityType === entityType
+      ),
+    [entityType, sharesQuery.data, user?.id]
+  );
 };

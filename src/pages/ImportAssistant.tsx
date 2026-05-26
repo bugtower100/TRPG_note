@@ -212,7 +212,6 @@ const ImportAssistant: React.FC<ImportAssistantProps> = ({ allowLegacyJsonImport
         const current = Array.isArray(campaignData[key]) ? campaignData[key] : [];
         nextData[key] = mergeMode === 'replace' ? incoming : appendWithIdGuard(current, incoming);
       });
-      dataService.saveCampaign(nextData);
       setCampaignData(nextData);
       setJobs((prev) =>
         prev.map((job) =>

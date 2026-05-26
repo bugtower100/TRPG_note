@@ -1,7 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { MoreHorizontal, Share2 } from 'lucide-react';
 import ShareDialog from './ShareDialog';
 import { useCampaignSession } from '../../context/CampaignContext';
+import { queryKeys } from '../../query/queryKeys';
 import { BaseEntity, CampaignConfig, CustomSubItem, GraphEntityType, ShareScope, SharedPermission } from '../../types';
 import { sharingService } from '../../services/sharingService';
 import { buildSharedSnapshot } from '../../utils/shareSnapshot';
@@ -28,17 +30,27 @@ const EntityShareActions: React.FC<EntityShareActionsProps> = ({
   const { currentCampaignId, user } = useCampaignSession();
   const [open, setOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [config, setConfig] = useState<CampaignConfig | null>(null);
   const [statusText, setStatusText] = useState('');
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
+  const configQuery = useQuery({
+    queryKey: currentCampaignId
+      ? queryKeys.campaigns.config(currentCampaignId, user?.id)
+      : ['campaigns', 'config', 'share-actions-disabled'] as const,
+    queryFn: async () => {
+      if (!currentCampaignId || !user) {
+        return null as CampaignConfig | null;
+      }
+      return sharingService.getCampaignConfig(currentCampaignId, user);
+    },
+    enabled: Boolean(currentCampaignId && user),
+  });
+  const config = configQuery.data ?? null;
 
   useEffect(() => {
-    if (!currentCampaignId || !user) return;
-    sharingService.getCampaignConfig(currentCampaignId, user)
-      .then(setConfig)
-      .catch((error) => setStatusText(error instanceof Error ? error.message : '分享配置加载失败'));
-  }, [currentCampaignId, user]);
+    if (!configQuery.error) return;
+    setStatusText(configQuery.error instanceof Error ? configQuery.error.message : '分享配置加载失败');
+  }, [configQuery.error]);
 
   const memberRole = useMemo(() => {
     if (!config || !user) return 'PL';

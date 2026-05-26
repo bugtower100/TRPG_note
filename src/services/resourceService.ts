@@ -1,3 +1,5 @@
+import { parseJsonResponse } from './apiClient';
+
 export interface ResourceItem {
   ref: string;
   url: string;
@@ -211,8 +213,7 @@ export const resourceService = {
 
   async list(): Promise<ResourceListResult> {
     const res = await fetch('/api/resources/list');
-    if (!res.ok) throw new Error('list_failed');
-    const data = await res.json();
+    const data = await parseJsonResponse<Record<string, unknown>>(res, 'list_failed');
     const folders = Array.isArray(data?.folders) ? data.folders : [];
     const items = Array.isArray(data?.items) ? data.items : [];
     return {
@@ -242,8 +243,7 @@ export const resourceService = {
       method: 'POST',
       body: formData,
     });
-    if (!res.ok) throw new Error('upload_failed');
-    return res.json();
+    return parseJsonResponse<{ ref: string; url: string }>(res, 'upload_failed');
   },
 
   async deleteOne(ref: string): Promise<void> {

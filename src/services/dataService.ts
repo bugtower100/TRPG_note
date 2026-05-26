@@ -1,13 +1,9 @@
-import { CampaignData, UserProfile, CampaignSummary, BaseEntity, Character, Location, Organization, Event, Clue, Timeline, Monster, RelationGraph, ClueRevealStatus, ClueRevealLogItem, SessionTask, SessionTaskStatus } from '../types';
+import { CampaignData, UserProfile, BaseEntity, Character, Location, Organization, Event, Clue, Timeline, Monster, RelationGraph, ClueRevealStatus, ClueRevealLogItem, SessionTask, SessionTaskStatus } from '../types';
 import { v4 as uuidv4 } from 'uuid';
-import { StorageAdapter } from './storageAdapter';
 
 const STORAGE_KEYS = {
-  CAMPAIGN_DATA: 'trpg_campaign_data', // Legacy key, keep for migration
   USERS: 'trpg_users',
-  CAMPAIGN_INDEX: 'trpg_campaign_index',
   CURRENT_USER: 'trpg_current_user',
-  DRAFT_PREFIX: 'trpg_draft_',
 } as const;
 
 export const DEFAULT_CAMPAIGN_DATA: CampaignData = {
@@ -51,29 +47,17 @@ const hashSecret = (input: string): string => {
 };
 
 class DataService {
-  private storage: StorageAdapter = {
+  private storage = {
     getItem: (key) => window.localStorage.getItem(key),
     setItem: (key, value) => window.localStorage.setItem(key, value),
     removeItem: (key) => window.localStorage.removeItem(key),
     keys: () => Object.keys(window.localStorage),
   };
-
-  setStorageAdapter(adapter: StorageAdapter): void {
-    this.storage = adapter;
-  }
   
   private userPrefix(): string {
     const u = this.getStoredData<UserProfile>(STORAGE_KEYS.CURRENT_USER);
     const id = typeof u?.id === 'string' && u.id ? u.id : 'default';
     return `trpg_u_${id}_`;
-  }
-
-  private indexKey(): string {
-    return `${this.userPrefix()}campaign_index`;
-  }
-
-  private campaignKey(id: string): string {
-    return `${this.userPrefix()}campaign_${id}`;
   }
 
   private draftKey(id: string): string {
@@ -461,57 +445,6 @@ class DataService {
     }
   }
 
-  // --- Campaign Index Management ---
-  getCampaigns(userId?: string): CampaignSummary[] {
-    const scoped = this.getStoredData<CampaignSummary[]>(this.indexKey()) || [];
-    if (!userId) return scoped;
-    return scoped.filter(c => c.ownerId === userId);
-  }
-
-  ensureCampaignSummary(summary: CampaignSummary): void {
-    const index = this.getCampaigns();
-    const summaryIdx = index.findIndex((campaign) => campaign.id === summary.id);
-    if (summaryIdx >= 0) {
-      index[summaryIdx] = { ...index[summaryIdx], ...summary };
-    } else {
-      index.push(summary);
-    }
-    this.saveDataToStorage(this.indexKey(), index);
-  }
-
-  createCampaign(name: string, description: string, ownerId: string): CampaignData {
-    const newId = uuidv4();
-    const newCampaign: CampaignData = {
-      ...DEFAULT_CAMPAIGN_DATA,
-      id: newId,
-      meta: {
-        ...DEFAULT_CAMPAIGN_DATA.meta,
-        schemaVersion: 2,
-        projectName: name,
-        description,
-        lastModified: Date.now(),
-      }
-    };
-
-    // Save actual data
-    this.saveDataToStorage(this.campaignKey(newId), newCampaign);
-
-    // Update Index
-    const index = this.getCampaigns(ownerId);
-    index.push({
-      id: newId,
-      name,
-      description,
-      lastModified: Date.now(),
-      ownerId,
-      visibility: 'private',
-      schemaVersion: 2,
-    });
-    this.saveDataToStorage(this.indexKey(), index);
-
-    return newCampaign;
-  }
-
   // --- File System Storage ---
   async saveToFileSystem(data: CampaignData, existingHandle?: any): Promise<any> {
     try {
@@ -576,60 +509,6 @@ class DataService {
       }
       return null;
     }
-  }
-
-  // --- Campaign Data Operations ---
-  loadCampaign(id?: string): CampaignData {
-    if (!id) {
-      return DEFAULT_CAMPAIGN_DATA;
-    }
-
-    const data = this.getStoredData<any>(this.campaignKey(id));
-    if (data) {
-      const normalized = this.normalizeCampaignData(data);
-      this.saveDataToStorage(this.campaignKey(normalized.id!), normalized);
-      return normalized;
-    }
-    const fresh = this.normalizeCampaignData({ ...DEFAULT_CAMPAIGN_DATA, id });
-    this.saveDataToStorage(this.campaignKey(fresh.id!), fresh);
-    return fresh;
-  }
-
-  saveCampaign(data: CampaignData): void {
-    const normalized = this.normalizeCampaignData(data);
-    const updatedData = {
-      ...normalized,
-      meta: {
-        ...normalized.meta,
-        lastModified: Date.now(),
-      }
-    };
-
-    if (updatedData.id) {
-      // Save to specific key
-      this.saveDataToStorage(this.campaignKey(updatedData.id), updatedData);
-      
-      // Update Index
-      const currentUser = this.getCurrentUser();
-      const index = this.getCampaigns(currentUser?.id);
-      const summaryIdx = index.findIndex(c => c.id === updatedData.id);
-      if (summaryIdx >= 0) {
-        index[summaryIdx] = {
-          ...index[summaryIdx],
-          name: updatedData.meta.projectName,
-          description: updatedData.meta.description || '',
-          lastModified: Date.now(),
-        };
-        this.saveDataToStorage(this.indexKey(), index);
-      }
-    }
-  }
-
-  deleteCampaign(id: string): void {
-    this.storage.removeItem(this.campaignKey(id));
-    const index = this.getCampaigns();
-    const newIndex = index.filter(c => c.id !== id);
-    this.saveDataToStorage(this.indexKey(), newIndex);
   }
 
   // --- Drafts ---

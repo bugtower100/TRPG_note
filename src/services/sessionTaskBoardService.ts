@@ -1,39 +1,22 @@
+import { getSessionTasks as getGeneratedSessionTasks } from '../generated/api';
 import { CampaignMemberRole, SessionTask, SessionTaskBoardDocument, UserProfile } from '../types';
-import { VersionConflictError } from './conflictError';
-import { campaignAccessService } from './campaignAccessService';
-
-const jsonHeaders = (user: UserProfile | null, campaignId?: string) => ({
-  'Content-Type': 'application/json',
-  'X-TRPG-User-Id': user?.id || '',
-  'X-TRPG-Username': encodeURIComponent(user?.username || ''),
-  ...campaignAccessService.buildHeaders(campaignId),
-});
+import { buildUserHeaders } from './apiClient';
+import {
+  buildCollaborationHeaders,
+  parseCollaborationResponse,
+  readCollaborationErrorMessage,
+  rethrowGeneratedCollaborationError,
+  unwrapGeneratedResponse,
+  type CollaborationErrorPayload,
+} from './collaborationApi';
+import { getGeneratedApiClient } from './generatedApiClient';
 
 class SessionTaskBoardService {
-  private parseErrorPayload(text: string): {
-    error?: string;
-    activeLease?: { username?: string; expiresAt?: number | null };
-    version?: number;
-    remoteDoc?: SessionTaskBoardDocument;
-  } | null {
-    if (!text) return null;
-    try {
-      return JSON.parse(text) as {
-        error?: string;
-        activeLease?: { username?: string; expiresAt?: number | null };
-        version?: number;
-        remoteDoc?: SessionTaskBoardDocument;
-      };
-    } catch {
-      return null;
-    }
-  }
-
-  private messageFromPayload(payload: {
-    error?: string;
-    activeLease?: { username?: string; expiresAt?: number | null };
-    version?: number;
-  } | null, fallbackText: string, status: number): string {
+  private messageFromPayload(
+    payload: CollaborationErrorPayload<SessionTaskBoardDocument> | null,
+    fallbackText: string,
+    status: number
+  ): string {
     if (!payload) return fallbackText || `HTTP ${status}`;
     if (payload.error === 'lease_conflict') {
       const username = payload.activeLease?.username || '其他人';
@@ -67,32 +50,25 @@ class SessionTaskBoardService {
   }
 
   private async parseResponse<T>(response: Response): Promise<T> {
-    if (!response.ok) {
-      const text = await response.text();
-      const payload = this.parseErrorPayload(text);
-      const message = this.messageFromPayload(payload, text, response.status);
-      if (payload?.error === 'version_conflict') {
-        throw new VersionConflictError<SessionTaskBoardDocument>(message, {
-          version: payload.version,
-          remote: payload.remoteDoc ?? null,
-        });
-      }
-      throw new Error(message);
-    }
-    return response.json() as Promise<T>;
-  }
-
-  private async readErrorMessage(response: Response): Promise<string> {
-    const text = await response.text();
-    const payload = this.parseErrorPayload(text);
-    return this.messageFromPayload(payload, text, response.status);
+    return parseCollaborationResponse<T, SessionTaskBoardDocument>(response, {
+      remoteFieldNames: ['remoteDoc'],
+      messageFromPayload: this.messageFromPayload.bind(this),
+    });
   }
 
   async getTaskBoard(campaignId: string, user: UserProfile | null): Promise<SessionTaskBoardDocument> {
-    const response = await fetch(`/api/campaigns/${campaignId}/session-tasks`, {
-      headers: jsonHeaders(user, campaignId),
-    });
-    return this.parseResponse<SessionTaskBoardDocument>(response);
+    try {
+      return unwrapGeneratedResponse(await getGeneratedSessionTasks({
+        client: getGeneratedApiClient(),
+        headers: buildUserHeaders(user, { campaignId }),
+        path: { campaignId },
+      })) as SessionTaskBoardDocument;
+    } catch (error) {
+      rethrowGeneratedCollaborationError<SessionTaskBoardDocument>(error, {
+        remoteFieldNames: ['remoteDoc'],
+        messageFromPayload: this.messageFromPayload.bind(this),
+      });
+    }
   }
 
   async saveTaskBoard(
@@ -108,7 +84,7 @@ class SessionTaskBoardService {
   ): Promise<SessionTaskBoardDocument> {
     const response = await fetch(`/api/campaigns/${campaignId}/session-tasks`, {
       method: 'PUT',
-      headers: jsonHeaders(user, campaignId),
+      headers: buildCollaborationHeaders(user, campaignId),
       body: JSON.stringify(payload),
     });
     return this.parseResponse<SessionTaskBoardDocument>(response);
@@ -117,7 +93,7 @@ class SessionTaskBoardService {
   async startLease(campaignId: string, user: UserProfile | null, role: CampaignMemberRole): Promise<SessionTaskBoardDocument> {
     const response = await fetch(`/api/campaigns/${campaignId}/session-tasks/lease/start`, {
       method: 'POST',
-      headers: jsonHeaders(user, campaignId),
+      headers: buildCollaborationHeaders(user, campaignId),
       body: JSON.stringify({ role }),
     });
     return this.parseResponse<SessionTaskBoardDocument>(response);
@@ -131,7 +107,7 @@ class SessionTaskBoardService {
   ): Promise<SessionTaskBoardDocument> {
     const response = await fetch(`/api/campaigns/${campaignId}/session-tasks/lease/refresh`, {
       method: 'POST',
-      headers: jsonHeaders(user, campaignId),
+      headers: buildCollaborationHeaders(user, campaignId),
       body: JSON.stringify({ role, leaseStartedAt }),
     });
     return this.parseResponse<SessionTaskBoardDocument>(response);
@@ -140,11 +116,14 @@ class SessionTaskBoardService {
   async endLease(campaignId: string, user: UserProfile | null, leaseStartedAt?: number | null): Promise<void> {
     const response = await fetch(`/api/campaigns/${campaignId}/session-tasks/lease/end`, {
       method: 'POST',
-      headers: jsonHeaders(user, campaignId),
+      headers: buildCollaborationHeaders(user, campaignId),
       body: JSON.stringify({ leaseStartedAt }),
     });
     if (!response.ok) {
-      throw new Error(await this.readErrorMessage(response));
+      throw new Error(await readCollaborationErrorMessage<SessionTaskBoardDocument>(response, {
+        remoteFieldNames: ['remoteDoc'],
+        messageFromPayload: this.messageFromPayload.bind(this),
+      }));
     }
   }
 }

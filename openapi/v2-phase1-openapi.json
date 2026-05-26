@@ -1,0 +1,2150 @@
+{
+  "components": {
+    "schemas": {
+      "CampaignConfigDoc": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/schemas/CampaignConfigDoc.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "campaignId": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "description": {
+            "type": "string"
+          },
+          "joinPasswordConfigured": {
+            "type": "boolean"
+          },
+          "joinPasswordHash": {
+            "type": "string"
+          },
+          "lastModified": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "members": {
+            "items": {
+              "$ref": "#/components/schemas/CampaignMember"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "ownerUserId": {
+            "type": "string"
+          },
+          "schemaVersion": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "updatedAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "visibility": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "campaignId",
+          "name",
+          "description",
+          "lastModified",
+          "visibility",
+          "ownerUserId",
+          "schemaVersion",
+          "members",
+          "createdAt",
+          "updatedAt"
+        ],
+        "type": "object"
+      },
+      "CampaignMember": {
+        "additionalProperties": false,
+        "properties": {
+          "joinedAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "lastActiveAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "role": {
+            "type": "string"
+          },
+          "userId": {
+            "type": "string"
+          },
+          "username": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "userId",
+          "username",
+          "role",
+          "joinedAt",
+          "lastActiveAt"
+        ],
+        "type": "object"
+      },
+      "ErrorDetail": {
+        "additionalProperties": false,
+        "properties": {
+          "location": {
+            "description": "Where the error occurred, e.g. 'body.items[3].tags' or 'path.thing-id'",
+            "type": "string"
+          },
+          "message": {
+            "description": "Error message text",
+            "type": "string"
+          },
+          "value": {
+            "description": "The value at the given location"
+          }
+        },
+        "type": "object"
+      },
+      "ErrorModel": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/schemas/ErrorModel.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "detail": {
+            "description": "A human-readable explanation specific to this occurrence of the problem.",
+            "examples": [
+              "Property foo is required but is missing."
+            ],
+            "type": "string"
+          },
+          "errors": {
+            "description": "Optional list of individual error details",
+            "items": {
+              "$ref": "#/components/schemas/ErrorDetail"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "instance": {
+            "description": "A URI reference that identifies the specific occurrence of the problem.",
+            "examples": [
+              "https://example.com/error-log/abc123"
+            ],
+            "format": "uri",
+            "type": "string"
+          },
+          "status": {
+            "description": "HTTP status code",
+            "examples": [
+              400
+            ],
+            "format": "int64",
+            "type": "integer"
+          },
+          "title": {
+            "description": "A short, human-readable summary of the problem type. This value should not change between occurrences of the error.",
+            "examples": [
+              "Bad Request"
+            ],
+            "type": "string"
+          },
+          "type": {
+            "default": "about:blank",
+            "description": "A URI reference to human-readable documentation for the error.",
+            "examples": [
+              "https://example.com/errors/example"
+            ],
+            "format": "uri",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "MigrationStatusResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/schemas/MigrationStatusResponse.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "canEnterApp": {
+            "type": "boolean"
+          },
+          "currentSchemaVersion": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "lastError": {
+            "type": "string"
+          },
+          "lastFinishedAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "lastStartedAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "message": {
+            "type": "string"
+          },
+          "requiresMigration": {
+            "type": "boolean"
+          },
+          "state": {
+            "type": "string"
+          },
+          "targetSchemaVersion": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "currentSchemaVersion",
+          "targetSchemaVersion",
+          "state",
+          "requiresMigration",
+          "canEnterApp",
+          "message"
+        ],
+        "type": "object"
+      },
+      "PublicCampaignSummary": {
+        "additionalProperties": false,
+        "properties": {
+          "description": {
+            "type": "string"
+          },
+          "hasJoinPassword": {
+            "type": "boolean"
+          },
+          "id": {
+            "type": "string"
+          },
+          "lastModified": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "memberCount": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "onlineMemberCount": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "ownerId": {
+            "type": "string"
+          },
+          "ownerUsername": {
+            "type": "string"
+          },
+          "visibility": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "description",
+          "lastModified",
+          "ownerId",
+          "ownerUsername",
+          "visibility",
+          "memberCount",
+          "onlineMemberCount"
+        ],
+        "type": "object"
+      },
+      "SessionTaskBoardDoc": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/schemas/SessionTaskBoardDoc.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "activeLease": {
+            "$ref": "#/components/schemas/TeamNoteLease"
+          },
+          "campaignId": {
+            "type": "string"
+          },
+          "plCanEdit": {
+            "type": "boolean"
+          },
+          "plCanView": {
+            "type": "boolean"
+          },
+          "tasks": {
+            "items": {
+              "$ref": "#/components/schemas/SessionTaskItem"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "updatedAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "updatedBy": {
+            "type": "string"
+          },
+          "updatedByName": {
+            "type": "string"
+          },
+          "version": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "campaignId",
+          "tasks",
+          "updatedBy",
+          "updatedByName",
+          "updatedAt",
+          "version"
+        ],
+        "type": "object"
+      },
+      "SessionTaskItem": {
+        "additionalProperties": false,
+        "properties": {
+          "assignee": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "description": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "title": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "description",
+          "status",
+          "assignee",
+          "createdAt",
+          "updatedAt"
+        ],
+        "type": "object"
+      },
+      "SharedEntityRecord": {
+        "additionalProperties": false,
+        "properties": {
+          "activeLease": {
+            "$ref": "#/components/schemas/TeamNoteLease"
+          },
+          "campaignId": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "entityId": {
+            "type": "string"
+          },
+          "entityName": {
+            "type": "string"
+          },
+          "entityType": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "permission": {
+            "type": "string"
+          },
+          "scope": {
+            "type": "string"
+          },
+          "scopeId": {
+            "type": "string"
+          },
+          "sharedByUserId": {
+            "type": "string"
+          },
+          "sharedByUsername": {
+            "type": "string"
+          },
+          "snapshot": {
+            "$ref": "#/components/schemas/SharedEntitySnapshot"
+          },
+          "sourceOwnerUserId": {
+            "type": "string"
+          },
+          "sourceOwnerUsername": {
+            "type": "string"
+          },
+          "targetUserId": {
+            "type": "string"
+          },
+          "targetUsername": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "version": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "campaignId",
+          "entityType",
+          "entityId",
+          "entityName",
+          "scope",
+          "permission",
+          "sourceOwnerUserId",
+          "sourceOwnerUsername",
+          "targetUserId",
+          "targetUsername",
+          "sharedByUserId",
+          "sharedByUsername",
+          "createdAt",
+          "updatedAt",
+          "version",
+          "snapshot"
+        ],
+        "type": "object"
+      },
+      "SharedEntitySnapshot": {
+        "additionalProperties": false,
+        "properties": {
+          "allSections": {
+            "items": {
+              "additionalProperties": {},
+              "type": "object"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "details": {
+            "type": "string"
+          },
+          "entityName": {
+            "type": "string"
+          },
+          "entityType": {
+            "type": "string"
+          },
+          "scope": {
+            "type": "string"
+          },
+          "sectionItems": {
+            "items": {
+              "additionalProperties": {},
+              "type": "object"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "sectionKey": {
+            "type": "string"
+          },
+          "sectionTitle": {
+            "type": "string"
+          },
+          "subItem": {
+            "additionalProperties": {},
+            "type": "object"
+          },
+          "subItemId": {
+            "type": "string"
+          },
+          "subItemTitle": {
+            "type": "string"
+          },
+          "timelineEvents": {
+            "items": {
+              "additionalProperties": {},
+              "type": "object"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "entityName",
+          "entityType",
+          "scope"
+        ],
+        "type": "object"
+      },
+      "StartMigrationResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/schemas/StartMigrationResponse.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "backupPath": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "started": {
+            "type": "boolean"
+          },
+          "status": {
+            "$ref": "#/components/schemas/MigrationStatusResponse"
+          }
+        },
+        "required": [
+          "started",
+          "message",
+          "status"
+        ],
+        "type": "object"
+      },
+      "TeamNoteDoc": {
+        "additionalProperties": false,
+        "properties": {
+          "activeLease": {
+            "$ref": "#/components/schemas/TeamNoteLease"
+          },
+          "campaignId": {
+            "type": "string"
+          },
+          "content": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "createdBy": {
+            "type": "string"
+          },
+          "createdByName": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "updatedBy": {
+            "type": "string"
+          },
+          "updatedByName": {
+            "type": "string"
+          },
+          "version": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "campaignId",
+          "title",
+          "content",
+          "createdBy",
+          "createdByName",
+          "updatedBy",
+          "updatedByName",
+          "createdAt",
+          "updatedAt",
+          "version"
+        ],
+        "type": "object"
+      },
+      "TeamNoteLease": {
+        "additionalProperties": false,
+        "properties": {
+          "expiresAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "role": {
+            "type": "string"
+          },
+          "startedAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "userId": {
+            "type": "string"
+          },
+          "username": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "userId",
+          "username",
+          "role",
+          "startedAt"
+        ],
+        "type": "object"
+      },
+      "V2CampaignBundle": {
+        "additionalProperties": false,
+        "properties": {
+          "characters": {
+            "items": {
+              "additionalProperties": {},
+              "type": "object"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "clues": {
+            "items": {
+              "additionalProperties": {},
+              "type": "object"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "events": {
+            "items": {
+              "additionalProperties": {},
+              "type": "object"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "locations": {
+            "items": {
+              "additionalProperties": {},
+              "type": "object"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "meta": {
+            "additionalProperties": {},
+            "type": "object"
+          },
+          "monsters": {
+            "items": {
+              "additionalProperties": {},
+              "type": "object"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "notes": {
+            "type": "string"
+          },
+          "organizations": {
+            "items": {
+              "additionalProperties": {},
+              "type": "object"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "relationGraphs": {
+            "items": {
+              "additionalProperties": {},
+              "type": "object"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "sessionTasks": {
+            "items": {
+              "additionalProperties": {},
+              "type": "object"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "timelines": {
+            "items": {
+              "additionalProperties": {},
+              "type": "object"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "meta",
+          "notes",
+          "characters",
+          "locations",
+          "organizations",
+          "events",
+          "clues",
+          "timelines",
+          "monsters",
+          "sessionTasks",
+          "relationGraphs"
+        ],
+        "type": "object"
+      },
+      "V2CampaignBundleResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/schemas/V2CampaignBundleResponse.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "bundle": {
+            "$ref": "#/components/schemas/V2CampaignBundle"
+          },
+          "campaignId": {
+            "type": "string"
+          },
+          "version": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "campaignId",
+          "version",
+          "bundle"
+        ],
+        "type": "object"
+      },
+      "V2CampaignBundleUpdateRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/schemas/V2CampaignBundleUpdateRequest.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "bundle": {
+            "$ref": "#/components/schemas/V2CampaignBundle"
+          },
+          "expectedVersion": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "expectedVersion",
+          "bundle"
+        ],
+        "type": "object"
+      },
+      "V2CampaignSummary": {
+        "additionalProperties": false,
+        "properties": {
+          "description": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "lastModified": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "ownerId": {
+            "type": "string"
+          },
+          "schemaVersion": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "visibility": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "description",
+          "lastModified",
+          "ownerId",
+          "visibility",
+          "schemaVersion"
+        ],
+        "type": "object"
+      },
+      "V2CreateCampaignRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/schemas/V2CreateCampaignRequest.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "description"
+        ],
+        "type": "object"
+      },
+      "V2CreateCampaignResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/schemas/V2CreateCampaignResponse.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "bundle": {
+            "$ref": "#/components/schemas/V2CampaignBundleResponse"
+          },
+          "summary": {
+            "$ref": "#/components/schemas/V2CampaignSummary"
+          }
+        },
+        "required": [
+          "summary",
+          "bundle"
+        ],
+        "type": "object"
+      },
+      "VersionRecord": {
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "type": "string"
+          },
+          "campaignId": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "documentId": {
+            "type": "string"
+          },
+          "documentType": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "operatorUserId": {
+            "type": "string"
+          },
+          "operatorUsername": {
+            "type": "string"
+          },
+          "previousSnapshot": {
+            "additionalProperties": {},
+            "type": "object"
+          },
+          "snapshot": {
+            "additionalProperties": {},
+            "type": "object"
+          },
+          "summary": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "campaignId",
+          "documentType",
+          "documentId",
+          "action",
+          "summary",
+          "operatorUserId",
+          "operatorUsername",
+          "createdAt",
+          "snapshot"
+        ],
+        "type": "object"
+      }
+    }
+  },
+  "info": {
+    "description": "Phase 1 V2 migration and campaign bundle contract. Runtime business logic remains on Gin handlers; Huma is introduced here to generate OpenAPI incrementally.",
+    "title": "TRPG Module Notes API",
+    "version": "v1.5.1"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/api/campaigns/public": {
+      "get": {
+        "description": "列出当前所有公开模组摘要，用于主页公开模组列表与进入流程。",
+        "operationId": "listPublicCampaigns",
+        "parameters": [
+          {
+            "description": "当前用户 ID",
+            "in": "header",
+            "name": "X-TRPG-User-Id",
+            "schema": {
+              "description": "当前用户 ID",
+              "type": "string"
+            }
+          },
+          {
+            "description": "当前用户名",
+            "in": "header",
+            "name": "X-TRPG-Username",
+            "schema": {
+              "description": "当前用户名",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PublicCampaignSummary"
+                  },
+                  "type": [
+                    "array",
+                    "null"
+                  ]
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "summary": "获取公开模组列表",
+        "tags": [
+          "campaigns-collaboration"
+        ]
+      }
+    },
+    "/api/campaigns/{campaignId}/config": {
+      "get": {
+        "description": "返回当前用户可见的模组配置与成员列表。公开模组在需要时可通过进入密码头访问。",
+        "operationId": "getCampaignConfig",
+        "parameters": [
+          {
+            "description": "当前用户 ID",
+            "in": "header",
+            "name": "X-TRPG-User-Id",
+            "schema": {
+              "description": "当前用户 ID",
+              "type": "string"
+            }
+          },
+          {
+            "description": "当前用户名",
+            "in": "header",
+            "name": "X-TRPG-Username",
+            "schema": {
+              "description": "当前用户名",
+              "type": "string"
+            }
+          },
+          {
+            "description": "公开模组进入密码，只有需要时才传",
+            "in": "header",
+            "name": "X-TRPG-Campaign-Password",
+            "schema": {
+              "description": "公开模组进入密码，只有需要时才传",
+              "type": "string"
+            }
+          },
+          {
+            "description": "模组 ID",
+            "in": "path",
+            "name": "campaignId",
+            "required": true,
+            "schema": {
+              "description": "模组 ID",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CampaignConfigDoc"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "summary": "获取模组协作配置",
+        "tags": [
+          "campaigns-collaboration"
+        ]
+      }
+    },
+    "/api/campaigns/{campaignId}/session-tasks": {
+      "get": {
+        "description": "读取任务看板文档及其查看/编辑权限。若 PL 被禁止查看，运行时将返回 403。",
+        "operationId": "getSessionTasks",
+        "parameters": [
+          {
+            "description": "当前用户 ID",
+            "in": "header",
+            "name": "X-TRPG-User-Id",
+            "schema": {
+              "description": "当前用户 ID",
+              "type": "string"
+            }
+          },
+          {
+            "description": "当前用户名",
+            "in": "header",
+            "name": "X-TRPG-Username",
+            "schema": {
+              "description": "当前用户名",
+              "type": "string"
+            }
+          },
+          {
+            "description": "公开模组进入密码，只有需要时才传",
+            "in": "header",
+            "name": "X-TRPG-Campaign-Password",
+            "schema": {
+              "description": "公开模组进入密码，只有需要时才传",
+              "type": "string"
+            }
+          },
+          {
+            "description": "模组 ID",
+            "in": "path",
+            "name": "campaignId",
+            "required": true,
+            "schema": {
+              "description": "模组 ID",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionTaskBoardDoc"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "summary": "获取任务看板",
+        "tags": [
+          "campaigns-collaboration"
+        ]
+      }
+    },
+    "/api/campaigns/{campaignId}/shares": {
+      "get": {
+        "description": "按 received 或 managed 视图读取共享内容列表。GM 的 managed 视图返回管理中的全部分享记录。",
+        "operationId": "listCampaignShares",
+        "parameters": [
+          {
+            "description": "当前用户 ID",
+            "in": "header",
+            "name": "X-TRPG-User-Id",
+            "schema": {
+              "description": "当前用户 ID",
+              "type": "string"
+            }
+          },
+          {
+            "description": "当前用户名",
+            "in": "header",
+            "name": "X-TRPG-Username",
+            "schema": {
+              "description": "当前用户名",
+              "type": "string"
+            }
+          },
+          {
+            "description": "公开模组进入密码，只有需要时才传",
+            "in": "header",
+            "name": "X-TRPG-Campaign-Password",
+            "schema": {
+              "description": "公开模组进入密码，只有需要时才传",
+              "type": "string"
+            }
+          },
+          {
+            "description": "模组 ID",
+            "in": "path",
+            "name": "campaignId",
+            "required": true,
+            "schema": {
+              "description": "模组 ID",
+              "type": "string"
+            }
+          },
+          {
+            "description": "读取视图，received 为收到的分享，managed 为 GM 管理视图",
+            "explode": false,
+            "in": "query",
+            "name": "view",
+            "schema": {
+              "description": "读取视图，received 为收到的分享，managed 为 GM 管理视图",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SharedEntityRecord"
+                  },
+                  "type": [
+                    "array",
+                    "null"
+                  ]
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "summary": "获取共享内容列表",
+        "tags": [
+          "campaigns-collaboration"
+        ]
+      }
+    },
+    "/api/campaigns/{campaignId}/team-notes": {
+      "get": {
+        "description": "读取模组下所有团队笔记，包含版本与当前租约状态。",
+        "operationId": "listTeamNotes",
+        "parameters": [
+          {
+            "description": "当前用户 ID",
+            "in": "header",
+            "name": "X-TRPG-User-Id",
+            "schema": {
+              "description": "当前用户 ID",
+              "type": "string"
+            }
+          },
+          {
+            "description": "当前用户名",
+            "in": "header",
+            "name": "X-TRPG-Username",
+            "schema": {
+              "description": "当前用户名",
+              "type": "string"
+            }
+          },
+          {
+            "description": "公开模组进入密码，只有需要时才传",
+            "in": "header",
+            "name": "X-TRPG-Campaign-Password",
+            "schema": {
+              "description": "公开模组进入密码，只有需要时才传",
+              "type": "string"
+            }
+          },
+          {
+            "description": "模组 ID",
+            "in": "path",
+            "name": "campaignId",
+            "required": true,
+            "schema": {
+              "description": "模组 ID",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/TeamNoteDoc"
+                  },
+                  "type": [
+                    "array",
+                    "null"
+                  ]
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "summary": "获取团队笔记列表",
+        "tags": [
+          "campaigns-collaboration"
+        ]
+      }
+    },
+    "/api/campaigns/{campaignId}/versions": {
+      "get": {
+        "description": "读取团队笔记、任务看板与共享内容的历史版本记录。当前仅 GM 可访问。",
+        "operationId": "listCampaignVersions",
+        "parameters": [
+          {
+            "description": "当前用户 ID",
+            "in": "header",
+            "name": "X-TRPG-User-Id",
+            "schema": {
+              "description": "当前用户 ID",
+              "type": "string"
+            }
+          },
+          {
+            "description": "当前用户名",
+            "in": "header",
+            "name": "X-TRPG-Username",
+            "schema": {
+              "description": "当前用户名",
+              "type": "string"
+            }
+          },
+          {
+            "description": "公开模组进入密码，只有需要时才传",
+            "in": "header",
+            "name": "X-TRPG-Campaign-Password",
+            "schema": {
+              "description": "公开模组进入密码，只有需要时才传",
+              "type": "string"
+            }
+          },
+          {
+            "description": "模组 ID",
+            "in": "path",
+            "name": "campaignId",
+            "required": true,
+            "schema": {
+              "description": "模组 ID",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/VersionRecord"
+                  },
+                  "type": [
+                    "array",
+                    "null"
+                  ]
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "summary": "获取模组版本记录",
+        "tags": [
+          "campaigns-collaboration"
+        ]
+      }
+    },
+    "/api/system/migration/start": {
+      "post": {
+        "description": "显式执行旧数据库到 V2 的迁移。禁止静默 fallback，失败时前端必须停留在迁移壳层。",
+        "operationId": "startMigration",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StartMigrationResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "500": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "summary": "显式开始迁移",
+        "tags": [
+          "system"
+        ]
+      }
+    },
+    "/api/system/migration/status": {
+      "get": {
+        "description": "启动期检查数据库 schema 与迁移状态。若 `canEnterApp` 为 false，前端必须停留在迁移界面，不得进入主应用。",
+        "operationId": "getMigrationStatus",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MigrationStatusResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "500": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "summary": "获取迁移状态",
+        "tags": [
+          "system"
+        ]
+      }
+    },
+    "/api/v2/campaigns": {
+      "get": {
+        "description": "列出当前用户可访问的 V2 主模组。正式主链路已切到后端，前端不得再依赖本地 campaign index。",
+        "operationId": "listV2Campaigns",
+        "parameters": [
+          {
+            "description": "当前用户 ID",
+            "in": "header",
+            "name": "X-TRPG-User-Id",
+            "schema": {
+              "description": "当前用户 ID",
+              "type": "string"
+            }
+          },
+          {
+            "description": "当前用户名",
+            "in": "header",
+            "name": "X-TRPG-Username",
+            "schema": {
+              "description": "当前用户名",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/V2CampaignSummary"
+                  },
+                  "type": [
+                    "array",
+                    "null"
+                  ]
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "summary": "获取当前用户可见的 V2 模组列表",
+        "tags": [
+          "campaigns-v2"
+        ]
+      },
+      "post": {
+        "description": "创建主模组，并同时初始化 owner 成员、配置与默认 bundle。",
+        "operationId": "createV2Campaign",
+        "parameters": [
+          {
+            "description": "当前用户 ID",
+            "in": "header",
+            "name": "X-TRPG-User-Id",
+            "schema": {
+              "description": "当前用户 ID",
+              "type": "string"
+            }
+          },
+          {
+            "description": "当前用户名",
+            "in": "header",
+            "name": "X-TRPG-Username",
+            "schema": {
+              "description": "当前用户名",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/V2CreateCampaignRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/V2CreateCampaignResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "summary": "创建 V2 模组",
+        "tags": [
+          "campaigns-v2"
+        ]
+      }
+    },
+    "/api/v2/campaigns/{campaignId}": {
+      "delete": {
+        "description": "删除主模组及其 V2 文档、成员、配置和协作记录。",
+        "operationId": "deleteV2Campaign",
+        "parameters": [
+          {
+            "description": "当前用户 ID",
+            "in": "header",
+            "name": "X-TRPG-User-Id",
+            "schema": {
+              "description": "当前用户 ID",
+              "type": "string"
+            }
+          },
+          {
+            "description": "当前用户名",
+            "in": "header",
+            "name": "X-TRPG-Username",
+            "schema": {
+              "description": "当前用户名",
+              "type": "string"
+            }
+          },
+          {
+            "description": "模组 ID",
+            "in": "path",
+            "name": "campaignId",
+            "required": true,
+            "schema": {
+              "description": "模组 ID",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "summary": "删除 V2 模组",
+        "tags": [
+          "campaigns-v2"
+        ]
+      }
+    },
+    "/api/v2/campaigns/{campaignId}/bundle": {
+      "get": {
+        "description": "读取 V2 主模组的过渡 bundle 契约。前端当前 Context 已正式建立在该后端链路之上。",
+        "operationId": "getV2CampaignBundle",
+        "parameters": [
+          {
+            "description": "当前用户 ID",
+            "in": "header",
+            "name": "X-TRPG-User-Id",
+            "schema": {
+              "description": "当前用户 ID",
+              "type": "string"
+            }
+          },
+          {
+            "description": "当前用户名",
+            "in": "header",
+            "name": "X-TRPG-Username",
+            "schema": {
+              "description": "当前用户名",
+              "type": "string"
+            }
+          },
+          {
+            "description": "公开模组进入密码，只有需要时才传",
+            "in": "header",
+            "name": "X-TRPG-Campaign-Password",
+            "schema": {
+              "description": "公开模组进入密码，只有需要时才传",
+              "type": "string"
+            }
+          },
+          {
+            "description": "模组 ID",
+            "in": "path",
+            "name": "campaignId",
+            "required": true,
+            "schema": {
+              "description": "模组 ID",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/V2CampaignBundleResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "summary": "获取模组 bundle",
+        "tags": [
+          "campaigns-v2"
+        ]
+      },
+      "put": {
+        "description": "使用 `expectedVersion` 执行显式乐观锁保存。发生冲突时返回 409，由前端显式处理。",
+        "operationId": "updateV2CampaignBundle",
+        "parameters": [
+          {
+            "description": "当前用户 ID",
+            "in": "header",
+            "name": "X-TRPG-User-Id",
+            "schema": {
+              "description": "当前用户 ID",
+              "type": "string"
+            }
+          },
+          {
+            "description": "当前用户名",
+            "in": "header",
+            "name": "X-TRPG-Username",
+            "schema": {
+              "description": "当前用户名",
+              "type": "string"
+            }
+          },
+          {
+            "description": "公开模组进入密码，只有需要时才传",
+            "in": "header",
+            "name": "X-TRPG-Campaign-Password",
+            "schema": {
+              "description": "公开模组进入密码，只有需要时才传",
+              "type": "string"
+            }
+          },
+          {
+            "description": "模组 ID",
+            "in": "path",
+            "name": "campaignId",
+            "required": true,
+            "schema": {
+              "description": "模组 ID",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/V2CampaignBundleUpdateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/V2CampaignBundleResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "summary": "更新模组 bundle",
+        "tags": [
+          "campaigns-v2"
+        ]
+      }
+    }
+  },
+  "tags": [
+    {
+      "description": "启动期迁移与系统状态",
+      "name": "system"
+    },
+    {
+      "description": "V2 主模组列表、创建、删除与 bundle 读写",
+      "name": "campaigns-v2"
+    },
+    {
+      "description": "协作配置、团队笔记、共享内容、版本记录与任务看板读取契约",
+      "name": "campaigns-collaboration"
+    }
+  ]
+}

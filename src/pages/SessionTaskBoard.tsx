@@ -1,5 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCampaignData, useCampaignSession } from '../context/CampaignContext';
+import { queryKeys } from '../query/queryKeys';
 import { CampaignConfig, SessionTask, SessionTaskBoardDocument, SessionTaskStatus } from '../types';
 import { dataService } from '../services/dataService';
 import { teamNotesService } from '../services/teamNotesService';
@@ -36,6 +38,7 @@ const SessionTaskBoard: React.FC = () => {
   const { campaignData, setCampaignData } = useCampaignData();
   const { currentCampaignId, user } = useCampaignSession();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [config, setConfig] = useState<CampaignConfig | null>(null);
   const [boardDoc, setBoardDoc] = useState<SessionTaskBoardDocument | null>(null);
   const [statusText, setStatusText] = useState('');
@@ -65,33 +68,55 @@ const SessionTaskBoard: React.FC = () => {
     if (!config || !user) return 'PL';
     return config.members.find((member) => member.userId === user.id)?.role || 'PL';
   }, [config, user]);
+  const configQueryKey = currentCampaignId
+    ? queryKeys.campaigns.config(currentCampaignId, user?.id)
+    : ['campaigns', 'config', 'disabled'] as const;
+  const taskBoardQueryKey = currentCampaignId
+    ? queryKeys.campaigns.sessionTasks(currentCampaignId, user?.id)
+    : ['campaigns', 'session-tasks', 'disabled'] as const;
+  const configQuery = useQuery({
+    queryKey: configQueryKey,
+    queryFn: async () => {
+      if (!currentCampaignId || !user) {
+        return null;
+      }
+      return teamNotesService.getConfig(currentCampaignId, user);
+    },
+    enabled: Boolean(currentCampaignId && user),
+    refetchInterval: editing ? false : 15_000,
+  });
+  const taskBoardQuery = useQuery({
+    queryKey: taskBoardQueryKey,
+    queryFn: async () => {
+      if (!currentCampaignId || !user) {
+        return null;
+      }
+      return sessionTaskBoardService.getTaskBoard(currentCampaignId, user);
+    },
+    enabled: Boolean(currentCampaignId && user),
+    refetchInterval: editing ? false : 15_000,
+  });
 
-  const loadBoard = React.useCallback(async () => {
-    if (!currentCampaignId || !user) return;
-    const [nextConfig, nextDoc] = await Promise.all([
-      teamNotesService.getConfig(currentCampaignId, user),
-      sessionTaskBoardService.getTaskBoard(currentCampaignId, user),
-    ]);
-    setConfig(nextConfig);
-    setBoardDoc(nextDoc);
-    setPermissionDraft(resolvePermissions(nextDoc));
-    if (!editing) {
-      setTaskDrafts(nextDoc.tasks);
+  useEffect(() => {
+    if (configQuery.data) {
+      setConfig(configQuery.data);
     }
-  }, [currentCampaignId, editing, user]);
+  }, [configQuery.data]);
 
   useEffect(() => {
-    loadBoard().catch((error) => setStatusText(error instanceof Error ? error.message : '任务看板加载失败'));
-  }, [loadBoard]);
+    if (!taskBoardQuery.data) return;
+    setBoardDoc(taskBoardQuery.data);
+    if (!editing) {
+      setPermissionDraft(resolvePermissions(taskBoardQuery.data));
+      setTaskDrafts(taskBoardQuery.data.tasks);
+    }
+  }, [editing, taskBoardQuery.data]);
 
   useEffect(() => {
-    if (!currentCampaignId || !user) return;
-    const timer = window.setInterval(() => {
-      if (editing) return;
-      loadBoard().catch(() => void 0);
-    }, 15000);
-    return () => window.clearInterval(timer);
-  }, [currentCampaignId, editing, loadBoard, user]);
+    const error = taskBoardQuery.error ?? configQuery.error;
+    if (!error) return;
+    setStatusText(error instanceof Error ? error.message : '任务看板加载失败');
+  }, [configQuery.error, taskBoardQuery.error]);
 
   useEffect(() => {
     if (!currentCampaignId || !user || !editing) return;
@@ -130,6 +155,7 @@ const SessionTaskBoard: React.FC = () => {
         setBoardDoc(saved);
         setTaskDrafts(saved.tasks);
         setPermissionDraft(resolvePermissions(saved));
+        queryClient.setQueryData(taskBoardQueryKey, saved);
         setCampaignData({
           ...campaignData,
           sessionTasks: saved.tasks,
@@ -149,7 +175,7 @@ const SessionTaskBoard: React.FC = () => {
         saveTimerRef.current = null;
       }
     };
-  }, [boardDoc, campaignData, currentCampaignId, editing, leaseStartedAt, memberRole, permissionDraft, setCampaignData, taskDrafts, user]);
+  }, [boardDoc, campaignData, currentCampaignId, editing, leaseStartedAt, memberRole, permissionDraft, queryClient, setCampaignData, taskBoardQueryKey, taskDrafts, user]);
 
   useEffect(() => {
     cleanupStateRef.current = {
@@ -270,6 +296,7 @@ const SessionTaskBoard: React.FC = () => {
       setBoardDoc(locked);
       setTaskDrafts(locked.tasks);
       setPermissionDraft(resolvePermissions(locked));
+      queryClient.setQueryData(taskBoardQueryKey, locked);
       setLeaseStartedAt(locked.activeLease?.startedAt ?? null);
       setEditing(true);
       setStatusText('已进入编辑状态');
@@ -300,6 +327,7 @@ const SessionTaskBoard: React.FC = () => {
     setBoardDoc(saved);
     setTaskDrafts(saved.tasks);
     setPermissionDraft(resolvePermissions(saved));
+    queryClient.setQueryData(taskBoardQueryKey, saved);
     setCampaignData({
       ...campaignData,
       sessionTasks: saved.tasks,
@@ -316,7 +344,7 @@ const SessionTaskBoard: React.FC = () => {
       await sessionTaskBoardService.endLease(currentCampaignId, user, leaseStartedAt);
       setEditing(false);
       setLeaseStartedAt(null);
-      await loadBoard().catch(() => void 0);
+      await Promise.all([configQuery.refetch(), taskBoardQuery.refetch()]).catch(() => void 0);
       return true;
     } catch (error) {
       if (error instanceof VersionConflictError && error.remote) {
@@ -340,6 +368,7 @@ const SessionTaskBoard: React.FC = () => {
     setBoardDoc(conflictDoc);
     setTaskDrafts(conflictDoc.tasks);
     setPermissionDraft(resolvePermissions(conflictDoc));
+    queryClient.setQueryData(taskBoardQueryKey, conflictDoc);
     setCampaignData({
       ...campaignData,
       sessionTasks: conflictDoc.tasks,
@@ -361,6 +390,7 @@ const SessionTaskBoard: React.FC = () => {
       setBoardDoc(saved);
       setTaskDrafts(saved.tasks);
       setPermissionDraft(resolvePermissions(saved));
+      queryClient.setQueryData(taskBoardQueryKey, saved);
       setCampaignData({
         ...campaignData,
         sessionTasks: saved.tasks,

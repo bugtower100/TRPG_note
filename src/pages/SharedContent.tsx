@@ -1,10 +1,12 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertCircle, ChevronDown, ChevronRight, ChevronUp, History, Plus, Trash2 } from 'lucide-react';
 import { useCampaignSession } from '../context/CampaignContext';
 import CustomSubItemsEditor from '../components/common/CustomSubItemsEditor';
 import RichTextEditor from '../components/common/RichTextEditor';
 import RichTextDisplay from '../components/common/RichTextDisplay';
 import ConflictResolveDialog from '../components/common/ConflictResolveDialog';
+import { queryKeys } from '../query/queryKeys';
 import { CustomSubItem, GraphEntityType, SharedEntityRecord, TimelineEvent } from '../types';
 import { sharingService } from '../services/sharingService';
 import { VersionConflictError } from '../services/conflictError';
@@ -25,6 +27,7 @@ interface SharedContentProps {
 const SharedContent: React.FC<SharedContentProps> = ({ embedded = false, shareId, entityType }) => {
   const { currentCampaignId, user } = useCampaignSession();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [shares, setShares] = useState<SharedEntityRecord[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [statusText, setStatusText] = useState('');
@@ -54,17 +57,58 @@ const SharedContent: React.FC<SharedContentProps> = ({ embedded = false, shareId
     leaseStartedAt: null,
   });
 
-  const loadShares = React.useCallback(async () => {
-    if (!currentCampaignId || !user) return;
-    const items = await sharingService.listReceivedShares(currentCampaignId, user);
-    const next = items.filter((item) => item.targetUserId === user.id && (!entityType || item.entityType === entityType));
-    setShares(next);
-    setSelectedId((prev) => shareId || prev || next[0]?.id || null);
-  }, [currentCampaignId, entityType, shareId, user]);
+  const sharesQueryKey = currentCampaignId
+    ? queryKeys.campaigns.shares(currentCampaignId, 'received', user?.id)
+    : ['campaigns', 'shares', 'received', 'shared-content-disabled'] as const;
+  const sharesQuery = useQuery({
+    queryKey: sharesQueryKey,
+    queryFn: async () => {
+      if (!currentCampaignId || !user) {
+        return [] as SharedEntityRecord[];
+      }
+      const items = await sharingService.listReceivedShares(currentCampaignId, user);
+      return items.filter((item) => item.targetUserId === user.id && (!entityType || item.entityType === entityType));
+    },
+    enabled: Boolean(currentCampaignId && user),
+    refetchInterval: editing ? false : 15_000,
+  });
+
+  const updateSharesStateAndCache = useCallback((
+    updater: SharedEntityRecord[] | ((prev: SharedEntityRecord[]) => SharedEntityRecord[])
+  ) => {
+    setShares((prev) => (typeof updater === 'function' ? updater(prev) : updater));
+    if (currentCampaignId && user) {
+      queryClient.setQueryData<SharedEntityRecord[]>(
+        queryKeys.campaigns.shares(currentCampaignId, 'received', user.id),
+        (prev = []) => (typeof updater === 'function' ? updater(prev) : updater)
+      );
+    }
+  }, [currentCampaignId, queryClient, user]);
 
   useEffect(() => {
-    loadShares().catch((error) => setStatusText(error instanceof Error ? error.message : '共享内容加载失败'));
-  }, [loadShares]);
+    if (!currentCampaignId || !user) {
+      setShares([]);
+      setSelectedId(null);
+      return;
+    }
+    if (!sharesQuery.data || editing) {
+      return;
+    }
+    const next = sharesQuery.data;
+    setShares(next);
+    setSelectedId((prev) => {
+      const preferredId = shareId || prev;
+      if (preferredId && next.some((item) => item.id === preferredId)) {
+        return preferredId;
+      }
+      return next[0]?.id ?? null;
+    });
+  }, [currentCampaignId, editing, shareId, sharesQuery.data, user]);
+
+  useEffect(() => {
+    if (!sharesQuery.error) return;
+    setStatusText(sharesQuery.error instanceof Error ? sharesQuery.error.message : '共享内容加载失败');
+  }, [sharesQuery.error]);
 
   useEffect(() => {
     if (shareId) {
@@ -76,14 +120,6 @@ const SharedContent: React.FC<SharedContentProps> = ({ embedded = false, shareId
     setCollapsedKeys({});
     setConflictShare(null);
   }, [selectedId]);
-
-  useEffect(() => {
-    if (!currentCampaignId || !user) return;
-    const timer = window.setInterval(() => {
-      loadShares().catch(() => void 0);
-    }, 15000);
-    return () => window.clearInterval(timer);
-  }, [currentCampaignId, loadShares, user]);
 
   const selected = useMemo(() => shares.find((item) => item.id === selectedId) || null, [shares, selectedId]);
   const canEditSelected = Boolean(selected && selected.permission === 'edit' && (selected.scope === 'subItem' || selected.scope === 'section' || selected.scope === 'entity'));
@@ -199,7 +235,7 @@ const SharedContent: React.FC<SharedContentProps> = ({ embedded = false, shareId
     }
     sharingService.startShareLease(currentCampaignId, selected.id, user)
       .then((next) => {
-        setShares((prev) => prev.map((item) => item.id === next.id ? next : item));
+        updateSharesStateAndCache((prev) => prev.map((item) => item.id === next.id ? next : item));
         hydrateDraftFromShare(next);
         setLeaseStartedAt(next.activeLease?.startedAt ?? null);
         setLeaseConflict(false);
@@ -216,18 +252,18 @@ const SharedContent: React.FC<SharedContentProps> = ({ embedded = false, shareId
     const timer = window.setInterval(() => {
       sharingService.refreshShareLease(currentCampaignId, selected.id, user, leaseStartedAt)
         .then((next) => {
-          setShares((prev) => prev.map((item) => item.id === next.id ? next : item));
+          updateSharesStateAndCache((prev) => prev.map((item) => item.id === next.id ? next : item));
           setLeaseStartedAt(next.activeLease?.startedAt ?? null);
         })
         .catch(() => {
           setEditing(false);
           setLeaseStartedAt(null);
           setStatusText('共享编辑状态已失效，请重新进入编辑');
-          loadShares().catch(() => void 0);
+          void sharesQuery.refetch();
         });
     }, 60000);
     return () => window.clearInterval(timer);
-  }, [currentCampaignId, editing, leaseStartedAt, loadShares, selected, user]);
+  }, [currentCampaignId, editing, leaseStartedAt, selected, sharesQuery, updateSharesStateAndCache, user]);
 
   useEffect(() => {
     if (!editing || !currentCampaignId || !selected || !user) return;
@@ -237,7 +273,7 @@ const SharedContent: React.FC<SharedContentProps> = ({ embedded = false, shareId
     if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current);
     saveTimerRef.current = window.setTimeout(() => {
       sharingService.saveShareContent(currentCampaignId, selected.id, user, buildSavePayload(selected, selected.version)).then((next) => {
-        setShares((prev) => prev.map((item) => item.id === next.id ? next : item));
+        updateSharesStateAndCache((prev) => prev.map((item) => item.id === next.id ? next : item));
         setStatusText(`已自动保存：${new Date(next.updatedAt).toLocaleTimeString()}`);
       }).catch((error) => {
         if (error instanceof VersionConflictError && error.remote) {
@@ -264,10 +300,11 @@ const SharedContent: React.FC<SharedContentProps> = ({ embedded = false, shareId
       saveTimerRef.current = null;
     }
     const next = await sharingService.saveShareContent(currentCampaignId, selected.id, user, buildSavePayload(selected, selected.version));
-    setShares((prev) => prev.map((item) => item.id === next.id ? next : item));
+    updateSharesStateAndCache((prev) => prev.map((item) => item.id === next.id ? next : item));
     setStatusText(`已保存：${new Date(next.updatedAt).toLocaleTimeString()}`);
     return next;
   };
+
 
   const handleStopEdit = async (): Promise<boolean> => {
     if (!currentCampaignId || !selected || !user) return false;
@@ -287,7 +324,7 @@ const SharedContent: React.FC<SharedContentProps> = ({ embedded = false, shareId
         setEditing(false);
         setLeaseStartedAt(null);
         setLeaseConflict(false);
-        await loadShares().catch(() => void 0);
+        await sharesQuery.refetch().catch(() => void 0);
       }
     }
     return true;
@@ -307,7 +344,7 @@ const SharedContent: React.FC<SharedContentProps> = ({ embedded = false, shareId
 
   const handleUseRemoteConflict = () => {
     if (!conflictShare) return;
-    setShares((prev) => prev.map((item) => item.id === conflictShare.id ? conflictShare : item));
+    updateSharesStateAndCache((prev) => prev.map((item) => item.id === conflictShare.id ? conflictShare : item));
     if (selectedId === conflictShare.id) {
       hydrateDraftFromShare(conflictShare);
     }
@@ -324,7 +361,7 @@ const SharedContent: React.FC<SharedContentProps> = ({ embedded = false, shareId
         user,
         buildSavePayload(conflictShare, conflictShare.version)
       );
-      setShares((prev) => prev.map((item) => item.id === next.id ? next : item));
+      updateSharesStateAndCache((prev) => prev.map((item) => item.id === next.id ? next : item));
       setConflictShare(null);
       setStatusText(`已覆盖保存：${new Date(next.updatedAt).toLocaleTimeString()}`);
     } catch (error) {
@@ -341,13 +378,14 @@ const SharedContent: React.FC<SharedContentProps> = ({ embedded = false, shareId
     if (!ok) return;
     try {
       await sharingService.revokeShare(currentCampaignId, selected.id, user);
+      updateSharesStateAndCache((prev) => prev.filter((item) => item.id !== selected.id));
       setStatusText('已删除分享副本');
       if (embedded) {
         navigate(`/${entityType || selected.entityType}`);
         return;
       }
-      await loadShares();
       setSelectedId((prev) => (prev === selected.id ? null : prev));
+      await sharesQuery.refetch();
     } catch (error) {
       setStatusText(error instanceof Error ? error.message : '删除分享副本失败');
     }

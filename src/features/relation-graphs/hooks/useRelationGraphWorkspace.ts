@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { dataService } from '../../../services/dataService';
 import { relationGraphService } from '../../../services/relationGraphService';
 import {
   ResourceFolder,
@@ -35,29 +34,6 @@ export const useRelationGraphWorkspace = ({
   const [resourceKeyword, setResourceKeyword] = useState('');
   const [resourceExpandedFolders, setResourceExpandedFolders] = useState<string[]>([RESOURCE_ROOT_PATH]);
   const [resourceSelectedFolderPath, setResourceSelectedFolderPath] = useState(RESOURCE_ROOT_PATH);
-  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const pendingSaveRef = useRef<CampaignData | null>(null);
-
-  const scheduleSave = useCallback((nextData: CampaignData, immediate = false) => {
-    pendingSaveRef.current = nextData;
-    if (saveTimerRef.current) {
-      clearTimeout(saveTimerRef.current);
-      saveTimerRef.current = null;
-    }
-    if (immediate) {
-      dataService.saveCampaign(nextData);
-      pendingSaveRef.current = null;
-      return;
-    }
-    saveTimerRef.current = setTimeout(() => {
-      if (pendingSaveRef.current) {
-        dataService.saveCampaign(pendingSaveRef.current);
-        pendingSaveRef.current = null;
-      }
-      saveTimerRef.current = null;
-    }, 280);
-  }, []);
-
   const graphs = useMemo(() => relationGraphService.list(campaignData), [campaignData]);
   const activeGraph = useMemo(
     () => graphs.find((g) => g.id === activeGraphId) || null,
@@ -75,34 +51,19 @@ export const useRelationGraphWorkspace = ({
     }
     const next = relationGraphService.update(campaignData, graph);
     setCampaignData(next);
-    scheduleSave(next, false);
-  }, [activeGraph, campaignData, scheduleSave, setCampaignData]);
+  }, [activeGraph, campaignData, setCampaignData]);
 
   useEffect(() => {
     if (graphs.length === 0) {
       const created = relationGraphService.create(campaignData, '主关系图');
       setCampaignData(created.data);
-      scheduleSave(created.data, true);
       setActiveGraphId(created.graph.id);
       return;
     }
     if (!activeGraphId || !graphs.some((g) => g.id === activeGraphId)) {
       setActiveGraphId(graphs[0].id);
     }
-  }, [graphs, activeGraphId, campaignData, setCampaignData, scheduleSave]);
-
-  useEffect(() => {
-    return () => {
-      if (saveTimerRef.current) {
-        clearTimeout(saveTimerRef.current);
-        saveTimerRef.current = null;
-      }
-      if (pendingSaveRef.current) {
-        dataService.saveCampaign(pendingSaveRef.current);
-        pendingSaveRef.current = null;
-      }
-    };
-  }, []);
+  }, [graphs, activeGraphId, campaignData, setCampaignData]);
 
   useEffect(() => {
     if (!entityIdToAdd && filteredEntities.length > 0) {
@@ -139,11 +100,10 @@ export const useRelationGraphWorkspace = ({
     if (name === null) return;
     const created = relationGraphService.create(campaignData, name);
     setCampaignData(created.data);
-    scheduleSave(created.data, true);
     setActiveGraphId(created.graph.id);
     setHistoryPast([]);
     setHistoryFuture([]);
-  }, [campaignData, scheduleSave, setCampaignData]);
+  }, [campaignData, setCampaignData]);
 
   const renameGraph = useCallback(() => {
     if (!activeGraph) return;
@@ -157,11 +117,10 @@ export const useRelationGraphWorkspace = ({
     if (!window.confirm('确定删除当前关系图吗？')) return;
     const next = relationGraphService.remove(campaignData, activeGraph.id);
     setCampaignData(next);
-    scheduleSave(next, true);
     setActiveGraphId(next.relationGraphs?.[0]?.id || null);
     setHistoryPast([]);
     setHistoryFuture([]);
-  }, [activeGraph, campaignData, scheduleSave, setCampaignData]);
+  }, [activeGraph, campaignData, setCampaignData]);
 
   const undo = useCallback(() => {
     if (!activeGraph || historyPast.length === 0) return;

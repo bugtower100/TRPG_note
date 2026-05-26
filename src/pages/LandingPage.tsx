@@ -19,7 +19,11 @@ const LandingPage: React.FC = () => {
   const { 
     user, login, logout, 
     campaignList, switchCampaign, createNewCampaign, 
-    openFromFileSystem, deleteCampaign
+    openFromFileSystem, deleteCampaign,
+    isCampaignLoading,
+    isCampaignSaving,
+    sessionError,
+    clearSessionError,
   } = useCampaignSession();
   const {
     theme: currentTheme,
@@ -135,7 +139,13 @@ const LandingPage: React.FC = () => {
   const handleCreate = (e: React.FormEvent) => {
     e.preventDefault();
     if (newCampaignName.trim()) {
-      createNewCampaign(newCampaignName, newCampaignDesc);
+      void createNewCampaign(newCampaignName, newCampaignDesc)
+        .then(() => {
+          setIsCreating(false);
+          setNewCampaignName('');
+          setNewCampaignDesc('');
+        })
+        .catch(() => void 0);
     }
   };
 
@@ -203,16 +213,7 @@ const LandingPage: React.FC = () => {
       });
       if (!accessGranted) return;
     }
-    dataService.ensureCampaignSummary({
-      id: campaign.id,
-      name: campaign.name,
-      description: campaign.description,
-      lastModified: campaign.lastModified,
-      ownerId: campaign.ownerId,
-      visibility: campaign.visibility,
-      schemaVersion: 2,
-    });
-    switchCampaign(campaign.id);
+    await switchCampaign(campaign.id);
   };
 
   if (!user) {
@@ -250,13 +251,27 @@ const LandingPage: React.FC = () => {
             <p className="mt-1 theme-text-secondary">
                 准备好开启新的冒险了吗？
             </p>
+            {sessionError && (
+              <div className="mt-3 rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700 max-w-xl">
+                <div>{sessionError}</div>
+                <button
+                  type="button"
+                  onClick={clearSessionError}
+                  className="mt-2 text-xs underline underline-offset-2"
+                >
+                  关闭提示
+                </button>
+              </div>
+            )}
           </div>
           <div className="flex flex-wrap gap-3 items-center">
              <ReleaseUpdateButton />
              <GuideHelpButton guideId="landing" />
              {/* Open Local File */}
              <button 
-                onClick={openFromFileSystem}
+                onClick={() => {
+                  void openFromFileSystem().catch(() => void 0);
+                }}
                 className="flex gap-2 items-center px-4 py-2 text-gray-700 bg-white rounded border border-gray-300 shadow-sm hover:bg-gray-50"
                 title="直接打开本地 JSON 文件"
             >
@@ -285,6 +300,11 @@ const LandingPage: React.FC = () => {
             >
                 退出登录
             </button>
+            {(isCampaignLoading || isCampaignSaving) && (
+              <span className="text-sm theme-text-secondary">
+                {isCampaignLoading ? '正在加载模组...' : '正在保存模组...'}
+              </span>
+            )}
           </div>
         </div>
 
@@ -419,7 +439,12 @@ const LandingPage: React.FC = () => {
                   onRemoveMember={(campaignId, memberUserId) => void handleRemoveMember(campaignId, memberUserId)}
                   onEnter={(nextCampaign) => void handleEnterCampaign(nextCampaign)}
                   onOpenExport={(campaignId) => setExportDialogTarget({ type: 'campaign', campaignId })}
-                  onDelete={(campaignId) => deleteCampaign(campaignId)}
+                  onDelete={(campaignId) => {
+                    if (!window.confirm('确定要删除这个模组吗？此操作不可恢复。')) {
+                      return;
+                    }
+                    void deleteCampaign(campaignId).catch(() => void 0);
+                  }}
                 />
               );
             })()

@@ -1,10 +1,12 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertCircle, FilePlus2, History, Lock, Trash2, Unlock } from 'lucide-react';
 import RichTextEditor from '../components/common/RichTextEditor';
 import RichTextDisplay from '../components/common/RichTextDisplay';
 import ConfirmDialog from '../components/common/ConfirmDialog';
 import ConflictResolveDialog from '../components/common/ConflictResolveDialog';
 import { useCampaignSession } from '../context/CampaignContext';
+import { queryKeys } from '../query/queryKeys';
 import { CampaignConfig, TeamNoteDocument } from '../types';
 import { teamNotesService } from '../services/teamNotesService';
 import { VersionConflictError } from '../services/conflictError';
@@ -13,6 +15,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 const TeamNotes: React.FC = () => {
   const { currentCampaignId, user } = useCampaignSession();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
   const [config, setConfig] = useState<CampaignConfig | null>(null);
   const [notes, setNotes] = useState<TeamNoteDocument[]>([]);
@@ -45,6 +48,34 @@ const TeamNotes: React.FC = () => {
     if (!config || !user) return 'PL';
     return config.members.find((member) => member.userId === user.id)?.role || 'PL';
   }, [config, user]);
+  const configQueryKey = currentCampaignId
+    ? queryKeys.campaigns.config(currentCampaignId, user?.id)
+    : ['campaigns', 'config', 'disabled'] as const;
+  const notesQueryKey = currentCampaignId
+    ? queryKeys.campaigns.teamNotes(currentCampaignId, user?.id)
+    : ['campaigns', 'team-notes', 'disabled'] as const;
+  const configQuery = useQuery({
+    queryKey: configQueryKey,
+    queryFn: async () => {
+      if (!currentCampaignId || !user) {
+        return null;
+      }
+      return teamNotesService.getConfig(currentCampaignId, user);
+    },
+    enabled: Boolean(currentCampaignId && user),
+    refetchInterval: editing ? false : 15_000,
+  });
+  const notesQuery = useQuery({
+    queryKey: notesQueryKey,
+    queryFn: async () => {
+      if (!currentCampaignId || !user) {
+        return [] as TeamNoteDocument[];
+      }
+      return teamNotesService.listTeamNotes(currentCampaignId, user);
+    },
+    enabled: Boolean(currentCampaignId && user),
+    refetchInterval: editing ? false : 15_000,
+  });
 
   const summarizeNote = (note: { title: string; content: string }) => {
     const plainContent = note.content.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
@@ -52,20 +83,23 @@ const TeamNotes: React.FC = () => {
     return [note.title || '（无标题）', contentPreview || '（无正文）'].join('\n');
   };
 
-  const loadAll = React.useCallback(async () => {
-    if (!currentCampaignId || !user) return;
-    const [nextConfig, nextNotes] = await Promise.all([
-      teamNotesService.getConfig(currentCampaignId, user),
-      teamNotesService.listTeamNotes(currentCampaignId, user),
-    ]);
-    setConfig(nextConfig);
-    setNotes(nextNotes);
-    setSelectedId((prev) => prev ?? nextNotes[0]?.id ?? null);
-  }, [currentCampaignId, user]);
+  useEffect(() => {
+    if (configQuery.data) {
+      setConfig(configQuery.data);
+    }
+  }, [configQuery.data]);
 
   useEffect(() => {
-    loadAll().catch(() => setStatusText('团队笔记加载失败'));
-  }, [loadAll]);
+    if (!notesQuery.data || editing) return;
+    setNotes(notesQuery.data);
+    setSelectedId((prev) => prev ?? notesQuery.data[0]?.id ?? null);
+  }, [editing, notesQuery.data]);
+
+  useEffect(() => {
+    const error = notesQuery.error ?? configQuery.error;
+    if (!error) return;
+    setStatusText(error instanceof Error ? error.message : '团队笔记加载失败');
+  }, [configQuery.error, notesQuery.error]);
 
   useEffect(() => {
     if (!selectedNote || editing) return;
@@ -82,14 +116,6 @@ const TeamNotes: React.FC = () => {
     nextParams.delete('noteId');
     setSearchParams(nextParams, { replace: true });
   }, [notes, requestedNoteId, searchParams, setSearchParams]);
-
-  useEffect(() => {
-    if (!currentCampaignId || !user) return;
-    const timer = window.setInterval(() => {
-      loadAll().catch(() => void 0);
-    }, 15000);
-    return () => window.clearInterval(timer);
-  }, [currentCampaignId, loadAll, user]);
 
   useEffect(() => {
     if (!currentCampaignId || !user || !editing || !selectedNote) return;
@@ -119,6 +145,9 @@ const TeamNotes: React.FC = () => {
         leaseStartedAt,
       }).then((saved) => {
         setNotes((prev) => prev.map((item) => item.id === saved.id ? saved : item));
+        queryClient.setQueryData<TeamNoteDocument[]>(notesQueryKey, (prev = []) =>
+          prev.map((item) => item.id === saved.id ? saved : item)
+        );
         setStatusText(`已自动保存：${new Date(saved.updatedAt).toLocaleTimeString()}`);
       }).catch((error) => {
         if (error instanceof VersionConflictError && error.remote) {
@@ -159,6 +188,7 @@ const TeamNotes: React.FC = () => {
     try {
       const created = await teamNotesService.createTeamNote(currentCampaignId, user, '新的团队笔记');
       setNotes((prev) => [created, ...prev]);
+      queryClient.setQueryData<TeamNoteDocument[]>(notesQueryKey, (prev = []) => [created, ...prev]);
       setSelectedId(created.id);
       setDraftTitle(created.title);
       setDraftContent(created.content);
@@ -173,6 +203,9 @@ const TeamNotes: React.FC = () => {
     try {
       const locked = await teamNotesService.startLease(currentCampaignId, selectedNote.id, user, memberRole);
       setNotes((prev) => prev.map((item) => item.id === locked.id ? locked : item));
+      queryClient.setQueryData<TeamNoteDocument[]>(notesQueryKey, (prev = []) =>
+        prev.map((item) => item.id === locked.id ? locked : item)
+      );
       setDraftTitle(locked.title);
       setDraftContent(locked.content);
       setLeaseStartedAt(locked.activeLease?.startedAt ?? null);
@@ -198,6 +231,9 @@ const TeamNotes: React.FC = () => {
       leaseStartedAt,
     });
     setNotes((prev) => prev.map((item) => item.id === saved.id ? saved : item));
+    queryClient.setQueryData<TeamNoteDocument[]>(notesQueryKey, (prev = []) =>
+      prev.map((item) => item.id === saved.id ? saved : item)
+    );
     setStatusText(`已保存：${new Date(saved.updatedAt).toLocaleTimeString()}`);
     return saved;
   };
@@ -219,7 +255,7 @@ const TeamNotes: React.FC = () => {
       if (shouldExitEdit) {
         setEditing(false);
         setLeaseStartedAt(null);
-        await loadAll().catch(() => void 0);
+        await Promise.all([configQuery.refetch(), notesQuery.refetch()]).catch(() => void 0);
       }
     }
     return true;
@@ -250,11 +286,13 @@ const TeamNotes: React.FC = () => {
     try {
       await teamNotesService.deleteTeamNote(currentCampaignId, deletingNote.id, user);
       const removedId = deletingNote.id;
+      const nextNotes = notes.filter((item) => item.id !== removedId);
       setDeletingNote(null);
-      setNotes((prev) => prev.filter((item) => item.id !== removedId));
+      setNotes(nextNotes);
+      queryClient.setQueryData<TeamNoteDocument[]>(notesQueryKey, nextNotes);
       setSelectedId((prev) => {
         if (prev !== removedId) return prev;
-        const next = notes.find((item) => item.id !== removedId);
+        const next = nextNotes[0];
         return next?.id ?? null;
       });
       if (selectedId === removedId) {
@@ -272,6 +310,9 @@ const TeamNotes: React.FC = () => {
   const handleUseRemoteConflict = () => {
     if (!conflictNote) return;
     setNotes((prev) => prev.map((item) => item.id === conflictNote.id ? conflictNote : item));
+    queryClient.setQueryData<TeamNoteDocument[]>(notesQueryKey, (prev = []) =>
+      prev.map((item) => item.id === conflictNote.id ? conflictNote : item)
+    );
     if (selectedId === conflictNote.id) {
       setDraftTitle(conflictNote.title);
       setDraftContent(conflictNote.content);
@@ -290,6 +331,9 @@ const TeamNotes: React.FC = () => {
         leaseStartedAt,
       });
       setNotes((prev) => prev.map((item) => item.id === saved.id ? saved : item));
+      queryClient.setQueryData<TeamNoteDocument[]>(notesQueryKey, (prev = []) =>
+        prev.map((item) => item.id === saved.id ? saved : item)
+      );
       setConflictNote(null);
       setStatusText(`已覆盖保存：${new Date(saved.updatedAt).toLocaleTimeString()}`);
     } catch (error) {

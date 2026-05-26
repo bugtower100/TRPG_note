@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { RotateCcw } from 'lucide-react';
 import { useCampaignSession } from '../context/CampaignContext';
+import { queryKeys } from '../query/queryKeys';
 import { VersionRecord } from '../types';
 import { sharingService } from '../services/sharingService';
 import RichTextDisplay from '../components/common/RichTextDisplay';
@@ -131,7 +133,6 @@ const VersionHistory: React.FC = () => {
   const { currentCampaignId, user } = useCampaignSession();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const [versions, setVersions] = useState<VersionRecord[]>([]);
   const [selected, setSelected] = useState<VersionRecord | null>(null);
   const [statusText, setStatusText] = useState('');
   const filterDocumentType = searchParams.get('documentType');
@@ -139,32 +140,38 @@ const VersionHistory: React.FC = () => {
   const diffRows = useMemo(() => selected ? buildDiffRows(selected.previousSnapshot, selected.snapshot) : [], [selected]);
   const summaryRows = useMemo(() => selected ? buildSummaryRows(selected.snapshot) : [], [selected]);
 
-  const loadVersions = React.useCallback(async () => {
-    if (!currentCampaignId || !user) return;
-    try {
-      const next = await sharingService.listVersions(currentCampaignId, user);
-      setVersions(next);
-      setStatusText('');
-    } catch (error) {
-      const message = error instanceof Error ? error.message : '版本记录加载失败';
-      if (message === 'forbidden') {
-        setStatusText('当前仅 GM 可查看历史版本，请联系主持人协助操作');
-      } else {
-        setStatusText(message);
+  const versionsQuery = useQuery({
+    queryKey: currentCampaignId
+      ? queryKeys.campaigns.versions(currentCampaignId, user?.id)
+      : ['campaigns', 'versions', 'disabled'] as const,
+    queryFn: async () => {
+      if (!currentCampaignId || !user) {
+        return [] as VersionRecord[];
       }
-      setVersions([]);
-    }
-  }, [currentCampaignId, user]);
+      return sharingService.listVersions(currentCampaignId, user);
+    },
+    enabled: Boolean(currentCampaignId && user),
+    refetchInterval: 15_000,
+  });
 
   useEffect(() => {
-    void loadVersions();
-  }, [loadVersions]);
+    if (!versionsQuery.error) {
+      setStatusText('');
+      return;
+    }
+    const message = versionsQuery.error instanceof Error ? versionsQuery.error.message : '版本记录加载失败';
+    if (message === 'forbidden') {
+      setStatusText('当前仅 GM 可查看历史版本，请联系主持人协助操作');
+      return;
+    }
+    setStatusText(message);
+  }, [versionsQuery.error]);
 
-  const visibleVersions = useMemo(() => versions.filter((version) => {
+  const visibleVersions = useMemo(() => (versionsQuery.data ?? []).filter((version) => {
     if (filterDocumentType && version.documentType !== filterDocumentType) return false;
     if (filterDocumentId && version.documentId !== filterDocumentId) return false;
     return true;
-  }), [filterDocumentId, filterDocumentType, versions]);
+  }), [filterDocumentId, filterDocumentType, versionsQuery.data]);
 
   useEffect(() => {
     setSelected((prev) => {
@@ -178,7 +185,7 @@ const VersionHistory: React.FC = () => {
     try {
       const result = await sharingService.restoreVersionCopy(currentCampaignId, selected.id, user);
       setStatusText('已恢复为副本');
-      await loadVersions();
+      await versionsQuery.refetch();
       if (selected.documentType === 'shared_entity') {
         const entityType = String(selected.snapshot.entityType || '');
         navigate(`/${entityType}/shared/${result.createdId}`);

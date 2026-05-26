@@ -1,39 +1,26 @@
+import {
+  getCampaignConfig as getGeneratedCampaignConfig,
+  listCampaignShares as listGeneratedCampaignShares,
+  listCampaignVersions as listGeneratedCampaignVersions,
+} from '../generated/api';
 import { CampaignConfig, GraphEntityType, SharedEntityRecord, SharedPermission, ShareScope, UserProfile, VersionRecord } from '../types';
-import { VersionConflictError } from './conflictError';
-import { campaignAccessService } from './campaignAccessService';
-
-const jsonHeaders = (user: UserProfile | null, campaignId?: string) => ({
-  'Content-Type': 'application/json',
-  'X-TRPG-User-Id': user?.id || '',
-  'X-TRPG-Username': encodeURIComponent(user?.username || ''),
-  ...campaignAccessService.buildHeaders(campaignId),
-});
+import { buildUserHeaders } from './apiClient';
+import {
+  buildCollaborationHeaders,
+  parseCollaborationResponse,
+  readCollaborationErrorMessage,
+  rethrowGeneratedCollaborationError,
+  unwrapGeneratedResponse,
+  type CollaborationErrorPayload,
+} from './collaborationApi';
+import { getGeneratedApiClient } from './generatedApiClient';
 
 class SharingService {
-  private parseErrorPayload(text: string): {
-    error?: string;
-    activeLease?: { username?: string };
-    version?: number;
-    remoteShare?: SharedEntityRecord;
-  } | null {
-    if (!text) return null;
-    try {
-      return JSON.parse(text) as {
-        error?: string;
-        activeLease?: { username?: string };
-        version?: number;
-        remoteShare?: SharedEntityRecord;
-      };
-    } catch {
-      return null;
-    }
-  }
-
-  private messageFromPayload(payload: {
-    error?: string;
-    activeLease?: { username?: string };
-    version?: number;
-  } | null, fallbackText: string, status: number): string {
+  private messageFromPayload(
+    payload: CollaborationErrorPayload<SharedEntityRecord> | null,
+    fallbackText: string,
+    status: number
+  ): string {
     if (!payload) return fallbackText || `HTTP ${status}`;
     if (payload.error === 'lease_conflict') {
       return `${payload.activeLease?.username || '其他人'} 正在编辑这条共享内容，请稍后再试`;
@@ -53,40 +40,43 @@ class SharingService {
     return fallbackText || `HTTP ${status}`;
   }
 
-  private async readErrorMessage(response: Response): Promise<string> {
-    const text = await response.text();
-    const payload = this.parseErrorPayload(text);
-    return this.messageFromPayload(payload, text, response.status);
-  }
-
   private async parseResponse<T>(response: Response): Promise<T> {
-    if (!response.ok) {
-      const text = await response.text();
-      const payload = this.parseErrorPayload(text);
-      const message = this.messageFromPayload(payload, text, response.status);
-      if (payload?.error === 'version_conflict') {
-        throw new VersionConflictError<SharedEntityRecord>(message, {
-          version: payload.version,
-          remote: payload.remoteShare ?? null,
-        });
-      }
-      throw new Error(message);
-    }
-    return response.json() as Promise<T>;
+    return parseCollaborationResponse<T, SharedEntityRecord>(response, {
+      remoteFieldNames: ['remoteShare'],
+      messageFromPayload: this.messageFromPayload.bind(this),
+    });
   }
 
   async listReceivedShares(campaignId: string, user: UserProfile | null): Promise<SharedEntityRecord[]> {
-    const response = await fetch(`/api/campaigns/${campaignId}/shares?view=received`, {
-      headers: jsonHeaders(user, campaignId),
-    });
-    return this.parseResponse<SharedEntityRecord[]>(response);
+    try {
+      return ((unwrapGeneratedResponse(await listGeneratedCampaignShares({
+        client: getGeneratedApiClient(),
+        headers: buildUserHeaders(user, { campaignId }),
+        path: { campaignId },
+        query: { view: 'received' },
+      })) ?? []) as unknown) as SharedEntityRecord[];
+    } catch (error) {
+      rethrowGeneratedCollaborationError<SharedEntityRecord>(error, {
+        remoteFieldNames: ['remoteShare'],
+        messageFromPayload: this.messageFromPayload.bind(this),
+      });
+    }
   }
 
   async listManagedShares(campaignId: string, user: UserProfile | null): Promise<SharedEntityRecord[]> {
-    const response = await fetch(`/api/campaigns/${campaignId}/shares?view=managed`, {
-      headers: jsonHeaders(user, campaignId),
-    });
-    return this.parseResponse<SharedEntityRecord[]>(response);
+    try {
+      return ((unwrapGeneratedResponse(await listGeneratedCampaignShares({
+        client: getGeneratedApiClient(),
+        headers: buildUserHeaders(user, { campaignId }),
+        path: { campaignId },
+        query: { view: 'managed' },
+      })) ?? []) as unknown) as SharedEntityRecord[];
+    } catch (error) {
+      rethrowGeneratedCollaborationError<SharedEntityRecord>(error, {
+        remoteFieldNames: ['remoteShare'],
+        messageFromPayload: this.messageFromPayload.bind(this),
+      });
+    }
   }
 
   async createShare(
@@ -105,7 +95,7 @@ class SharingService {
   ): Promise<SharedEntityRecord[]> {
     const response = await fetch(`/api/campaigns/${campaignId}/shares`, {
       method: 'POST',
-      headers: jsonHeaders(user, campaignId),
+      headers: buildCollaborationHeaders(user, campaignId),
       body: JSON.stringify(payload),
     });
     return this.parseResponse<SharedEntityRecord[]>(response);
@@ -114,39 +104,58 @@ class SharingService {
   async revokeShare(campaignId: string, shareId: string, user: UserProfile | null): Promise<void> {
     const response = await fetch(`/api/campaigns/${campaignId}/shares/${shareId}`, {
       method: 'DELETE',
-      headers: jsonHeaders(user, campaignId),
+      headers: buildCollaborationHeaders(user, campaignId),
     });
     if (!response.ok) {
-      throw new Error(await this.readErrorMessage(response));
+      throw new Error(await readCollaborationErrorMessage<SharedEntityRecord>(response, {
+        remoteFieldNames: ['remoteShare'],
+        messageFromPayload: this.messageFromPayload.bind(this),
+      }));
     }
   }
 
   async listVersions(campaignId: string, user: UserProfile | null): Promise<VersionRecord[]> {
-    const response = await fetch(`/api/campaigns/${campaignId}/versions`, {
-      headers: jsonHeaders(user, campaignId),
-    });
-    return this.parseResponse<VersionRecord[]>(response);
+    try {
+      return (unwrapGeneratedResponse(await listGeneratedCampaignVersions({
+        client: getGeneratedApiClient(),
+        headers: buildUserHeaders(user, { campaignId }),
+        path: { campaignId },
+      })) ?? []) as VersionRecord[];
+    } catch (error) {
+      rethrowGeneratedCollaborationError<SharedEntityRecord>(error, {
+        remoteFieldNames: ['remoteShare'],
+        messageFromPayload: this.messageFromPayload.bind(this),
+      });
+    }
   }
 
   async restoreVersionCopy(campaignId: string, versionId: string, user: UserProfile | null): Promise<{ createdId: string }> {
     const response = await fetch(`/api/campaigns/${campaignId}/versions/${versionId}/restore-copy`, {
       method: 'POST',
-      headers: jsonHeaders(user, campaignId),
+      headers: buildCollaborationHeaders(user, campaignId),
     });
     return this.parseResponse<{ createdId: string }>(response);
   }
 
   async getCampaignConfig(campaignId: string, user: UserProfile | null): Promise<CampaignConfig> {
-    const response = await fetch(`/api/campaigns/${campaignId}/config`, {
-      headers: jsonHeaders(user, campaignId),
-    });
-    return this.parseResponse<CampaignConfig>(response);
+    try {
+      return unwrapGeneratedResponse(await getGeneratedCampaignConfig({
+        client: getGeneratedApiClient(),
+        headers: buildUserHeaders(user, { campaignId }),
+        path: { campaignId },
+      })) as CampaignConfig;
+    } catch (error) {
+      rethrowGeneratedCollaborationError<SharedEntityRecord>(error, {
+        remoteFieldNames: ['remoteShare'],
+        messageFromPayload: this.messageFromPayload.bind(this),
+      });
+    }
   }
 
   async startShareLease(campaignId: string, shareId: string, user: UserProfile | null): Promise<SharedEntityRecord> {
     const response = await fetch(`/api/campaigns/${campaignId}/shares/${shareId}/lease/start`, {
       method: 'POST',
-      headers: jsonHeaders(user, campaignId),
+      headers: buildCollaborationHeaders(user, campaignId),
     });
     return this.parseResponse<SharedEntityRecord>(response);
   }
@@ -159,7 +168,7 @@ class SharingService {
   ): Promise<SharedEntityRecord> {
     const response = await fetch(`/api/campaigns/${campaignId}/shares/${shareId}/lease/refresh`, {
       method: 'POST',
-      headers: jsonHeaders(user, campaignId),
+      headers: buildCollaborationHeaders(user, campaignId),
       body: JSON.stringify({ leaseStartedAt }),
     });
     return this.parseResponse<SharedEntityRecord>(response);
@@ -168,11 +177,14 @@ class SharingService {
   async endShareLease(campaignId: string, shareId: string, user: UserProfile | null, leaseStartedAt?: number | null): Promise<void> {
     const response = await fetch(`/api/campaigns/${campaignId}/shares/${shareId}/lease/end`, {
       method: 'POST',
-      headers: jsonHeaders(user, campaignId),
+      headers: buildCollaborationHeaders(user, campaignId),
       body: JSON.stringify({ leaseStartedAt }),
     });
     if (!response.ok) {
-      throw new Error(await this.readErrorMessage(response));
+      throw new Error(await readCollaborationErrorMessage<SharedEntityRecord>(response, {
+        remoteFieldNames: ['remoteShare'],
+        messageFromPayload: this.messageFromPayload.bind(this),
+      }));
     }
   }
 
@@ -193,7 +205,7 @@ class SharingService {
   ): Promise<SharedEntityRecord> {
     const response = await fetch(`/api/campaigns/${campaignId}/shares/${shareId}/content`, {
       method: 'PUT',
-      headers: jsonHeaders(user, campaignId),
+      headers: buildCollaborationHeaders(user, campaignId),
       body: JSON.stringify(payload),
     });
     return this.parseResponse<SharedEntityRecord>(response);

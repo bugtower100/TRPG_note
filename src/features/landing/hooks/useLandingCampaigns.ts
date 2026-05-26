@@ -1,5 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useMemo, useState } from 'react';
+import { useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import { CampaignConfig, CampaignSummary, PublicCampaignSummary, UserProfile } from '../../../types';
+import { queryKeys } from '../../../query/queryKeys';
 import { teamNotesService } from '../../../services/teamNotesService';
 import { campaignAccessService } from '../../../services/campaignAccessService';
 
@@ -19,48 +21,75 @@ const buildFallbackConfig = (campaignId: string, ownerUserId: string): CampaignC
 });
 
 export const useLandingCampaigns = ({ user, campaignList }: UseLandingCampaignsParams) => {
-  const [campaignConfigs, setCampaignConfigs] = useState<Record<string, CampaignConfig>>({});
+  const queryClient = useQueryClient();
+  const [configOverrides, setConfigOverrides] = useState<Record<string, Partial<CampaignConfig>>>({});
   const [savingConfigId, setSavingConfigId] = useState<string | null>(null);
-  const [publicCampaigns, setPublicCampaigns] = useState<PublicCampaignSummary[]>([]);
+  const campaignConfigQueries = useQueries({
+    queries: campaignList.map((campaign) => ({
+      queryKey: queryKeys.campaigns.config(campaign.id, user?.id),
+      queryFn: async () => {
+        if (!user) {
+          throw new Error('当前用户信息缺失，请重新登录后再试。');
+        }
+        return teamNotesService.getConfig(campaign.id, user);
+      },
+      enabled: Boolean(user),
+      staleTime: 10_000,
+    })),
+  });
+  const publicCampaignsQuery = useQuery({
+    queryKey: queryKeys.campaigns.publicList(user?.id),
+    queryFn: async () => {
+      if (!user) {
+        return [] as PublicCampaignSummary[];
+      }
+      return teamNotesService.listPublicCampaigns(user);
+    },
+    enabled: Boolean(user),
+    staleTime: 10_000,
+  });
 
-  useEffect(() => {
-    if (!user || campaignList.length === 0) {
-      setCampaignConfigs({});
-      return;
-    }
-
-    Promise.all(
-      campaignList.map(async (campaign) => {
-        const config = await teamNotesService.updateConfig(campaign.id, user, {
-          name: campaign.name,
-          description: campaign.description,
-          lastModified: campaign.lastModified,
-        });
-        return [campaign.id, config] as const;
-      })
-    ).then((entries) => {
-      setCampaignConfigs(Object.fromEntries(entries));
-    }).catch(() => void 0);
-  }, [campaignList, user]);
-
-  useEffect(() => {
+  const campaignConfigs = useMemo(() => {
     if (!user) {
-      setPublicCampaigns([]);
-      return;
+      return {};
     }
-    teamNotesService.listPublicCampaigns(user)
-      .then((items) => {
-        setPublicCampaigns(items.filter((item) => item.ownerId !== user.id));
-      })
-      .catch(() => void 0);
-  }, [campaignList, user]);
+    return campaignList.reduce<Record<string, CampaignConfig>>((acc, campaign, index) => {
+      const fetchedConfig = campaignConfigQueries[index]?.data;
+      const baseConfig = fetchedConfig || buildFallbackConfig(campaign.id, user.id);
+      const override = configOverrides[campaign.id];
+      acc[campaign.id] = override ? { ...baseConfig, ...override } : baseConfig;
+      return acc;
+    }, {});
+  }, [campaignConfigQueries, campaignList, configOverrides, user]);
+
+  const publicCampaigns = useMemo(
+    () => (publicCampaignsQuery.data ?? []).filter((item) => item.ownerId !== user?.id),
+    [publicCampaignsQuery.data, user?.id]
+  );
+
+  const syncConfigCache = (campaignId: string, nextConfig: CampaignConfig) => {
+    if (!user) return;
+    queryClient.setQueryData(queryKeys.campaigns.config(campaignId, user.id), nextConfig);
+    setConfigOverrides((prev) => {
+      const next = { ...prev };
+      delete next[campaignId];
+      return next;
+    });
+  };
+
+  const refreshPublicCampaignsCache = async () => {
+    if (!user) return;
+    await queryClient.invalidateQueries({
+      queryKey: queryKeys.campaigns.publicList(user.id),
+    });
+  };
 
   const setCampaignVisibility = (campaignId: string, visibility: CampaignConfig['visibility']) => {
     if (!user) return;
-    setCampaignConfigs((prev) => ({
+    setConfigOverrides((prev) => ({
       ...prev,
       [campaignId]: {
-        ...(prev[campaignId] || buildFallbackConfig(campaignId, user.id)),
+        ...(prev[campaignId] || {}),
         visibility,
       },
     }));
@@ -79,7 +108,8 @@ export const useLandingCampaigns = ({ user, campaignList }: UseLandingCampaignsP
         lastModified: currentCampaign?.lastModified,
         visibility: current.visibility,
       });
-      setCampaignConfigs((prev) => ({ ...prev, [campaignId]: next }));
+      syncConfigCache(campaignId, next);
+      await refreshPublicCampaignsCache();
     } finally {
       setSavingConfigId(null);
     }
@@ -101,7 +131,8 @@ export const useLandingCampaigns = ({ user, campaignList }: UseLandingCampaignsP
         joinPassword: normalized,
         clearJoinPassword: normalized === '',
       });
-      setCampaignConfigs((prev) => ({ ...prev, [campaignId]: next }));
+      syncConfigCache(campaignId, next);
+      await refreshPublicCampaignsCache();
       if (normalized === '') {
         campaignAccessService.clearPassword(campaignId);
       }
@@ -121,7 +152,8 @@ export const useLandingCampaigns = ({ user, campaignList }: UseLandingCampaignsP
       campaignAccessService.setPassword(campaign.id, passwordText);
     }
     try {
-      await teamNotesService.getConfig(campaign.id, user);
+      const config = await teamNotesService.getConfig(campaign.id, user);
+      syncConfigCache(campaign.id, config);
       return true;
     } catch (error) {
       campaignAccessService.clearPassword(campaign.id);
@@ -131,7 +163,8 @@ export const useLandingCampaigns = ({ user, campaignList }: UseLandingCampaignsP
         if (retry === null) return false;
         campaignAccessService.setPassword(campaign.id, retry.trim());
         try {
-          await teamNotesService.getConfig(campaign.id, user);
+          const config = await teamNotesService.getConfig(campaign.id, user);
+          syncConfigCache(campaign.id, config);
           return true;
         } catch (retryError) {
           campaignAccessService.clearPassword(campaign.id);
@@ -149,7 +182,8 @@ export const useLandingCampaigns = ({ user, campaignList }: UseLandingCampaignsP
     if (!window.confirm('确定要将该 PL 从成员列表中移除吗？之后对方再次进入公开模组时会重新加入。')) return;
     try {
       const next = await teamNotesService.removeMember(campaignId, memberUserId, user);
-      setCampaignConfigs((prev) => ({ ...prev, [campaignId]: next }));
+      syncConfigCache(campaignId, next);
+      await refreshPublicCampaignsCache();
     } catch (error) {
       window.alert(error instanceof Error ? error.message : '移除成员失败');
     }

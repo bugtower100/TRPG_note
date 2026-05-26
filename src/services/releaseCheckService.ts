@@ -1,3 +1,5 @@
+import { parseJsonResponse } from './apiClient';
+
 export interface LatestReleaseInfo {
   tagName: string;
   releaseName: string;
@@ -37,10 +39,10 @@ export const releaseCheckService = {
       },
       cache: 'no-store',
     });
-    if (!response.ok) {
-      throw new Error(`release_check_failed:${response.status}`);
-    }
-    const payload = await response.json();
+    const payload = await parseJsonResponse<Record<string, unknown>>(
+      response,
+      `release_check_failed:${response.status}`
+    );
     const tagName = String(payload?.tag_name || '').trim();
     if (!tagName) {
       throw new Error('release_tag_missing');
