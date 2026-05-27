@@ -1,4 +1,4 @@
-import appVersionRaw from '../../server/version.txt?raw';
+import appVersionRaw from '../../version.txt?raw';
 
 const normalized = appVersionRaw.trim();
 

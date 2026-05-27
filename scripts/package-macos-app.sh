@@ -3,7 +3,7 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 APP_NAME="${APP_NAME:-TRPG模组笔记}"
-VERSION_SOURCE="${ROOT_DIR}/server/version.txt"
+VERSION_SOURCE="${ROOT_DIR}/version.txt"
 if [[ -z "${APP_VERSION:-}" && -f "${VERSION_SOURCE}" ]]; then
   APP_VERSION="$(tr -d '\r\n' < "${VERSION_SOURCE}")"
 fi

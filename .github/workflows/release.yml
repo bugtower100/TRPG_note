@@ -68,7 +68,7 @@ jobs:
         id: version
         shell: bash
         run: |
-          raw="$(tr -d '\r\n' < server/version.txt)"
+          raw="$(tr -d '\r\n' < version.txt)"
           raw="${raw#v}"
           echo "app_version=${raw}" >> "${GITHUB_OUTPUT}"
           echo "release_tag=v${raw}" >> "${GITHUB_OUTPUT}"
@@ -103,7 +103,7 @@ jobs:
         env:
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
-        run: go build -o release/TRPG模组笔记.exe
+        run: go build -ldflags "-X main.buildAppVersion=${{ steps.version.outputs.effective_tag }}" -o release/TRPG模组笔记.exe
 
       - name: Create Windows ZIP
         if: ${{ matrix.platform == 'windows' }}
@@ -134,7 +134,7 @@ jobs:
         env:
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
-        run: go build -o release/trpg-note
+        run: go build -ldflags "-X main.buildAppVersion=${{ steps.version.outputs.effective_tag }}" -o release/trpg-note
 
       - name: Build macOS app binary
         if: ${{ matrix.platform == 'macos' }}
@@ -143,7 +143,7 @@ jobs:
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
           CGO_ENABLED: 1
-        run: go build -o release/trpg-note
+        run: go build -ldflags "-X main.buildAppVersion=${{ steps.version.outputs.effective_tag }}" -o release/trpg-note
 
       - name: Create Linux tar.gz
         if: ${{ matrix.platform == 'linux' }}
@@ -202,7 +202,7 @@ jobs:
         id: version
         shell: bash
         run: |
-          raw="$(tr -d '\r\n' < server/version.txt)"
+          raw="$(tr -d '\r\n' < version.txt)"
           raw="${raw#v}"
           file_tag="v${raw}"
           if [[ "${GITHUB_REF}" == refs/tags/* ]]; then

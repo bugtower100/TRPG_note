@@ -33,7 +33,7 @@ jobs:
         id: version
         shell: bash
         run: |
-          raw="$(tr -d '\r\n' < server/version.txt)"
+          raw="$(tr -d '\r\n' < version.txt)"
           raw="${raw#v}"
           echo "version_tag=v${raw}" >> "${GITHUB_OUTPUT}"
 
