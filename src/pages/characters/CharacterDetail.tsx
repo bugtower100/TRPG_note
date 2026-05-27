@@ -48,9 +48,8 @@ const CharacterDetail: React.FC<CharacterDetailProps> = ({ entityId }) => {
     deleteItem: (itemId) => deleteEntity('characters', itemId),
   });
 
-  if (!character) return <div>加载中...</div>;
-
   const setSectionItemsWithDefault = useCallback((key: string, items: CustomSubItem[]) => {
+    if (!character) return;
     const updatedCharacter: Character = {
       ...character,
       sectionSubItems: {
@@ -70,6 +69,8 @@ const CharacterDetail: React.FC<CharacterDetailProps> = ({ entityId }) => {
     }
     setSectionItems(key, items);
   }, [setSectionItems, setSectionItemsWithDefault]);
+
+  if (!character) return <div>加载中...</div>;
 
   return (
     <div className="max-w-4xl mx-auto space-y-6 pb-12 px-2 sm:px-0">
