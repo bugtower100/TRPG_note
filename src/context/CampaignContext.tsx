@@ -30,6 +30,9 @@ const CampaignSessionContext = createContext<CampaignSessionContextValue | undef
 const CampaignThemeContext = createContext<CampaignThemeContextValue | undefined>(undefined);
 const CampaignTabsContext = createContext<CampaignTabsContextValue | undefined>(undefined);
 
+const AUTO_SAVE_DELAY_MS = 320;
+const UNSAVED_WARNING_DELAY_MS = 1200;
+
 const useRequiredContext = <T,>(context: React.Context<T | undefined>, name: string) => {
   const value = useContext(context);
   if (value === undefined) {
@@ -48,13 +51,16 @@ export const CampaignProvider: React.FC<{ children: ReactNode }> = ({ children }
   const [customThemes, setCustomThemes] = useState<CustomThemeConfig[]>([]);
   const [selectedCustomThemeName, setSelectedCustomThemeName] = useState<string | null>(null);
   const [fileHandle, setFileHandle] = useState<any>(null);
+  const [isSessionBootstrapping, setIsSessionBootstrapping] = useState(true);
   const [isCampaignLoading, setIsCampaignLoading] = useState(false);
   const [isCampaignSaving, setIsCampaignSaving] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [showUnsavedWarning, setShowUnsavedWarning] = useState(false);
   const [sessionError, setSessionError] = useState<string | null>(null);
   const [tabs, setTabs] = useState<Tab[]>([]);
   const [activeTabId, setActiveTabId] = useState<string | null>(null);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const unsavedWarningTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingSaveRef = useRef<CampaignData | null>(null);
   const bundleVersionRef = useRef(0);
   const saveRequestIdRef = useRef(0);
@@ -63,6 +69,29 @@ export const CampaignProvider: React.FC<{ children: ReactNode }> = ({ children }
   const clearSessionError = useCallback(() => {
     setSessionError(null);
   }, []);
+
+  const clearUnsavedWarningTimer = useCallback(() => {
+    if (unsavedWarningTimerRef.current) {
+      clearTimeout(unsavedWarningTimerRef.current);
+      unsavedWarningTimerRef.current = null;
+    }
+  }, []);
+
+  const resetUnsavedState = useCallback(() => {
+    clearUnsavedWarningTimer();
+    setHasUnsavedChanges(false);
+    setShowUnsavedWarning(false);
+  }, [clearUnsavedWarningTimer]);
+
+  const scheduleUnsavedWarning = useCallback(() => {
+    clearUnsavedWarningTimer();
+    unsavedWarningTimerRef.current = setTimeout(() => {
+      unsavedWarningTimerRef.current = null;
+      if (mountedRef.current && pendingSaveRef.current) {
+        setShowUnsavedWarning(true);
+      }
+    }, UNSAVED_WARNING_DELAY_MS);
+  }, [clearUnsavedWarningTimer]);
 
   const mergeCampaignSummary = useCallback((
     items: CampaignSummary[],
@@ -127,7 +156,7 @@ export const CampaignProvider: React.FC<{ children: ReactNode }> = ({ children }
   ) => {
     bundleVersionRef.current = version;
     pendingSaveRef.current = null;
-    setHasUnsavedChanges(false);
+    resetUnsavedState();
     if (targetUserId) {
       queryClient.setQueryData(queryKeys.campaigns.bundle(campaignId, targetUserId), {
         campaignId,
@@ -147,7 +176,7 @@ export const CampaignProvider: React.FC<{ children: ReactNode }> = ({ children }
       },
       campaignId
     );
-  }, [queryClient, syncCampaignSummary]);
+  }, [queryClient, resetUnsavedState, syncCampaignSummary]);
 
   const reloadCurrentCampaign = useCallback(async () => {
     if (!currentCampaignId || !user) {
@@ -212,6 +241,8 @@ export const CampaignProvider: React.FC<{ children: ReactNode }> = ({ children }
     } catch (error) {
       if (mountedRef.current && requestId === saveRequestIdRef.current) {
         setHasUnsavedChanges(true);
+        setShowUnsavedWarning(true);
+        clearUnsavedWarningTimer();
         if (error instanceof VersionConflictError) {
           setSessionError('检测到模组版本冲突：远端已有更新，当前修改尚未写入后端。请显式重新加载远端版本后再继续编辑。');
         } else {
@@ -226,19 +257,20 @@ export const CampaignProvider: React.FC<{ children: ReactNode }> = ({ children }
         setIsCampaignSaving(false);
       }
     }
-  }, [applyLoadedCampaign, currentCampaignId, user]);
+  }, [applyLoadedCampaign, clearUnsavedWarningTimer, currentCampaignId, user]);
 
   const scheduleCampaignSave = useCallback((data: CampaignData) => {
     pendingSaveRef.current = data;
     setHasUnsavedChanges(true);
+    scheduleUnsavedWarning();
     if (saveTimerRef.current) {
       clearTimeout(saveTimerRef.current);
     }
     saveTimerRef.current = setTimeout(() => {
       saveTimerRef.current = null;
       void flushPendingSave();
-    }, 320);
-  }, [flushPendingSave]);
+    }, AUTO_SAVE_DELAY_MS);
+  }, [flushPendingSave, scheduleUnsavedWarning]);
 
   const setCampaignData = useCallback((update: SetStateAction<CampaignData>) => {
     setCampaignDataState((prev) => {
@@ -262,6 +294,9 @@ export const CampaignProvider: React.FC<{ children: ReactNode }> = ({ children }
 
     void (async () => {
       if (!currentUser) {
+        if (mountedRef.current) {
+          setIsSessionBootstrapping(false);
+        }
         return;
       }
       try {
@@ -283,6 +318,7 @@ export const CampaignProvider: React.FC<{ children: ReactNode }> = ({ children }
       } finally {
         if (mountedRef.current) {
           setIsCampaignLoading(false);
+          setIsSessionBootstrapping(false);
         }
       }
     })();
@@ -366,8 +402,9 @@ export const CampaignProvider: React.FC<{ children: ReactNode }> = ({ children }
       if (saveTimerRef.current) {
         clearTimeout(saveTimerRef.current);
       }
+      clearUnsavedWarningTimer();
     };
-  }, []);
+  }, [clearUnsavedWarningTimer]);
 
   useEffect(() => {
     const handler = (event: BeforeUnloadEvent) => {
@@ -389,6 +426,7 @@ export const CampaignProvider: React.FC<{ children: ReactNode }> = ({ children }
     const newUser = dataService.createUser(username);
     dataService.setCurrentUser(newUser);
     setUser(newUser);
+    setIsSessionBootstrapping(false);
     void refreshCampaignList(newUser).catch((error) => {
       setSessionError(error instanceof Error ? error.message : '获取模组列表失败。');
     });
@@ -400,10 +438,11 @@ export const CampaignProvider: React.FC<{ children: ReactNode }> = ({ children }
     const previousCampaignIds = campaignList.map((item) => item.id);
     dataService.setCurrentUser(null);
     setUser(null);
+    setIsSessionBootstrapping(false);
     setCurrentCampaignId(null);
     setCampaignDataState(DEFAULT_CAMPAIGN_DATA);
     setCampaignList([]);
-    setHasUnsavedChanges(false);
+    resetUnsavedState();
     setSessionError(null);
     bundleVersionRef.current = 0;
     pendingSaveRef.current = null;
@@ -416,7 +455,7 @@ export const CampaignProvider: React.FC<{ children: ReactNode }> = ({ children }
         queryClient.removeQueries({ queryKey: queryKeys.campaigns.config(campaignId, previousUserId) });
       });
     }
-  }, [campaignList, queryClient, user?.id]);
+  }, [campaignList, queryClient, resetUnsavedState, user?.id]);
 
   const switchCampaign = useCallback(async (id: string) => {
     if (!user) {
@@ -490,11 +529,11 @@ export const CampaignProvider: React.FC<{ children: ReactNode }> = ({ children }
       }
       setCurrentCampaignId(null);
       setCampaignDataState(DEFAULT_CAMPAIGN_DATA);
-      setHasUnsavedChanges(false);
+      resetUnsavedState();
       pendingSaveRef.current = null;
       bundleVersionRef.current = 0;
     })();
-  }, [campaignDataState, flushPendingSave]);
+  }, [campaignDataState, flushPendingSave, resetUnsavedState]);
 
   const deleteCampaign = useCallback(async (id: string) => {
     if (!user) {
@@ -512,7 +551,7 @@ export const CampaignProvider: React.FC<{ children: ReactNode }> = ({ children }
       if (currentCampaignId === id) {
         setCurrentCampaignId(null);
         setCampaignDataState(DEFAULT_CAMPAIGN_DATA);
-        setHasUnsavedChanges(false);
+        resetUnsavedState();
         pendingSaveRef.current = null;
         bundleVersionRef.current = 0;
       }
@@ -526,7 +565,7 @@ export const CampaignProvider: React.FC<{ children: ReactNode }> = ({ children }
         setIsCampaignLoading(false);
       }
     }
-  }, [clearSessionError, currentCampaignId, queryClient, setCampaignListForUser, user]);
+  }, [clearSessionError, currentCampaignId, queryClient, resetUnsavedState, setCampaignListForUser, user]);
 
   const saveCampaign = useCallback(async () => {
     if (saveTimerRef.current) {
@@ -677,9 +716,11 @@ export const CampaignProvider: React.FC<{ children: ReactNode }> = ({ children }
     logout,
     currentCampaignId,
     campaignList,
+    isSessionBootstrapping,
     isCampaignLoading,
     isCampaignSaving,
     hasUnsavedChanges,
+    showUnsavedWarning,
     sessionError,
     clearSessionError,
     reloadCurrentCampaign,
@@ -698,9 +739,11 @@ export const CampaignProvider: React.FC<{ children: ReactNode }> = ({ children }
     logout,
     currentCampaignId,
     campaignList,
+    isSessionBootstrapping,
     isCampaignLoading,
     isCampaignSaving,
     hasUnsavedChanges,
+    showUnsavedWarning,
     sessionError,
     clearSessionError,
     reloadCurrentCampaign,

@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import App from './App';
 import MigrationStatusScreen from './components/system/MigrationStatusScreen';
+import StartupSplashScreen from './components/system/StartupSplashScreen';
 import { migrationService, type MigrationStatus } from './services/migrationService';
 
 type BootstrapState =
@@ -78,6 +79,10 @@ const BootstrapApp: React.FC = () => {
     void runBootstrap();
   }, [runBootstrap]);
 
+  if (state.phase === 'checking') {
+    return <StartupSplashScreen message="正在检查数据库状态..." />;
+  }
+
   if (state.phase === 'ready') {
     return <App />;
   }
@@ -85,7 +90,7 @@ const BootstrapApp: React.FC = () => {
   return (
     <MigrationStatusScreen
       status={state.status}
-      loading={state.phase === 'checking'}
+      loading={false}
       error={state.error}
       actionLoading={actionLoading}
       actionMessage={actionMessage}

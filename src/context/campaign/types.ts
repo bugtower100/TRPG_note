@@ -28,9 +28,11 @@ export interface CampaignSessionContextValue {
   logout: () => void;
   currentCampaignId: string | null;
   campaignList: CampaignSummary[];
+  isSessionBootstrapping: boolean;
   isCampaignLoading: boolean;
   isCampaignSaving: boolean;
   hasUnsavedChanges: boolean;
+  showUnsavedWarning: boolean;
   sessionError: string | null;
   clearSessionError: () => void;
   reloadCurrentCampaign: () => Promise<void>;

@@ -7,7 +7,7 @@ import { GuideHelpButton, GuideId } from './common/InteractiveGuide';
 
 const Layout: React.FC = () => {
   const { tabs } = useCampaignTabs();
-  const { currentCampaignId, isCampaignSaving, hasUnsavedChanges, sessionError, clearSessionError, reloadCurrentCampaign } = useCampaignSession();
+  const { currentCampaignId, isCampaignSaving, showUnsavedWarning, sessionError, clearSessionError, reloadCurrentCampaign } = useCampaignSession();
   const location = useLocation();
   const [isTabPanelMaximized, setIsTabPanelMaximized] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
@@ -181,9 +181,9 @@ const Layout: React.FC = () => {
             <div className="bg-blue-600 text-white px-4 py-2 text-sm">
               正在将当前模组写入后端，请不要立即关闭页面。
             </div>
-          ) : currentCampaignId && hasUnsavedChanges ? (
+          ) : currentCampaignId && showUnsavedWarning ? (
             <div className="bg-amber-500 text-black px-4 py-2 text-sm">
-              当前模组存在未保存修改。系统会尝试自动保存，但在看到保存成功前请不要刷新或关闭页面。
+              当前模组的改动尚未稳定写入后端。请在看到保存成功前不要刷新或关闭页面；若该提示持续存在，请检查网络或重新加载远端版本。
             </div>
           ) : null}
         </div>

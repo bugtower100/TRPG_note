@@ -8,7 +8,7 @@ import { teamNotesService } from '../services/teamNotesService';
 import { sessionTaskBoardService } from '../services/sessionTaskBoardService';
 import { VersionConflictError } from '../services/conflictError';
 import ConflictResolveDialog from '../components/common/ConflictResolveDialog';
-import { Lock, Unlock, History, AlertCircle } from 'lucide-react';
+import { Lock, Unlock, History, AlertCircle, GripVertical } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import EntityTagEditor from '../components/common/EntityTagEditor';
 
@@ -34,6 +34,12 @@ const resolvePermissions = (doc: SessionTaskBoardDocument | null) => ({
   plCanEdit: doc?.plCanEdit ?? true,
 });
 
+type TaskDropTarget = {
+  status: SessionTaskStatus;
+  taskId?: string;
+  position: 'before' | 'after' | 'end';
+};
+
 const SessionTaskBoard: React.FC = () => {
   const { campaignData, setCampaignData } = useCampaignData();
   const { currentCampaignId, user } = useCampaignSession();
@@ -51,6 +57,8 @@ const SessionTaskBoard: React.FC = () => {
   const [taskDrafts, setTaskDrafts] = useState<SessionTask[]>([]);
   const [expandedTaskIds, setExpandedTaskIds] = useState<string[]>([]);
   const [permissionDraft, setPermissionDraft] = useState({ plCanView: true, plCanEdit: true });
+  const [draggingTaskId, setDraggingTaskId] = useState<string | null>(null);
+  const [dropTarget, setDropTarget] = useState<TaskDropTarget | null>(null);
   const saveTimerRef = useRef<number | null>(null);
   const cleanupStateRef = useRef<{
     campaignId: string | null;
@@ -419,6 +427,56 @@ const SessionTaskBoard: React.FC = () => {
       : '';
   const canViewBoard = memberRole === 'GM' || permissionDraft.plCanView;
   const canEditBoard = memberRole === 'GM' || permissionDraft.plCanEdit;
+  const canReorderTasks = editing && canEditBoard;
+
+  const clearTaskDragState = () => {
+    setDraggingTaskId(null);
+    setDropTarget(null);
+  };
+
+  const reorderTasks = (
+    sourceId: string,
+    targetStatus: SessionTaskStatus,
+    targetId?: string,
+    position: 'before' | 'after' | 'end' = 'end'
+  ) => {
+    if (!canReorderTasks) return;
+    updateTasks((tasks) => {
+      const sourceTask = tasks.find((task) => task.id === sourceId);
+      if (!sourceTask) return tasks;
+
+      const nextBuckets = statusOrder.reduce<Record<SessionTaskStatus, SessionTask[]>>(
+        (acc, status) => {
+          acc[status] = tasks
+            .filter((task) => task.status === status && task.id !== sourceId)
+            .map((task) => ({ ...task }));
+          return acc;
+        },
+        { todo: [], in_progress: [], done: [] }
+      );
+
+      const nextTask: SessionTask = {
+        ...sourceTask,
+        status: targetStatus,
+        updatedAt: Date.now(),
+      };
+      const targetBucket = nextBuckets[targetStatus];
+
+      if (!targetId || position === 'end') {
+        targetBucket.push(nextTask);
+      } else {
+        const targetIndex = targetBucket.findIndex((task) => task.id === targetId);
+        if (targetIndex < 0) {
+          targetBucket.push(nextTask);
+        } else {
+          const insertIndex = position === 'after' ? targetIndex + 1 : targetIndex;
+          targetBucket.splice(insertIndex, 0, nextTask);
+        }
+      }
+
+      return statusOrder.flatMap((status) => nextBuckets[status]);
+    });
+  };
 
   return (
     <div className="space-y-6">
@@ -551,97 +609,197 @@ const SessionTaskBoard: React.FC = () => {
               <span className="text-xs theme-text-secondary">{tasksByStatus[status].length} 条</span>
             </div>
             {tasksByStatus[status].length === 0 ? (
-              <div className="text-xs theme-text-secondary py-6 text-center border border-dashed border-theme rounded">
+              <div
+                className={`text-xs theme-text-secondary py-6 text-center border border-dashed rounded ${
+                  dropTarget?.status === status && dropTarget.position === 'end'
+                    ? 'border-primary bg-primary/5'
+                    : 'border-theme'
+                }`}
+                onDragOver={(dragEvent) => {
+                  if (!canReorderTasks || !draggingTaskId) return;
+                  dragEvent.preventDefault();
+                  dragEvent.dataTransfer.dropEffect = 'move';
+                  setDropTarget({ status, position: 'end' });
+                }}
+                onDrop={(dragEvent) => {
+                  if (!canReorderTasks || !draggingTaskId) return;
+                  dragEvent.preventDefault();
+                  reorderTasks(draggingTaskId, status);
+                  clearTaskDragState();
+                }}
+              >
                 当前无任务
               </div>
             ) : (
-              tasksByStatus[status].map((task) => (
-                <article key={task.id} className="border border-theme rounded p-3 space-y-2">
-                  <div className="flex items-start gap-2">
-                    <input
-                      type="text"
-                      value={task.title}
-                      onChange={(event) => patchTask(task.id, { title: event.target.value })}
-                      disabled={!editing}
-                      className="flex-1 min-w-0 px-2 py-1.5 border border-theme rounded bg-transparent font-medium"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => toggleTaskExpanded(task.id)}
-                      className="shrink-0 px-2 py-1 text-xs rounded border border-theme hover:bg-primary-light"
-                    >
-                      {expandedTaskIds.includes(task.id) ? '收起详情' : editing ? '展开编辑' : '展开详情'}
-                    </button>
-                  </div>
-                  {!expandedTaskIds.includes(task.id) && (
-                    <div className="space-y-1">
-                      {task.description.trim() ? (
-                        <p className="text-xs theme-text-secondary line-clamp-2 whitespace-pre-wrap break-words">
-                          {task.description}
-                        </p>
-                      ) : null}
-                      {(task.tags || []).length > 0 ? (
-                        <div className="flex flex-wrap gap-1">
-                          {(task.tags || []).map((tag) => (
-                            <span key={tag} className="px-2 py-0.5 text-[11px] rounded border border-theme theme-text-secondary">
-                              {tag}
-                            </span>
-                          ))}
+              <>
+                {tasksByStatus[status].map((task) => {
+                  const isDropBefore =
+                    dropTarget?.taskId === task.id &&
+                    dropTarget.position === 'before' &&
+                    draggingTaskId !== task.id;
+                  const isDropAfter =
+                    dropTarget?.taskId === task.id &&
+                    dropTarget.position === 'after' &&
+                    draggingTaskId !== task.id;
+                  return (
+                    <div key={task.id} className="relative">
+                      {isDropBefore && (
+                        <div className="pointer-events-none absolute inset-x-0 -top-1 z-10">
+                          <div className="h-1 rounded-full bg-primary shadow-[0_0_0_2px_rgba(59,130,246,0.18)]" />
                         </div>
-                      ) : null}
-                      {!task.description.trim() && (task.tags || []).length === 0 }
-                    </div>
-                  )}
-                  {expandedTaskIds.includes(task.id) && (
-                    <div className="space-y-2">
-                      <textarea
-                        value={task.description}
-                        onChange={(event) => patchTask(task.id, { description: event.target.value })}
-                        placeholder="任务说明（可选）"
-                        disabled={!editing}
-                        className="w-full min-h-20 px-2 py-1.5 border border-theme rounded bg-transparent text-sm"
-                      />
-                      <div className="grid grid-cols-1 gap-2">
-                        <EntityTagEditor
-                          tags={task.tags || []}
-                          disabled={!editing}
-                          compact
-                          hideLabel
-                          onChange={(nextTags) => patchTask(task.id, { tags: nextTags })}
-                        />
-                      </div>
-                    </div>
-                  )}
-                  <div className="grid grid-cols-3 gap-1">
-                    {statusOrder.map((nextStatus) => (
-                      <button
-                        key={nextStatus}
-                        type="button"
-                        onClick={() => patchTask(task.id, { status: nextStatus })}
-                        disabled={!editing}
-                        className={`px-2 py-1 text-xs rounded border ${
-                          task.status === nextStatus
-                            ? 'bg-primary text-white border-primary'
-                            : 'border-theme hover:bg-primary-light'
+                      )}
+                      <article
+                        draggable={canReorderTasks}
+                        onDragStart={(dragEvent) => {
+                          if (!canReorderTasks) return;
+                          dragEvent.dataTransfer.effectAllowed = 'move';
+                          dragEvent.dataTransfer.setData('text/plain', task.id);
+                          setDraggingTaskId(task.id);
+                          setDropTarget(null);
+                        }}
+                        onDragOver={(dragEvent) => {
+                          if (!canReorderTasks || !draggingTaskId || draggingTaskId === task.id) return;
+                          dragEvent.preventDefault();
+                          dragEvent.dataTransfer.dropEffect = 'move';
+                          const rect = dragEvent.currentTarget.getBoundingClientRect();
+                          const nextPosition = dragEvent.clientY < rect.top + rect.height / 2 ? 'before' : 'after';
+                          setDropTarget({ status, taskId: task.id, position: nextPosition });
+                        }}
+                        onDrop={(dragEvent) => {
+                          if (!canReorderTasks || !draggingTaskId || draggingTaskId === task.id) return;
+                          dragEvent.preventDefault();
+                          reorderTasks(draggingTaskId, status, task.id, dropTarget?.position === 'after' ? 'after' : 'before');
+                          clearTaskDragState();
+                        }}
+                        onDragEnd={() => clearTaskDragState()}
+                        className={`border border-theme rounded p-3 space-y-2 ${
+                          draggingTaskId === task.id ? 'opacity-50' : ''
                         }`}
                       >
-                        {statusLabel[nextStatus]}
-                      </button>
-                    ))}
-                  </div>
-                  <div className="flex justify-end">
-                    <button
-                      type="button"
-                      onClick={() => deleteTask(task.id)}
-                      disabled={!editing || memberRole !== 'GM'}
-                      title={memberRole === 'GM' ? '删除任务' : '仅 GM 可删除任务'}
-                      className="text-xs text-red-600 hover:text-red-700"
-                    >
-                      删除
-                    </button>
-                  </div>
-                </article>
-              ))
+                        <div className="flex items-start gap-2">
+                          {canReorderTasks && (
+                            <span
+                              className="mt-2 shrink-0 cursor-grab text-gray-400 active:cursor-grabbing"
+                              title="拖拽调整顺序"
+                            >
+                              <GripVertical size={16} />
+                            </span>
+                          )}
+                          <input
+                            type="text"
+                            value={task.title}
+                            onChange={(event) => patchTask(task.id, { title: event.target.value })}
+                            disabled={!editing}
+                            className="flex-1 min-w-0 px-2 py-1.5 border border-theme rounded bg-transparent font-medium"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => toggleTaskExpanded(task.id)}
+                            className="shrink-0 px-2 py-1 text-xs rounded border border-theme hover:bg-primary-light"
+                          >
+                            {expandedTaskIds.includes(task.id) ? '收起详情' : editing ? '展开编辑' : '展开详情'}
+                          </button>
+                        </div>
+                        {!expandedTaskIds.includes(task.id) && (
+                          <div className="space-y-1">
+                            {task.description.trim() ? (
+                              <p className="text-xs theme-text-secondary line-clamp-2 whitespace-pre-wrap break-words">
+                                {task.description}
+                              </p>
+                            ) : null}
+                            {(task.tags || []).length > 0 ? (
+                              <div className="flex flex-wrap gap-1">
+                                {(task.tags || []).map((tag) => (
+                                  <span key={tag} className="px-2 py-0.5 text-[11px] rounded border border-theme theme-text-secondary">
+                                    {tag}
+                                  </span>
+                                ))}
+                              </div>
+                            ) : null}
+                            {!task.description.trim() && (task.tags || []).length === 0}
+                          </div>
+                        )}
+                        {expandedTaskIds.includes(task.id) && (
+                          <div className="space-y-2">
+                            <textarea
+                              value={task.description}
+                              onChange={(event) => patchTask(task.id, { description: event.target.value })}
+                              placeholder="任务说明（可选）"
+                              disabled={!editing}
+                              className="w-full min-h-20 px-2 py-1.5 border border-theme rounded bg-transparent text-sm"
+                            />
+                            <div className="grid grid-cols-1 gap-2">
+                              <EntityTagEditor
+                                tags={task.tags || []}
+                                disabled={!editing}
+                                compact
+                                hideLabel
+                                onChange={(nextTags) => patchTask(task.id, { tags: nextTags })}
+                              />
+                            </div>
+                          </div>
+                        )}
+                        <div className="grid grid-cols-3 gap-1">
+                          {statusOrder.map((nextStatus) => (
+                            <button
+                              key={nextStatus}
+                              type="button"
+                              onClick={() => patchTask(task.id, { status: nextStatus })}
+                              disabled={!editing}
+                              className={`px-2 py-1 text-xs rounded border ${
+                                task.status === nextStatus
+                                  ? 'bg-primary text-white border-primary'
+                                  : 'border-theme hover:bg-primary-light'
+                              }`}
+                            >
+                              {statusLabel[nextStatus]}
+                            </button>
+                          ))}
+                        </div>
+                        <div className="flex justify-end">
+                          <button
+                            type="button"
+                            onClick={() => deleteTask(task.id)}
+                            disabled={!editing || memberRole !== 'GM'}
+                            title={memberRole === 'GM' ? '删除任务' : '仅 GM 可删除任务'}
+                            className="text-xs text-red-600 hover:text-red-700"
+                          >
+                            删除
+                          </button>
+                        </div>
+                      </article>
+                      {isDropAfter && (
+                        <div className="pointer-events-none absolute inset-x-0 -bottom-1 z-10">
+                          <div className="h-1 rounded-full bg-primary shadow-[0_0_0_2px_rgba(59,130,246,0.18)]" />
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+                <div
+                  className={`rounded border border-dashed px-3 py-2 text-center text-xs transition ${
+                    canReorderTasks
+                      ? dropTarget?.status === status && dropTarget.position === 'end'
+                        ? 'border-primary bg-primary/5 text-primary'
+                        : 'border-theme theme-text-secondary'
+                      : 'border-transparent'
+                  }`}
+                  onDragOver={(dragEvent) => {
+                    if (!canReorderTasks || !draggingTaskId) return;
+                    dragEvent.preventDefault();
+                    dragEvent.dataTransfer.dropEffect = 'move';
+                    setDropTarget({ status, position: 'end' });
+                  }}
+                  onDrop={(dragEvent) => {
+                    if (!canReorderTasks || !draggingTaskId) return;
+                    dragEvent.preventDefault();
+                    reorderTasks(draggingTaskId, status);
+                    clearTaskDragState();
+                  }}
+                >
+                  {canReorderTasks ? '拖到这里可放到本列末尾' : ''}
+                </div>
+              </>
             )}
           </section>
         ))}

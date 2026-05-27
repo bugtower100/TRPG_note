@@ -5,6 +5,7 @@ import { GuideProvider } from './components/common/InteractiveGuide';
 import Layout from './components/Layout';
 import ErrorBoundary from './components/ErrorBoundary';
 import LandingPage from './pages/LandingPage';
+import StartupSplashScreen from './components/system/StartupSplashScreen';
 
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const Settings = lazy(() => import('./pages/Settings'));
@@ -35,7 +36,11 @@ const routeFallback = (
 );
 
 function AppContent() {
-  const { user, currentCampaignId } = useCampaignSession();
+  const { user, currentCampaignId, isSessionBootstrapping } = useCampaignSession();
+
+  if (isSessionBootstrapping) {
+    return <StartupSplashScreen message="正在恢复用户与最近打开的模组..." />;
+  }
 
   // If not logged in or no campaign selected, show Landing Page
   if (!user || !currentCampaignId) {
