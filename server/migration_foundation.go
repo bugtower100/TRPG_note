@@ -109,6 +109,27 @@ func ensureMigrationFoundation(db *gorm.DB) error {
 	return nil
 }
 
+func ensureReadyV2SchemaTables(db *gorm.DB) error {
+	status, err := buildMigrationStatus(db)
+	if err != nil {
+		return err
+	}
+	if !status.CanEnterApp || status.CurrentSchemaVersion < targetSchemaVersion {
+		return nil
+	}
+	return db.AutoMigrate(
+		&V2User{},
+		&V2Campaign{},
+		&V2CampaignMember{},
+		&V2CampaignDocument{},
+		&V2CampaignConfig{},
+		&V2TeamNote{},
+		&V2Share{},
+		&V2DocumentVersion{},
+		&V2ResourceIndex{},
+	)
+}
+
 func ensureMetaDefault(db *gorm.DB, key, value string) error {
 	_, exists, err := getAppMeta(db, key)
 	if err != nil {

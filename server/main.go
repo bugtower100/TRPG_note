@@ -679,6 +679,9 @@ func openDB(cfg Config) *gorm.DB {
 	if err := ensureMigrationFoundation(db); err != nil {
 		log.Fatalf("failed to initialize migration foundation: %v", err)
 	}
+	if err := ensureReadyV2SchemaTables(db); err != nil {
+		log.Fatalf("failed to ensure ready v2 schema tables: %v", err)
+	}
 	return db
 }
 
