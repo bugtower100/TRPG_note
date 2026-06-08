@@ -91,26 +91,39 @@ const TimelineDetail: React.FC<TimelineDetailProps> = ({ entityId, embedded = fa
     }
   };
 
-  const addEvent = () => {
-    const newEvent: TimelineEvent = {
-      id: uuidv4(),
-      title: `新节点 ${timeline.timelineEvents.length + 1}`,
-      time: '',
-      content: '',
-      relations: [],
-      relatedImages: [],
-      isRevealed: false,
-    };
+  const createNewEvent = (): TimelineEvent => ({
+    id: uuidv4(),
+    title: `新节点 ${timeline.timelineEvents.length + 1}`,
+    time: '',
+    content: '',
+    relations: [],
+    relatedImages: [],
+    isRevealed: false,
+  });
 
-    const updatedTimeline = {
+  const insertEventAt = (insertIndex: number) => {
+    const newEvent = createNewEvent();
+    const nextEvents = [...timeline.timelineEvents];
+    nextEvents.splice(insertIndex, 0, newEvent);
+    persistTimeline({
       ...timeline,
-      timelineEvents: [...timeline.timelineEvents, newEvent],
-    };
-
-    persistTimeline(updatedTimeline);
+      timelineEvents: nextEvents,
+    });
     setSelectedEventId(newEvent.id);
     setEventDraft({ ...newEvent });
     setIsEditingEvent(true);
+  };
+
+  const addEvent = () => {
+    insertEventAt(timeline.timelineEvents.length);
+  };
+
+  const addEventAfterSelected = () => {
+    if (selectedIndex < 0) {
+      addEvent();
+      return;
+    }
+    insertEventAt(selectedIndex + 1);
   };
 
   const deleteEvent = (eventId: string) => {
@@ -506,6 +519,13 @@ const TimelineDetail: React.FC<TimelineDetailProps> = ({ entityId, embedded = fa
                   className="px-3 py-2 rounded bg-primary text-white hover:bg-primary-dark"
                 >
                   开始编辑
+                </button>
+                <button
+                  type="button"
+                  onClick={addEventAfterSelected}
+                  className="px-3 py-2 rounded border border-theme hover:bg-primary-light"
+                >
+                  在此节点后添加节点
                 </button>
                 <button
                   type="button"

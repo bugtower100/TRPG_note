@@ -31,6 +31,7 @@ export interface CampaignSessionContextValue {
   isSessionBootstrapping: boolean;
   isCampaignLoading: boolean;
   isCampaignSaving: boolean;
+  showSavingNotice: boolean;
   hasUnsavedChanges: boolean;
   showUnsavedWarning: boolean;
   sessionError: string | null;

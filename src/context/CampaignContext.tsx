@@ -30,7 +30,8 @@ const CampaignSessionContext = createContext<CampaignSessionContextValue | undef
 const CampaignThemeContext = createContext<CampaignThemeContextValue | undefined>(undefined);
 const CampaignTabsContext = createContext<CampaignTabsContextValue | undefined>(undefined);
 
-const AUTO_SAVE_DELAY_MS = 320;
+const AUTO_SAVE_DELAY_MS = 1200;
+const SAVE_NOTICE_DELAY_MS = 900;
 const UNSAVED_WARNING_DELAY_MS = 1200;
 
 const useRequiredContext = <T,>(context: React.Context<T | undefined>, name: string) => {
@@ -54,14 +55,18 @@ export const CampaignProvider: React.FC<{ children: ReactNode }> = ({ children }
   const [isSessionBootstrapping, setIsSessionBootstrapping] = useState(true);
   const [isCampaignLoading, setIsCampaignLoading] = useState(false);
   const [isCampaignSaving, setIsCampaignSaving] = useState(false);
+  const [showSavingNotice, setShowSavingNotice] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [showUnsavedWarning, setShowUnsavedWarning] = useState(false);
   const [sessionError, setSessionError] = useState<string | null>(null);
   const [tabs, setTabs] = useState<Tab[]>([]);
   const [activeTabId, setActiveTabId] = useState<string | null>(null);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const savingNoticeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const unsavedWarningTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingSaveRef = useRef<CampaignData | null>(null);
+  const isComposingRef = useRef(false);
+  const saveDeferredByCompositionRef = useRef(false);
   const bundleVersionRef = useRef(0);
   const saveRequestIdRef = useRef(0);
   const mountedRef = useRef(true);
@@ -74,6 +79,13 @@ export const CampaignProvider: React.FC<{ children: ReactNode }> = ({ children }
     if (unsavedWarningTimerRef.current) {
       clearTimeout(unsavedWarningTimerRef.current);
       unsavedWarningTimerRef.current = null;
+    }
+  }, []);
+
+  const clearSavingNoticeTimer = useCallback(() => {
+    if (savingNoticeTimerRef.current) {
+      clearTimeout(savingNoticeTimerRef.current);
+      savingNoticeTimerRef.current = null;
     }
   }, []);
 
@@ -268,6 +280,11 @@ export const CampaignProvider: React.FC<{ children: ReactNode }> = ({ children }
     }
     saveTimerRef.current = setTimeout(() => {
       saveTimerRef.current = null;
+      if (isComposingRef.current) {
+        // Avoid interrupting IME composition with a save-triggered rerender.
+        saveDeferredByCompositionRef.current = true;
+        return;
+      }
       void flushPendingSave();
     }, AUTO_SAVE_DELAY_MS);
   }, [flushPendingSave, scheduleUnsavedWarning]);
@@ -284,6 +301,38 @@ export const CampaignProvider: React.FC<{ children: ReactNode }> = ({ children }
       return next;
     });
   }, [currentCampaignId, scheduleCampaignSave]);
+
+  useEffect(() => {
+    const handleCompositionStart = () => {
+      isComposingRef.current = true;
+    };
+    const handleCompositionEnd = () => {
+      isComposingRef.current = false;
+      if (!saveDeferredByCompositionRef.current || !pendingSaveRef.current) {
+        return;
+      }
+      saveDeferredByCompositionRef.current = false;
+      if (saveTimerRef.current) {
+        clearTimeout(saveTimerRef.current);
+      }
+      saveTimerRef.current = setTimeout(() => {
+        saveTimerRef.current = null;
+        if (isComposingRef.current) {
+          saveDeferredByCompositionRef.current = true;
+          return;
+        }
+        void flushPendingSave();
+      }, AUTO_SAVE_DELAY_MS);
+    };
+
+    window.addEventListener('compositionstart', handleCompositionStart, true);
+    window.addEventListener('compositionend', handleCompositionEnd, true);
+
+    return () => {
+      window.removeEventListener('compositionstart', handleCompositionStart, true);
+      window.removeEventListener('compositionend', handleCompositionEnd, true);
+    };
+  }, [flushPendingSave]);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -398,13 +447,32 @@ export const CampaignProvider: React.FC<{ children: ReactNode }> = ({ children }
   }, [campaignDataState]);
 
   useEffect(() => {
+    clearSavingNoticeTimer();
+    if (!isCampaignSaving || !currentCampaignId) {
+      setShowSavingNotice(false);
+      return;
+    }
+    savingNoticeTimerRef.current = setTimeout(() => {
+      savingNoticeTimerRef.current = null;
+      if (mountedRef.current && isCampaignSaving) {
+        setShowSavingNotice(true);
+      }
+    }, SAVE_NOTICE_DELAY_MS);
+
+    return () => {
+      clearSavingNoticeTimer();
+    };
+  }, [clearSavingNoticeTimer, currentCampaignId, isCampaignSaving]);
+
+  useEffect(() => {
     return () => {
       if (saveTimerRef.current) {
         clearTimeout(saveTimerRef.current);
       }
+      clearSavingNoticeTimer();
       clearUnsavedWarningTimer();
     };
-  }, [clearUnsavedWarningTimer]);
+  }, [clearSavingNoticeTimer, clearUnsavedWarningTimer]);
 
   useEffect(() => {
     const handler = (event: BeforeUnloadEvent) => {
@@ -719,6 +787,7 @@ export const CampaignProvider: React.FC<{ children: ReactNode }> = ({ children }
     isSessionBootstrapping,
     isCampaignLoading,
     isCampaignSaving,
+    showSavingNotice,
     hasUnsavedChanges,
     showUnsavedWarning,
     sessionError,
@@ -742,6 +811,7 @@ export const CampaignProvider: React.FC<{ children: ReactNode }> = ({ children }
     isSessionBootstrapping,
     isCampaignLoading,
     isCampaignSaving,
+    showSavingNotice,
     hasUnsavedChanges,
     showUnsavedWarning,
     sessionError,

@@ -7,7 +7,7 @@ import { GuideHelpButton, GuideId } from './common/InteractiveGuide';
 
 const Layout: React.FC = () => {
   const { tabs } = useCampaignTabs();
-  const { currentCampaignId, isCampaignSaving, showUnsavedWarning, sessionError, clearSessionError, reloadCurrentCampaign } = useCampaignSession();
+  const { currentCampaignId, showSavingNotice, showUnsavedWarning, sessionError, clearSessionError, reloadCurrentCampaign } = useCampaignSession();
   const location = useLocation();
   const [isTabPanelMaximized, setIsTabPanelMaximized] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
@@ -177,7 +177,7 @@ const Layout: React.FC = () => {
             <div className="bg-red-600 text-white px-4 py-2 text-sm">
               当前无法连接后端。正式数据不会静默保存到浏览器缓存，请在连接恢复后再继续保存；当前页面中的未保存修改在刷新或关闭后可能丢失。
             </div>
-          ) : currentCampaignId && isCampaignSaving ? (
+          ) : currentCampaignId && showSavingNotice ? (
             <div className="bg-blue-600 text-white px-4 py-2 text-sm">
               正在将当前模组写入后端，请不要立即关闭页面。
             </div>
