@@ -1027,12 +1027,13 @@ func registerBackupRoutes(group *gin.RouterGroup, db *gorm.DB, cfg Config) {
 		importedAssetMap := make(map[string]string)
 		missingAssetSet := make(map[string]struct{})
 		for _, item := range bundle.Campaigns {
+			itemName, _ := extractCampaignMeta(item.CampaignData)
 			if mode == "overwrite" {
 				if _, ok := existing[item.OriginalCampaignID]; !ok {
 					skippedCount += 1
 					skipped = append(skipped, gin.H{
 						"originalCampaignId": item.OriginalCampaignID,
-						"name":               item.Name,
+						"name":               itemName,
 						"reason":             "no_match",
 					})
 					continue

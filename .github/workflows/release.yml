@@ -72,6 +72,7 @@ jobs:
           raw="${raw#v}"
           echo "app_version=${raw}" >> "${GITHUB_OUTPUT}"
           echo "release_tag=v${raw}" >> "${GITHUB_OUTPUT}"
+          echo "package_name=TRPG模组笔记-${raw}-${{ matrix.platform }}-${{ matrix.goarch }}${{ matrix.platform == 'windows' && '.zip' || matrix.platform == 'macos' && '.zip' || '.tar.gz' }}" >> "${GITHUB_OUTPUT}"
           if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
             echo "effective_tag=${GITHUB_REF_NAME}" >> "${GITHUB_OUTPUT}"
           elif [[ -n "${{ inputs.release_tag }}" ]]; then
@@ -125,7 +126,7 @@ jobs:
 
           Compress-Archive `
             -Path "$staging/*" `
-            -DestinationPath "${{ matrix.package_name }}" `
+            -DestinationPath "${{ steps.version.outputs.package_name }}" `
             -Force
 
       - name: Build Linux binary
@@ -162,7 +163,7 @@ jobs:
             mkdir -p "$staging/data"
           fi
 
-          tar -C "$staging" -czf "${{ matrix.package_name }}" .
+          tar -C "$staging" -czf "${{ steps.version.outputs.package_name }}" .
 
       - name: Create macOS app package
         if: ${{ matrix.platform == 'macos' }}
@@ -170,7 +171,7 @@ jobs:
         env:
           APP_VERSION: ${{ steps.version.outputs.effective_tag }}
         run: |
-          bash ./scripts/package-macos-app.sh "server/release/trpg-note" "${{ matrix.package_name }}"
+          bash ./scripts/package-macos-app.sh "server/release/trpg-note" "${{ steps.version.outputs.package_name }}"
 
       - name: Verify macOS app bundle structure
         if: ${{ matrix.platform == 'macos' }}
@@ -187,7 +188,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact_name }}
-          path: ${{ matrix.package_name }}
+          path: ${{ steps.version.outputs.package_name }}
           if-no-files-found: error
 
   publish-release:
@@ -217,6 +218,7 @@ jobs:
           else
             name="${tag}"
           fi
+          echo "app_version=${raw}" >> "${GITHUB_OUTPUT}"
           echo "tag=${tag}" >> "${GITHUB_OUTPUT}"
           echo "name=${name}" >> "${GITHUB_OUTPUT}"
 
@@ -250,11 +252,11 @@ jobs:
             - 延长了自动保存时间，防止保存过快使用不便
             - 修复了导入识别成功但实际失败问题
           files: |
-            TRPG模组笔记-windows-amd64.zip
-            TRPG模组笔记-windows-arm64.zip
-            TRPG模组笔记-linux-amd64.tar.gz
-            TRPG模组笔记-linux-arm64.tar.gz
-            TRPG模组笔记-macos-arm64.zip
+            TRPG模组笔记-${{ steps.version.outputs.app_version }}-windows-amd64.zip
+            TRPG模组笔记-${{ steps.version.outputs.app_version }}-windows-arm64.zip
+            TRPG模组笔记-${{ steps.version.outputs.app_version }}-linux-amd64.tar.gz
+            TRPG模组笔记-${{ steps.version.outputs.app_version }}-linux-arm64.tar.gz
+            TRPG模组笔记-${{ steps.version.outputs.app_version }}-macos-arm64.zip
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
