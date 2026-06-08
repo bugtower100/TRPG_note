@@ -63,7 +63,7 @@ interface ImportAssistantProps {
 
 const ImportAssistant: React.FC<ImportAssistantProps> = ({ allowLegacyJsonImport = true }) => {
   const { campaignData, setCampaignData } = useCampaignData();
-  const { user } = useCampaignSession();
+  const { user, currentCampaignId, reloadCampaignList, reloadCurrentCampaign } = useCampaignSession();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [sourceData, setSourceData] = useState<CampaignData | null>(null);
   const [sourceFileName, setSourceFileName] = useState('');
@@ -104,14 +104,17 @@ const ImportAssistant: React.FC<ImportAssistantProps> = ({ allowLegacyJsonImport
     if (!bundlePreview) return null;
     let addCount = 0;
     let overwriteCount = 0;
+    let skipCount = 0;
     bundlePreview.campaigns.forEach((item) => {
       if (bundleImportMode === 'overwrite' && item.matchedCampaignId) {
         overwriteCount += 1;
+      } else if (bundleImportMode === 'overwrite') {
+        skipCount += 1;
       } else {
         addCount += 1;
       }
     });
-    return { addCount, overwriteCount };
+    return { addCount, overwriteCount, skipCount };
   }, [bundleImportMode, bundlePreview]);
 
   const handlePickFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -256,14 +259,24 @@ const ImportAssistant: React.FC<ImportAssistantProps> = ({ allowLegacyJsonImport
         fileName: selectedBundleFile.name,
         startedAt,
         status: 'running',
-        message: `正在执行${bundleImportMode === 'overwrite' ? '覆盖/添加' : '添加'}导入...`,
+        message: `正在执行${bundleImportMode === 'overwrite' ? '覆盖' : '添加'}导入...`,
       },
       ...prev,
     ]);
     setBusy(true);
     try {
       const result = await backupService.importBundle(selectedBundleFile, user, bundleImportMode);
-      setNeedsReload(true);
+      let reloadHint = '';
+      try {
+        await reloadCampaignList();
+        if (currentCampaignId && result.campaigns.some((item) => item.id === currentCampaignId)) {
+          await reloadCurrentCampaign();
+        }
+        setNeedsReload(false);
+      } catch {
+        setNeedsReload(true);
+        reloadHint = ' 模组已导入，但当前页面未能自动同步，请手动刷新查看最新内容。';
+      }
       setJobs((prev) =>
         prev.map((job) =>
           job.id === jobId
@@ -273,8 +286,8 @@ const ImportAssistant: React.FC<ImportAssistantProps> = ({ allowLegacyJsonImport
                 finishedAt: Date.now(),
                 message:
                   result.missingAssetCount && result.missingAssetCount > 0
-                    ? `导入完成：新增 ${result.addedCount} 个，覆盖 ${result.overwrittenCount} 个，另有 ${result.missingAssetCount} 个缺失资源已跳过。`
-                    : `导入完成：新增 ${result.addedCount} 个，覆盖 ${result.overwrittenCount} 个。`,
+                    ? `导入完成：新增 ${result.addedCount} 个，覆盖 ${result.overwrittenCount} 个，跳过 ${result.skippedCount || 0} 个，另有 ${result.missingAssetCount} 个缺失资源已跳过。${reloadHint}`
+                    : `导入完成：新增 ${result.addedCount} 个，覆盖 ${result.overwrittenCount} 个，跳过 ${result.skippedCount || 0} 个。${reloadHint}`,
               }
             : job
         )
@@ -331,7 +344,7 @@ const ImportAssistant: React.FC<ImportAssistantProps> = ({ allowLegacyJsonImport
         </div>
         {needsReload && (
           <div className="flex flex-wrap items-center gap-2 text-sm text-green-700 bg-green-50 border border-green-200 rounded px-3 py-2">
-            <span>导入已经完成，刷新页面后可以看到最新模组列表。</span>
+            <span>导入已经完成，但列表尚未自动同步。请刷新页面后查看最新模组列表。</span>
             <button
               type="button"
               onClick={() => window.location.reload()}
@@ -377,7 +390,7 @@ const ImportAssistant: React.FC<ImportAssistantProps> = ({ allowLegacyJsonImport
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 border border-theme rounded p-3">
               <div className="space-y-1">
                 <div className="text-sm font-medium">导入模式</div>
-                <div className="text-xs theme-text-secondary">“添加”会全部作为新模组导入；“覆盖/添加”会优先覆盖同 ID 模组，找不到匹配时则新增。</div>
+                <div className="text-xs theme-text-secondary">“添加导入”会全部作为新模组导入；“覆盖导入”只覆盖已匹配的模组，未匹配项会跳过，不会新增。</div>
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 <select
@@ -386,7 +399,7 @@ const ImportAssistant: React.FC<ImportAssistantProps> = ({ allowLegacyJsonImport
                   className="px-3 py-2 border border-theme rounded bg-transparent text-sm"
                 >
                   <option value="add">添加导入</option>
-                  <option value="overwrite">覆盖/添加导入</option>
+                  <option value="overwrite">覆盖导入</option>
                 </select>
                 <button
                   type="button"
@@ -401,13 +414,14 @@ const ImportAssistant: React.FC<ImportAssistantProps> = ({ allowLegacyJsonImport
 
             {bundleActionSummary && (
               <div className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded px-3 py-2">
-                本次预计新增 {bundleActionSummary.addCount} 个模组，覆盖 {bundleActionSummary.overwriteCount} 个模组。
+                本次预计新增 {bundleActionSummary.addCount} 个模组，覆盖 {bundleActionSummary.overwriteCount} 个模组，跳过 {bundleActionSummary.skipCount} 个未匹配模组。
               </div>
             )}
 
             <div className="space-y-3">
               {bundlePreview.campaigns.map((item) => {
                 const willOverwrite = bundleImportMode === 'overwrite' && Boolean(item.matchedCampaignId);
+                const willSkip = bundleImportMode === 'overwrite' && !item.matchedCampaignId;
                 return (
                   <div key={`${item.originalCampaignId}-${item.name}`} className="border border-theme rounded p-4">
                     <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
@@ -416,8 +430,18 @@ const ImportAssistant: React.FC<ImportAssistantProps> = ({ allowLegacyJsonImport
                         <div className="text-sm theme-text-secondary mt-1">{item.description || '暂无描述'}</div>
                         <div className="text-xs theme-text-secondary mt-2 break-all">原始模组 ID：{item.originalCampaignId}</div>
                       </div>
-                      <div className={`text-xs px-2 py-1 rounded border ${willOverwrite ? 'border-amber-300 text-amber-700 bg-amber-50' : 'border-blue-300 text-blue-700 bg-blue-50'}`}>
-                        {willOverwrite ? `将覆盖：${item.matchedCampaignName || item.matchedCampaignId}` : '将新增为新模组'}
+                      <div className={`text-xs px-2 py-1 rounded border ${
+                        willOverwrite
+                          ? 'border-amber-300 text-amber-700 bg-amber-50'
+                          : willSkip
+                            ? 'border-slate-300 text-slate-700 bg-slate-50'
+                            : 'border-blue-300 text-blue-700 bg-blue-50'
+                      }`}>
+                        {willOverwrite
+                          ? `将覆盖：${item.matchedCampaignName || item.matchedCampaignId}`
+                          : willSkip
+                            ? '未匹配到现有模组，将跳过'
+                            : '将新增为新模组'}
                       </div>
                     </div>
                     <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-6 gap-2 mt-3 text-xs">

@@ -246,7 +246,9 @@ jobs:
           make_latest: true
           body: |
             ## ${{ steps.version.outputs.name }} 更新内容
-            - 
+            - 为时间线节点添加了节点后添加节点按钮
+            - 延长了自动保存时间，防止保存过快使用不便
+            - 修复了导入识别成功但实际失败问题
           files: |
             TRPG模组笔记-windows-amd64.zip
             TRPG模组笔记-windows-arm64.zip

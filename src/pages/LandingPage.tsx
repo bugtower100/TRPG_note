@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useCampaignSession, useCampaignTheme } from '../context/CampaignContext';
-import { Download, Upload, FolderOpen, Plus, ChevronDown } from 'lucide-react';
+import { Download, Upload, Plus, ChevronDown } from 'lucide-react';
 import { dataService } from '../services/dataService';
 import { GuideHelpButton } from '../components/common/InteractiveGuide';
 import ReleaseUpdateButton from '../components/common/ReleaseUpdateButton';
@@ -19,7 +19,7 @@ const LandingPage: React.FC = () => {
   const { 
     user, login, logout, 
     campaignList, switchCampaign, createNewCampaign, 
-    openFromFileSystem, deleteCampaign,
+    deleteCampaign,
     isCampaignLoading,
     isCampaignSaving,
     sessionError,
@@ -267,24 +267,13 @@ const LandingPage: React.FC = () => {
           <div className="flex flex-wrap gap-3 items-center">
              <ReleaseUpdateButton />
              <GuideHelpButton guideId="landing" />
-             {/* Open Local File */}
-             <button 
-                onClick={() => {
-                  void openFromFileSystem().catch(() => void 0);
-                }}
-                className="flex gap-2 items-center px-4 py-2 text-gray-700 bg-white rounded border border-gray-300 shadow-sm hover:bg-gray-50"
-                title="直接打开本地 JSON 文件"
-            >
-                <FolderOpen size={18} />
-                <span>打开本地文件</span>
-            </button>
             <button 
                 onClick={() => setImportAssistantOpen(true)}
                 className="flex gap-2 items-center px-4 py-2 text-gray-700 bg-white rounded border border-gray-300 shadow-sm hover:bg-gray-50"
-                title="打开导入助手"
+                title="导入模组或备份包"
             >
                 <Upload size={18} />
-                <span>导入助手</span>
+                <span>导入模组</span>
             </button>
             <button
                 onClick={() => setExportDialogTarget({ type: 'all' })}

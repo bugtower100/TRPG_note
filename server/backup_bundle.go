@@ -483,6 +483,78 @@ func setImportedCampaignData(raw any, campaignID string, importedAt int64) (any,
 	return root, name, description, nil
 }
 
+func buildImportedV2Bundle(campaignID string, raw any) (V2CampaignBundle, error) {
+	root, ok := raw.(map[string]any)
+	if !ok {
+		return V2CampaignBundle{}, fmt.Errorf("invalid_campaign_payload")
+	}
+	meta, _ := root["meta"].(map[string]any)
+	if meta == nil {
+		meta = map[string]any{}
+	}
+	return V2CampaignBundle{
+		ID:             campaignID,
+		Meta:           meta,
+		Notes:          stringFromAny(root["notes"]),
+		Characters:     toMapSlice(root["characters"]),
+		Locations:      toMapSlice(root["locations"]),
+		Organizations:  toMapSlice(root["organizations"]),
+		Events:         toMapSlice(root["events"]),
+		Clues:          toMapSlice(root["clues"]),
+		Timelines:      toMapSlice(root["timelines"]),
+		Monsters:       toMapSlice(root["monsters"]),
+		SessionTasks:   toMapSlice(root["sessionTasks"]),
+		RelationGraphs: toMapSlice(root["relationGraphs"]),
+	}, nil
+}
+
+func upsertImportedV2Campaign(tx *gorm.DB, campaignID, userID, projectName, description string, updatedAt time.Time) error {
+	var existing V2Campaign
+	err := tx.First(&existing, "id = ?", campaignID).Error
+	if err != nil && err != gorm.ErrRecordNotFound {
+		return err
+	}
+
+	campaign := V2Campaign{
+		ID:               campaignID,
+		Name:             strings.TrimSpace(projectName),
+		Description:      strings.TrimSpace(description),
+		OwnerUserID:      userID,
+		Visibility:       "private",
+		JoinPasswordHash: "",
+		CreatedAt:        updatedAt,
+		UpdatedAt:        updatedAt,
+	}
+	if campaign.Name == "" {
+		campaign.Name = "导入模组"
+	}
+	if err == nil {
+		campaign.CreatedAt = existing.CreatedAt
+		campaign.ThemeID = existing.ThemeID
+		if campaign.CreatedAt.IsZero() {
+			campaign.CreatedAt = updatedAt
+		}
+	}
+	if err := tx.Save(&campaign).Error; err != nil {
+		return err
+	}
+
+	if err := tx.Where("campaign_id = ?", campaignID).Delete(&V2CampaignMember{}).Error; err != nil {
+		return err
+	}
+	member := V2CampaignMember{
+		CampaignID: campaignID,
+		UserID:     userID,
+		Role:       "owner",
+		CreatedAt:  updatedAt,
+		UpdatedAt:  updatedAt,
+	}
+	joinedAt := updatedAt
+	member.JoinedAt = &joinedAt
+	member.LastActiveAt = &joinedAt
+	return tx.Save(&member).Error
+}
+
 func rewriteResourceRefsInString(text string, refMap map[string]string) string {
 	if directRef, ok := normalizeBackupResourceRef(text); ok {
 		if nextRef, exists := refMap[directRef]; exists {
@@ -872,14 +944,22 @@ func registerBackupRoutes(group *gin.RouterGroup, db *gorm.DB, cfg Config) {
 			c.JSON(400, gin.H{"error": err.Error()})
 			return
 		}
-		summaries, err := loadStoredCampaignSummaries(db, userID)
+		items, err := listV2Campaigns(db, userID)
 		if err != nil {
 			c.JSON(500, gin.H{"error": "database_error"})
 			return
 		}
-		existing := make(map[string]storedCampaignSummary, len(summaries))
-		for _, item := range summaries {
-			existing[item.ID] = item
+		existing := make(map[string]storedCampaignSummary, len(items))
+		for _, item := range items {
+			existing[item.ID] = storedCampaignSummary{
+				ID:            item.ID,
+				Name:          item.Name,
+				Description:   item.Description,
+				LastModified:  item.LastModified,
+				OwnerID:       item.OwnerID,
+				Visibility:    item.Visibility,
+				SchemaVersion: item.SchemaVersion,
+			}
 		}
 		preview, err := buildBackupPreview(header.Filename, manifest, bundle, existing)
 		if err != nil {
@@ -920,23 +1000,44 @@ func registerBackupRoutes(group *gin.RouterGroup, db *gorm.DB, cfg Config) {
 			return
 		}
 
-		summaries, err := loadStoredCampaignSummaries(db, userID)
+		items, err := listV2Campaigns(db, userID)
 		if err != nil {
 			c.JSON(500, gin.H{"error": "database_error"})
 			return
 		}
-		existing := make(map[string]storedCampaignSummary, len(summaries))
-		for _, item := range summaries {
-			existing[item.ID] = item
+		existing := make(map[string]storedCampaignSummary, len(items))
+		for _, item := range items {
+			existing[item.ID] = storedCampaignSummary{
+				ID:            item.ID,
+				Name:          item.Name,
+				Description:   item.Description,
+				LastModified:  item.LastModified,
+				OwnerID:       item.OwnerID,
+				Visibility:    item.Visibility,
+				SchemaVersion: item.SchemaVersion,
+			}
 		}
 
 		now := time.Now().UnixMilli()
 		imported := make([]gin.H, 0, len(bundle.Campaigns))
+		skipped := make([]gin.H, 0)
 		addedCount := 0
 		overwrittenCount := 0
+		skippedCount := 0
 		importedAssetMap := make(map[string]string)
 		missingAssetSet := make(map[string]struct{})
 		for _, item := range bundle.Campaigns {
+			if mode == "overwrite" {
+				if _, ok := existing[item.OriginalCampaignID]; !ok {
+					skippedCount += 1
+					skipped = append(skipped, gin.H{
+						"originalCampaignId": item.OriginalCampaignID,
+						"name":               item.Name,
+						"reason":             "no_match",
+					})
+					continue
+				}
+			}
 			refSet, err := importBundleAssetMap(item)
 			if err != nil {
 				c.JSON(400, gin.H{"error": "invalid_bundle"})
@@ -976,14 +1077,9 @@ func registerBackupRoutes(group *gin.RouterGroup, db *gorm.DB, cfg Config) {
 				c.JSON(400, gin.H{"error": "invalid_campaign_payload"})
 				return
 			}
-			if resultMode == "overwritten" {
-				if err := deleteCampaignDocuments(db, targetCampaignID); err != nil {
-					c.JSON(500, gin.H{"error": "database_error"})
-					return
-				}
-			}
-			if _, err := kvSaveJSON(db, userCampaignKey(userID, targetCampaignID), campaignDataValue); err != nil {
-				c.JSON(500, gin.H{"error": "database_error"})
+			importedBundle, err := buildImportedV2Bundle(targetCampaignID, campaignDataValue)
+			if err != nil {
+				c.JSON(400, gin.H{"error": "invalid_campaign_payload"})
 				return
 			}
 
@@ -1033,57 +1129,88 @@ func registerBackupRoutes(group *gin.RouterGroup, db *gorm.DB, cfg Config) {
 				}
 				importedConfig.UpdatedAt = now
 			}
-			if err := saveCampaignConfigDoc(db, importedConfig); err != nil {
-				c.JSON(500, gin.H{"error": "database_error"})
+			updatedAt := time.UnixMilli(now)
+			if err := db.Transaction(func(tx *gorm.DB) error {
+				if resultMode == "overwritten" {
+					if err := deleteCampaignDocuments(tx, targetCampaignID); err != nil {
+						return err
+					}
+					if err := tx.Where("campaign_id = ?", targetCampaignID).Delete(&V2TeamNote{}).Error; err != nil {
+						return err
+					}
+					if err := tx.Where("campaign_id = ?", targetCampaignID).Delete(&V2Share{}).Error; err != nil {
+						return err
+					}
+					if err := tx.Where("campaign_id = ?", targetCampaignID).Delete(&V2DocumentVersion{}).Error; err != nil {
+						return err
+					}
+				}
+				if _, err := kvSaveJSON(tx, userCampaignKey(userID, targetCampaignID), campaignDataValue); err != nil {
+					return err
+				}
+				if err := upsertImportedV2Campaign(tx, targetCampaignID, userID, projectName, description, updatedAt); err != nil {
+					return err
+				}
+				if _, err := saveV2CampaignBundle(tx, targetCampaignID, V2CampaignBundleUpdateRequest{
+					ExpectedVersion: 0,
+					Bundle:          importedBundle,
+				}); err != nil {
+					return err
+				}
+				if err := saveCampaignConfigDoc(tx, importedConfig); err != nil {
+					return err
+				}
+				for _, note := range item.TeamNotes {
+					remappedNote, err := remapResourceRefsForTypedValue(note, refMap)
+					if err != nil {
+						return fmt.Errorf("invalid_team_note")
+					}
+					remappedNote.CampaignID = targetCampaignID
+					remappedNote.ActiveLease = nil
+					if strings.TrimSpace(remappedNote.ID) == "" {
+						remappedNote.ID = fmt.Sprintf("tn_%d", time.Now().UnixNano())
+					}
+					if remappedNote.CreatedAt == 0 {
+						remappedNote.CreatedAt = now
+					}
+					if remappedNote.UpdatedAt == 0 {
+						remappedNote.UpdatedAt = now
+					}
+					if remappedNote.Version <= 0 {
+						remappedNote.Version = 1
+					}
+					if _, err := kvSaveJSON(tx, teamNoteKey(targetCampaignID, remappedNote.ID), remappedNote); err != nil {
+						return err
+					}
+				}
+				if item.TaskBoard != nil {
+					remappedBoard, err := remapResourceRefsForTypedValue(*item.TaskBoard, refMap)
+					if err != nil {
+						return fmt.Errorf("invalid_task_board")
+					}
+					remappedBoard.CampaignID = targetCampaignID
+					remappedBoard.ActiveLease = nil
+					remappedBoard.UpdatedAt = now
+					if remappedBoard.Version <= 0 {
+						remappedBoard.Version = 1
+					}
+					ensureTaskBoardPermissions(&remappedBoard)
+					if _, err := kvSaveJSON(tx, taskBoardKey(targetCampaignID), remappedBoard); err != nil {
+						return err
+					}
+				}
+				return nil
+			}); err != nil {
+				switch err.Error() {
+				case "invalid_team_note", "invalid_task_board":
+					c.JSON(400, gin.H{"error": err.Error()})
+				default:
+					c.JSON(500, gin.H{"error": "database_error"})
+				}
 				return
 			}
 
-			for _, note := range item.TeamNotes {
-				remappedNote, err := remapResourceRefsForTypedValue(note, refMap)
-				if err != nil {
-					c.JSON(400, gin.H{"error": "invalid_team_note"})
-					return
-				}
-				remappedNote.CampaignID = targetCampaignID
-				remappedNote.ActiveLease = nil
-				if strings.TrimSpace(remappedNote.ID) == "" {
-					remappedNote.ID = fmt.Sprintf("tn_%d", time.Now().UnixNano())
-				}
-				if remappedNote.CreatedAt == 0 {
-					remappedNote.CreatedAt = now
-				}
-				if remappedNote.UpdatedAt == 0 {
-					remappedNote.UpdatedAt = now
-				}
-				if remappedNote.Version <= 0 {
-					remappedNote.Version = 1
-				}
-				if _, err := kvSaveJSON(db, teamNoteKey(targetCampaignID, remappedNote.ID), remappedNote); err != nil {
-					c.JSON(500, gin.H{"error": "database_error"})
-					return
-				}
-			}
-
-			if item.TaskBoard != nil {
-				remappedBoard, err := remapResourceRefsForTypedValue(*item.TaskBoard, refMap)
-				if err != nil {
-					c.JSON(400, gin.H{"error": "invalid_task_board"})
-					return
-				}
-				remappedBoard.CampaignID = targetCampaignID
-				remappedBoard.ActiveLease = nil
-				remappedBoard.UpdatedAt = now
-				if remappedBoard.Version <= 0 {
-					remappedBoard.Version = 1
-				}
-				ensureTaskBoardPermissions(&remappedBoard)
-				if _, err := kvSaveJSON(db, taskBoardKey(targetCampaignID), remappedBoard); err != nil {
-					c.JSON(500, gin.H{"error": "database_error"})
-					return
-				}
-			}
-
-			summary := storedCampaignSummary{
+			existing[targetCampaignID] = storedCampaignSummary{
 				ID:            targetCampaignID,
 				Name:          projectName,
 				Description:   description,
@@ -1092,8 +1219,6 @@ func registerBackupRoutes(group *gin.RouterGroup, db *gorm.DB, cfg Config) {
 				Visibility:    "private",
 				SchemaVersion: 2,
 			}
-			summaries = upsertStoredCampaignSummary(summaries, summary)
-			existing[targetCampaignID] = summary
 			imported = append(imported, gin.H{
 				"id":          targetCampaignID,
 				"name":        projectName,
@@ -1109,17 +1234,6 @@ func registerBackupRoutes(group *gin.RouterGroup, db *gorm.DB, cfg Config) {
 			}
 		}
 
-		sort.Slice(summaries, func(i, j int) bool {
-			if summaries[i].LastModified != summaries[j].LastModified {
-				return summaries[i].LastModified > summaries[j].LastModified
-			}
-			return summaries[i].Name < summaries[j].Name
-		})
-		if err := saveStoredCampaignSummaries(db, userID, summaries); err != nil {
-			c.JSON(500, gin.H{"error": "database_error"})
-			return
-		}
-
 		missingAssets := make([]string, 0, len(missingAssetSet))
 		for ref := range missingAssetSet {
 			missingAssets = append(missingAssets, ref)
@@ -1130,7 +1244,9 @@ func registerBackupRoutes(group *gin.RouterGroup, db *gorm.DB, cfg Config) {
 			"importedCount":     len(imported),
 			"addedCount":        addedCount,
 			"overwrittenCount":  overwrittenCount,
+			"skippedCount":       skippedCount,
 			"campaigns":         imported,
+			"skippedCampaigns":   skipped,
 			"missingAssetCount": len(missingAssets),
 			"missingAssets":     missingAssets,
 		})

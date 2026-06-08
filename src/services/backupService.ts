@@ -31,7 +31,9 @@ export interface BackupImportResult {
   importedCount: number;
   addedCount: number;
   overwrittenCount: number;
+  skippedCount?: number;
   campaigns: Array<{ id: string; name: string; mode: 'added' | 'overwritten' }>;
+  skippedCampaigns?: Array<{ originalCampaignId: string; name: string; reason: 'no_match' }>;
   missingAssetCount?: number;
   missingAssets?: string[];
 }
@@ -72,7 +74,7 @@ async function parseImportResponse(response: Response) {
   if (!response.ok) {
     throw new Error(text || '备份导入失败');
   }
-  return payload ?? { importedCount: 0, addedCount: 0, overwrittenCount: 0, campaigns: [] };
+  return payload ?? { importedCount: 0, addedCount: 0, overwrittenCount: 0, skippedCount: 0, campaigns: [], skippedCampaigns: [] };
 }
 
 async function parsePreviewResponse(response: Response) {

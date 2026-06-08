@@ -214,6 +214,22 @@ export const CampaignProvider: React.FC<{ children: ReactNode }> = ({ children }
     }
   }, [applyLoadedCampaign, clearSessionError, currentCampaignId, queryClient, user]);
 
+  const reloadCampaignList = useCallback(async () => {
+    if (!user) {
+      setCampaignList([]);
+      return;
+    }
+    clearSessionError();
+    try {
+      await refreshCampaignList(user);
+    } catch (error) {
+      if (mountedRef.current) {
+        setSessionError(error instanceof Error ? error.message : '刷新模组列表失败。');
+      }
+      throw error;
+    }
+  }, [clearSessionError, refreshCampaignList, user]);
+
   const flushPendingSave = useCallback(async (overrideData?: CampaignData) => {
     const campaignId = currentCampaignId;
     const targetUser = user;
@@ -662,19 +678,6 @@ export const CampaignProvider: React.FC<{ children: ReactNode }> = ({ children }
     }
   }, []);
 
-  const openFromFileSystem = useCallback(async () => {
-    if (user) {
-      const message = '当前应用正式数据已切到后端。若要把本地 JSON 写入正式模组，请使用导入助手并显式执行导入。';
-      setSessionError(message);
-      throw new Error(message);
-    }
-    const result = await dataService.loadFromFileSystem();
-    if (!result) return;
-    const { data, handle } = result;
-    setCampaignDataState(data);
-    setFileHandle(handle);
-  }, [user]);
-
   const updateEntity = useCallback((collection: keyof CampaignData, item: any) => {
     setCampaignData((prev) => {
       if (!Array.isArray(prev[collection])) return prev;
@@ -792,6 +795,7 @@ export const CampaignProvider: React.FC<{ children: ReactNode }> = ({ children }
     showUnsavedWarning,
     sessionError,
     clearSessionError,
+    reloadCampaignList,
     reloadCurrentCampaign,
     switchCampaign,
     createNewCampaign,
@@ -799,7 +803,6 @@ export const CampaignProvider: React.FC<{ children: ReactNode }> = ({ children }
     exitCampaign,
     exportData,
     importData,
-    openFromFileSystem,
   }), [
     saveCampaign,
     saveToFileSystem,
@@ -816,6 +819,7 @@ export const CampaignProvider: React.FC<{ children: ReactNode }> = ({ children }
     showUnsavedWarning,
     sessionError,
     clearSessionError,
+    reloadCampaignList,
     reloadCurrentCampaign,
     switchCampaign,
     createNewCampaign,
@@ -823,7 +827,6 @@ export const CampaignProvider: React.FC<{ children: ReactNode }> = ({ children }
     exitCampaign,
     exportData,
     importData,
-    openFromFileSystem,
   ]);
 
   const themeValue = useMemo<CampaignThemeContextValue>(() => ({

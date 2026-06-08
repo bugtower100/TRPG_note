@@ -36,6 +36,7 @@ export interface CampaignSessionContextValue {
   showUnsavedWarning: boolean;
   sessionError: string | null;
   clearSessionError: () => void;
+  reloadCampaignList: () => Promise<void>;
   reloadCurrentCampaign: () => Promise<void>;
   switchCampaign: (id: string) => Promise<void>;
   createNewCampaign: (name: string, description: string) => Promise<void>;
@@ -43,7 +44,6 @@ export interface CampaignSessionContextValue {
   exitCampaign: () => void;
   exportData: () => void;
   importData: (file: File) => Promise<void>;
-  openFromFileSystem: () => Promise<void>;
 }
 
 export interface CampaignThemeContextValue {
