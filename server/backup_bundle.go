@@ -106,6 +106,51 @@ func loadStoredCampaignSummaries(db *gorm.DB, userID string) ([]storedCampaignSu
 	return items, nil
 }
 
+func loadExportableCampaignSummaries(db *gorm.DB, userID string) ([]storedCampaignSummary, error) {
+	legacyItems, err := loadStoredCampaignSummaries(db, userID)
+	if err != nil {
+		return nil, err
+	}
+	v2Items, err := listV2Campaigns(db, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	merged := make([]storedCampaignSummary, 0, len(legacyItems)+len(v2Items))
+	seen := make(map[string]int, len(legacyItems)+len(v2Items))
+	for _, item := range legacyItems {
+		if strings.TrimSpace(item.ID) == "" {
+			continue
+		}
+		seen[item.ID] = len(merged)
+		merged = append(merged, item)
+	}
+	for _, item := range v2Items {
+		summary := storedCampaignSummary{
+			ID:            item.ID,
+			Name:          item.Name,
+			Description:   item.Description,
+			LastModified:  item.LastModified,
+			OwnerID:       item.OwnerID,
+			Visibility:    item.Visibility,
+			SchemaVersion: item.SchemaVersion,
+		}
+		if index, ok := seen[summary.ID]; ok {
+			merged[index] = summary
+			continue
+		}
+		seen[summary.ID] = len(merged)
+		merged = append(merged, summary)
+	}
+	sort.SliceStable(merged, func(i, j int) bool {
+		if merged[i].LastModified == merged[j].LastModified {
+			return merged[i].ID < merged[j].ID
+		}
+		return merged[i].LastModified > merged[j].LastModified
+	})
+	return merged, nil
+}
+
 func saveStoredCampaignSummaries(db *gorm.DB, userID string, items []storedCampaignSummary) error {
 	_, err := kvSaveJSON(db, userCampaignIndexKey(userID), items)
 	return err
@@ -121,6 +166,54 @@ func loadUserCampaignPayload(db *gorm.DB, userID, campaignID string) (any, error
 		return nil, gorm.ErrRecordNotFound
 	}
 	return raw, nil
+}
+
+func loadAccessibleV2Campaign(db *gorm.DB, userID, campaignID string) (V2Campaign, error) {
+	var campaign V2Campaign
+	err := db.
+		Joins("JOIN campaign_members ON campaign_members.campaign_id = campaigns.id").
+		Where("campaigns.id = ? AND campaign_members.user_id = ?", campaignID, userID).
+		First(&campaign).Error
+	if err != nil {
+		return V2Campaign{}, err
+	}
+	return campaign, nil
+}
+
+func buildLegacyCampaignDataFromV2(bundle V2CampaignBundle) map[string]any {
+	return map[string]any{
+		"id":             bundle.ID,
+		"meta":           bundle.Meta,
+		"notes":          bundle.Notes,
+		"characters":     bundle.Characters,
+		"locations":      bundle.Locations,
+		"organizations":  bundle.Organizations,
+		"events":         bundle.Events,
+		"clues":          bundle.Clues,
+		"timelines":      bundle.Timelines,
+		"monsters":       bundle.Monsters,
+		"sessionTasks":   bundle.SessionTasks,
+		"relationGraphs": bundle.RelationGraphs,
+	}
+}
+
+func loadCampaignPayloadForBackup(db *gorm.DB, userID, campaignID string) (any, error) {
+	raw, err := loadUserCampaignPayload(db, userID, campaignID)
+	if err == nil {
+		return raw, nil
+	}
+	if err != gorm.ErrRecordNotFound {
+		return nil, err
+	}
+
+	if _, err := loadAccessibleV2Campaign(db, userID, campaignID); err != nil {
+		return nil, err
+	}
+	bundle, err := loadV2CampaignBundle(db, campaignID)
+	if err != nil {
+		return nil, err
+	}
+	return buildLegacyCampaignDataFromV2(bundle.Bundle), nil
 }
 
 func loadCampaignConfigOptional(db *gorm.DB, campaignID string) (*CampaignConfigDoc, error) {
@@ -168,7 +261,7 @@ func loadTaskBoardOptional(db *gorm.DB, campaignID string) (*SessionTaskBoardDoc
 }
 
 func buildBackupCampaignBundle(db *gorm.DB, userID, campaignID string) (backupCampaignBundle, error) {
-	campaignData, err := loadUserCampaignPayload(db, userID, campaignID)
+	campaignData, err := loadCampaignPayloadForBackup(db, userID, campaignID)
 	if err != nil {
 		return backupCampaignBundle{}, err
 	}
@@ -857,7 +950,7 @@ func registerBackupRoutes(group *gin.RouterGroup, db *gorm.DB, cfg Config) {
 			c.JSON(400, gin.H{"error": "missing_identity"})
 			return
 		}
-		summaries, err := loadStoredCampaignSummaries(db, userID)
+		summaries, err := loadExportableCampaignSummaries(db, userID)
 		if err != nil {
 			c.JSON(500, gin.H{"error": "database_error"})
 			return
