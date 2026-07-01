@@ -1245,9 +1245,9 @@ func registerBackupRoutes(group *gin.RouterGroup, db *gorm.DB, cfg Config) {
 			"importedCount":     len(imported),
 			"addedCount":        addedCount,
 			"overwrittenCount":  overwrittenCount,
-			"skippedCount":       skippedCount,
+			"skippedCount":      skippedCount,
 			"campaigns":         imported,
-			"skippedCampaigns":   skipped,
+			"skippedCampaigns":  skipped,
 			"missingAssetCount": len(missingAssets),
 			"missingAssets":     missingAssets,
 		})

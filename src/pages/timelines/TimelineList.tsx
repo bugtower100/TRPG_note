@@ -5,12 +5,14 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { Timeline } from '../../types';
 import { ExternalLink } from 'lucide-react';
 import TimelineDetail from './TimelineDetail';
+import { useCampaignMemberRole } from '../../hooks/useCampaignMemberRole';
 
 const TimelineList: React.FC = () => {
   const { id: routeTimelineId } = useParams<{ id?: string }>();
   const { campaignData, setCampaignData } = useCampaignData();
   const { openInTab } = useCampaignTabs();
   const navigate = useNavigate();
+  const { canManageCampaignContent } = useCampaignMemberRole();
 
   const handleAdd = () => {
     const newTimeline = dataService.createEntity<Timeline>({
@@ -28,7 +30,7 @@ const TimelineList: React.FC = () => {
     navigate(`/timelines/${newTimeline.id}`);
   };
 
-  const timelines = campaignData.timelines;
+  const timelines = canManageCampaignContent ? campaignData.timelines : [];
   const activeTimeline = useMemo(
     () => timelines.find((timeline) => timeline.id === routeTimelineId) || null,
     [timelines, routeTimelineId]
@@ -76,21 +78,25 @@ const TimelineList: React.FC = () => {
               侧边打开
             </button>
           )}
-          <button
-            type="button"
-            onClick={() => navigate('/timelines/workbench', {
-              state: { focusTimelineId: activeTimeline?.id || '' },
-            })}
-            className="px-3 py-2 border border-theme rounded-md hover:bg-primary-light transition-colors whitespace-nowrap"
-          >
-            工作版
-          </button>
-          <button
-            onClick={handleAdd}
-            className="px-3 py-2 bg-primary text-white rounded-md hover:bg-primary-dark transition-colors whitespace-nowrap"
-          >
-            新建时间线
-          </button>
+          {canManageCampaignContent && (
+            <>
+              <button
+                type="button"
+                onClick={() => navigate('/timelines/workbench', {
+                  state: { focusTimelineId: activeTimeline?.id || '' },
+                })}
+                className="px-3 py-2 border border-theme rounded-md hover:bg-primary-light transition-colors whitespace-nowrap"
+              >
+                工作版
+              </button>
+              <button
+                onClick={handleAdd}
+                className="px-3 py-2 bg-primary text-white rounded-md hover:bg-primary-dark transition-colors whitespace-nowrap"
+              >
+                新建时间线
+              </button>
+            </>
+          )}
         </div>
       </div>
 

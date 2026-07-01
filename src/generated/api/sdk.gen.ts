@@ -2,7 +2,7 @@
 
 import type { Client, Options as Options2, TDataShape } from './client';
 import { client } from './client.gen';
-import type { CreateV2CampaignData, CreateV2CampaignErrors, CreateV2CampaignResponses, DeleteV2CampaignData, DeleteV2CampaignErrors, DeleteV2CampaignResponses, GetCampaignConfigData, GetCampaignConfigErrors, GetCampaignConfigResponses, GetMigrationStatusData, GetMigrationStatusErrors, GetMigrationStatusResponses, GetSessionTasksData, GetSessionTasksErrors, GetSessionTasksResponses, GetV2CampaignBundleData, GetV2CampaignBundleErrors, GetV2CampaignBundleResponses, ListCampaignSharesData, ListCampaignSharesErrors, ListCampaignSharesResponses, ListCampaignVersionsData, ListCampaignVersionsErrors, ListCampaignVersionsResponses, ListPublicCampaignsData, ListPublicCampaignsErrors, ListPublicCampaignsResponses, ListTeamNotesData, ListTeamNotesErrors, ListTeamNotesResponses, ListV2CampaignsData, ListV2CampaignsErrors, ListV2CampaignsResponses, StartMigrationData, StartMigrationErrors, StartMigrationResponses, UpdateV2CampaignBundleData, UpdateV2CampaignBundleErrors, UpdateV2CampaignBundleResponses } from './types.gen';
+import type { CreateCharacterSheetData, CreateCharacterSheetErrors, CreateCharacterSheetResponses, CreateV2CampaignData, CreateV2CampaignErrors, CreateV2CampaignResponses, DeleteCharacterSheetData, DeleteCharacterSheetErrors, DeleteCharacterSheetResponses, DeleteV2CampaignData, DeleteV2CampaignErrors, DeleteV2CampaignResponses, GetCampaignConfigData, GetCampaignConfigErrors, GetCampaignConfigResponses, GetCharacterSheetData, GetCharacterSheetErrors, GetCharacterSheetResponses, GetMigrationStatusData, GetMigrationStatusErrors, GetMigrationStatusResponses, GetSessionTasksData, GetSessionTasksErrors, GetSessionTasksResponses, GetV2CampaignBundleData, GetV2CampaignBundleErrors, GetV2CampaignBundleResponses, ListCampaignSharesData, ListCampaignSharesErrors, ListCampaignSharesResponses, ListCampaignVersionsData, ListCampaignVersionsErrors, ListCampaignVersionsResponses, ListCharacterSheetsData, ListCharacterSheetsErrors, ListCharacterSheetsResponses, ListPublicCampaignsData, ListPublicCampaignsErrors, ListPublicCampaignsResponses, ListTeamNotesData, ListTeamNotesErrors, ListTeamNotesResponses, ListV2CampaignsData, ListV2CampaignsErrors, ListV2CampaignsResponses, PreviewCharacterSheetImportData, PreviewCharacterSheetImportErrors, PreviewCharacterSheetImportResponses, StartMigrationData, StartMigrationErrors, StartMigrationResponses, UpdateCharacterSheetData, UpdateCharacterSheetErrors, UpdateCharacterSheetResponses, UpdateV2CampaignBundleData, UpdateV2CampaignBundleErrors, UpdateV2CampaignBundleResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -24,6 +24,69 @@ export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends 
  * 列出当前所有公开模组摘要，用于主页公开模组列表与进入流程。
  */
 export const listPublicCampaigns = <ThrowOnError extends boolean = false>(options?: Options<ListPublicCampaignsData, ThrowOnError>) => (options?.client ?? client).get<ListPublicCampaignsResponses, ListPublicCampaignsErrors, ThrowOnError>({ url: '/api/campaigns/public', ...options });
+
+/**
+ * 获取角色卡列表
+ *
+ * 按当前用户权限返回模组内可见的角色卡摘要列表。
+ */
+export const listCharacterSheets = <ThrowOnError extends boolean = false>(options: Options<ListCharacterSheetsData, ThrowOnError>) => (options.client ?? client).get<ListCharacterSheetsResponses, ListCharacterSheetsErrors, ThrowOnError>({ url: '/api/campaigns/{campaignId}/character-sheets', ...options });
+
+/**
+ * 创建角色卡
+ *
+ * 创建一张新的角色卡文档，首版支持 CoC7 与 DND5e。
+ */
+export const createCharacterSheet = <ThrowOnError extends boolean = false>(options: Options<CreateCharacterSheetData, ThrowOnError>) => (options.client ?? client).post<CreateCharacterSheetResponses, CreateCharacterSheetErrors, ThrowOnError>({
+    url: '/api/campaigns/{campaignId}/character-sheets',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * 预览角色卡文本导入
+ *
+ * 解析文本中的角色卡数值与字段，返回识别结果与规范化草稿，不直接落库。
+ */
+export const previewCharacterSheetImport = <ThrowOnError extends boolean = false>(options: Options<PreviewCharacterSheetImportData, ThrowOnError>) => (options.client ?? client).post<PreviewCharacterSheetImportResponses, PreviewCharacterSheetImportErrors, ThrowOnError>({
+    url: '/api/campaigns/{campaignId}/character-sheets/import-text/preview',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * 删除角色卡
+ *
+ * 删除一张角色卡文档。
+ */
+export const deleteCharacterSheet = <ThrowOnError extends boolean = false>(options: Options<DeleteCharacterSheetData, ThrowOnError>) => (options.client ?? client).delete<DeleteCharacterSheetResponses, DeleteCharacterSheetErrors, ThrowOnError>({ url: '/api/campaigns/{campaignId}/character-sheets/{sheetId}', ...options });
+
+/**
+ * 获取角色卡详情
+ *
+ * 返回一张角色卡的完整内容。
+ */
+export const getCharacterSheet = <ThrowOnError extends boolean = false>(options: Options<GetCharacterSheetData, ThrowOnError>) => (options.client ?? client).get<GetCharacterSheetResponses, GetCharacterSheetErrors, ThrowOnError>({ url: '/api/campaigns/{campaignId}/character-sheets/{sheetId}', ...options });
+
+/**
+ * 更新角色卡
+ *
+ * 使用 expectedVersion 执行角色卡更新，冲突时返回 409。
+ */
+export const updateCharacterSheet = <ThrowOnError extends boolean = false>(options: Options<UpdateCharacterSheetData, ThrowOnError>) => (options.client ?? client).put<UpdateCharacterSheetResponses, UpdateCharacterSheetErrors, ThrowOnError>({
+    url: '/api/campaigns/{campaignId}/character-sheets/{sheetId}',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
 
 /**
  * 获取模组协作配置

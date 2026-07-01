@@ -4,6 +4,7 @@ import { useCampaignData, useCampaignSession } from '../../context/CampaignConte
 import EntityDetailHeader from '../../features/entities/components/EntityDetailHeader';
 import SectionedEntityContent from '../../features/entities/components/SectionedEntityContent';
 import { useSectionedEntityDetail } from '../../features/entities/hooks/useSectionedEntityDetail';
+import { useCampaignMemberRole } from '../../hooks/useCampaignMemberRole';
 
 interface LocationDetailProps {
   entityId?: string;
@@ -15,6 +16,7 @@ const LocationDetail: React.FC<LocationDetailProps> = ({ entityId }) => {
   const navigate = useNavigate();
   const { campaignData, updateEntity, deleteEntity } = useCampaignData();
   const { saveCampaign } = useCampaignSession();
+  const { canManageCampaignContent } = useCampaignMemberRole();
   const sectionDefs = [
     { key: 'detail', title: '地点详情' },
   ];
@@ -36,7 +38,7 @@ const LocationDetail: React.FC<LocationDetailProps> = ({ entityId }) => {
     toggleAllSections,
   } = useSectionedEntityDetail({
     id,
-    items: campaignData.locations,
+    items: canManageCampaignContent ? campaignData.locations : [],
     navigate,
     listPath: '/locations',
     initialCollapsed: { detail: true },

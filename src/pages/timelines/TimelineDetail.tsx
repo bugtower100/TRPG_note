@@ -12,6 +12,7 @@ import EntityShareActions, { ShareSectionAction, ShareSubItemAction } from '../.
 import { markdownToPreviewText } from '../../components/common/richTextReference';
 import EntityDetailHeader from '../../features/entities/components/EntityDetailHeader';
 import { useSectionedEntityDetail } from '../../features/entities/hooks/useSectionedEntityDetail';
+import { useCampaignMemberRole } from '../../hooks/useCampaignMemberRole';
 
 interface TimelineDetailProps {
   entityId?: string;
@@ -25,6 +26,7 @@ const TimelineDetail: React.FC<TimelineDetailProps> = ({ entityId, embedded = fa
   const navigate = useNavigate();
   const { campaignData, updateEntity, deleteEntity } = useCampaignData();
   const { saveCampaign } = useCampaignSession();
+  const { canManageCampaignContent } = useCampaignMemberRole();
   const sectionDefs = [{ key: 'intro', title: '简介' }];
   const {
     entity: timeline,
@@ -44,7 +46,7 @@ const TimelineDetail: React.FC<TimelineDetailProps> = ({ entityId, embedded = fa
     toggleAllSections,
   } = useSectionedEntityDetail({
     id,
-    items: campaignData.timelines,
+    items: canManageCampaignContent ? campaignData.timelines : [],
     navigate,
     listPath: '/timelines',
     navigateOnMissing: !embedded,

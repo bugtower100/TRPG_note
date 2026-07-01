@@ -177,6 +177,20 @@ func loadV2CampaignBundle(db *gorm.DB, campaignID string) (V2CampaignBundleRespo
 	}, nil
 }
 
+func redactV2CampaignBundleForPL(response V2CampaignBundleResponse) V2CampaignBundleResponse {
+	response.Bundle.Notes = ""
+	response.Bundle.Characters = []map[string]any{}
+	response.Bundle.Locations = []map[string]any{}
+	response.Bundle.Organizations = []map[string]any{}
+	response.Bundle.Events = []map[string]any{}
+	response.Bundle.Clues = []map[string]any{}
+	response.Bundle.Timelines = []map[string]any{}
+	response.Bundle.Monsters = []map[string]any{}
+	response.Bundle.SessionTasks = []map[string]any{}
+	response.Bundle.RelationGraphs = []map[string]any{}
+	return response
+}
+
 func saveV2CampaignDocument(tx *gorm.DB, campaignID, docType string, content any, version int) error {
 	payload, err := json.Marshal(content)
 	if err != nil {

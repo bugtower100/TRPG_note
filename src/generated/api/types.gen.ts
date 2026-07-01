@@ -31,6 +31,116 @@ export type CampaignMember = {
     username: string;
 };
 
+export type CharacterSheetBaseInfo = {
+    age?: string;
+    avatarAssetPath?: string;
+    background?: string;
+    gender?: string;
+    notes?: string;
+    tags?: Array<string> | null;
+    title?: string;
+};
+
+export type CharacterSheetCreateRequest = {
+    /**
+     * A URL to the JSON Schema for this object.
+     */
+    readonly $schema?: string;
+    linkedEntityId?: string;
+    name: string;
+    summary: string;
+    system: string;
+};
+
+export type CharacterSheetDocument = {
+    /**
+     * A URL to the JSON Schema for this object.
+     */
+    readonly $schema?: string;
+    assignedUserIds?: Array<string> | null;
+    avatarAssetPath?: string;
+    campaignId: string;
+    createdAt: number;
+    id: string;
+    linkedEntityId?: string;
+    linkedEntityType?: string;
+    memberPermissions?: Array<CharacterSheetMemberPermission> | null;
+    name: string;
+    ownerUserId: string;
+    ownerUsername: string;
+    payload: CharacterSheetPayload;
+    summary?: string;
+    system: string;
+    updatedAt: number;
+    updatedBy: string;
+    updatedByName: string;
+    version: number;
+    visibility: string;
+};
+
+export type CharacterSheetImportPreview = {
+    /**
+     * A URL to the JSON Schema for this object.
+     */
+    readonly $schema?: string;
+    confidence: number;
+    detectedSystem: string;
+    missingFields: Array<string> | null;
+    name: string;
+    payload: CharacterSheetPayload;
+    summary?: string;
+    system: string;
+    warnings: Array<string> | null;
+};
+
+export type CharacterSheetImportPreviewRequest = {
+    /**
+     * A URL to the JSON Schema for this object.
+     */
+    readonly $schema?: string;
+    systemHint?: string;
+    text: string;
+};
+
+export type CharacterSheetMemberPermission = {
+    permission: string;
+    userId: string;
+};
+
+export type CharacterSheetPayload = {
+    base: CharacterSheetBaseInfo;
+    coc7?: {
+        [key: string]: unknown;
+    };
+    dnd5e?: {
+        [key: string]: unknown;
+    };
+};
+
+export type CharacterSheetSummary = {
+    campaignId: string;
+    id: string;
+    linkedEntityId?: string;
+    linkedEntityType?: string;
+    name: string;
+    ownerUserId: string;
+    ownerUsername: string;
+    summary: string;
+    system: string;
+    updatedAt: number;
+    updatedBy: string;
+    visibility: string;
+};
+
+export type CharacterSheetUpdateRequest = {
+    /**
+     * A URL to the JSON Schema for this object.
+     */
+    readonly $schema?: string;
+    expectedVersion?: number;
+    sheet: CharacterSheetDocument;
+};
+
 export type ErrorDetail = {
     /**
      * Where the error occurred, e.g. 'body.items[3].tags' or 'path.thing-id'
@@ -327,6 +437,56 @@ export type CampaignConfigDocWritable = {
     visibility: string;
 };
 
+export type CharacterSheetCreateRequestWritable = {
+    linkedEntityId?: string;
+    name: string;
+    summary: string;
+    system: string;
+};
+
+export type CharacterSheetDocumentWritable = {
+    assignedUserIds?: Array<string> | null;
+    avatarAssetPath?: string;
+    campaignId: string;
+    createdAt: number;
+    id: string;
+    linkedEntityId?: string;
+    linkedEntityType?: string;
+    memberPermissions?: Array<CharacterSheetMemberPermission> | null;
+    name: string;
+    ownerUserId: string;
+    ownerUsername: string;
+    payload: CharacterSheetPayload;
+    summary?: string;
+    system: string;
+    updatedAt: number;
+    updatedBy: string;
+    updatedByName: string;
+    version: number;
+    visibility: string;
+};
+
+export type CharacterSheetImportPreviewWritable = {
+    confidence: number;
+    detectedSystem: string;
+    missingFields: Array<string> | null;
+    name: string;
+    payload: CharacterSheetPayload;
+    summary?: string;
+    system: string;
+    warnings: Array<string> | null;
+};
+
+export type CharacterSheetImportPreviewRequestWritable = {
+    systemHint?: string;
+    text: string;
+};
+
+export type CharacterSheetUpdateRequestWritable = {
+    expectedVersion?: number;
+    sheet: CharacterSheetDocumentWritable;
+};
+
 export type ErrorModelWritable = {
     /**
      * A human-readable explanation specific to this occurrence of the problem.
@@ -444,6 +604,370 @@ export type ListPublicCampaignsResponses = {
 };
 
 export type ListPublicCampaignsResponse = ListPublicCampaignsResponses[keyof ListPublicCampaignsResponses];
+
+export type ListCharacterSheetsData = {
+    body?: never;
+    headers?: {
+        /**
+         * 当前用户 ID
+         */
+        'X-TRPG-User-Id'?: string;
+        /**
+         * 当前用户名
+         */
+        'X-TRPG-Username'?: string;
+        /**
+         * 公开模组进入密码，只有需要时才传
+         */
+        'X-TRPG-Campaign-Password'?: string;
+    };
+    path: {
+        /**
+         * 模组 ID
+         */
+        campaignId: string;
+    };
+    query?: never;
+    url: '/api/campaigns/{campaignId}/character-sheets';
+};
+
+export type ListCharacterSheetsErrors = {
+    /**
+     * Bad Request
+     */
+    400: ErrorModel;
+    /**
+     * Forbidden
+     */
+    403: ErrorModel;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorModel;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorModel;
+};
+
+export type ListCharacterSheetsError = ListCharacterSheetsErrors[keyof ListCharacterSheetsErrors];
+
+export type ListCharacterSheetsResponses = {
+    /**
+     * OK
+     */
+    200: Array<CharacterSheetSummary> | null;
+};
+
+export type ListCharacterSheetsResponse = ListCharacterSheetsResponses[keyof ListCharacterSheetsResponses];
+
+export type CreateCharacterSheetData = {
+    body: CharacterSheetCreateRequestWritable;
+    headers?: {
+        /**
+         * 当前用户 ID
+         */
+        'X-TRPG-User-Id'?: string;
+        /**
+         * 当前用户名
+         */
+        'X-TRPG-Username'?: string;
+        /**
+         * 公开模组进入密码，只有需要时才传
+         */
+        'X-TRPG-Campaign-Password'?: string;
+    };
+    path: {
+        /**
+         * 模组 ID
+         */
+        campaignId: string;
+    };
+    query?: never;
+    url: '/api/campaigns/{campaignId}/character-sheets';
+};
+
+export type CreateCharacterSheetErrors = {
+    /**
+     * Bad Request
+     */
+    400: ErrorModel;
+    /**
+     * Forbidden
+     */
+    403: ErrorModel;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorModel;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorModel;
+};
+
+export type CreateCharacterSheetError = CreateCharacterSheetErrors[keyof CreateCharacterSheetErrors];
+
+export type CreateCharacterSheetResponses = {
+    /**
+     * OK
+     */
+    200: CharacterSheetDocument;
+};
+
+export type CreateCharacterSheetResponse = CreateCharacterSheetResponses[keyof CreateCharacterSheetResponses];
+
+export type PreviewCharacterSheetImportData = {
+    body: CharacterSheetImportPreviewRequestWritable;
+    headers?: {
+        /**
+         * 当前用户 ID
+         */
+        'X-TRPG-User-Id'?: string;
+        /**
+         * 当前用户名
+         */
+        'X-TRPG-Username'?: string;
+        /**
+         * 公开模组进入密码，只有需要时才传
+         */
+        'X-TRPG-Campaign-Password'?: string;
+    };
+    path: {
+        /**
+         * 模组 ID
+         */
+        campaignId: string;
+    };
+    query?: never;
+    url: '/api/campaigns/{campaignId}/character-sheets/import-text/preview';
+};
+
+export type PreviewCharacterSheetImportErrors = {
+    /**
+     * Bad Request
+     */
+    400: ErrorModel;
+    /**
+     * Forbidden
+     */
+    403: ErrorModel;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorModel;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorModel;
+};
+
+export type PreviewCharacterSheetImportError = PreviewCharacterSheetImportErrors[keyof PreviewCharacterSheetImportErrors];
+
+export type PreviewCharacterSheetImportResponses = {
+    /**
+     * OK
+     */
+    200: CharacterSheetImportPreview;
+};
+
+export type PreviewCharacterSheetImportResponse = PreviewCharacterSheetImportResponses[keyof PreviewCharacterSheetImportResponses];
+
+export type DeleteCharacterSheetData = {
+    body?: never;
+    headers?: {
+        /**
+         * 当前用户 ID
+         */
+        'X-TRPG-User-Id'?: string;
+        /**
+         * 当前用户名
+         */
+        'X-TRPG-Username'?: string;
+        /**
+         * 公开模组进入密码，只有需要时才传
+         */
+        'X-TRPG-Campaign-Password'?: string;
+    };
+    path: {
+        /**
+         * 模组 ID
+         */
+        campaignId: string;
+        /**
+         * 角色卡 ID
+         */
+        sheetId: string;
+    };
+    query?: never;
+    url: '/api/campaigns/{campaignId}/character-sheets/{sheetId}';
+};
+
+export type DeleteCharacterSheetErrors = {
+    /**
+     * Bad Request
+     */
+    400: ErrorModel;
+    /**
+     * Forbidden
+     */
+    403: ErrorModel;
+    /**
+     * Not Found
+     */
+    404: ErrorModel;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorModel;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorModel;
+};
+
+export type DeleteCharacterSheetError = DeleteCharacterSheetErrors[keyof DeleteCharacterSheetErrors];
+
+export type DeleteCharacterSheetResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type DeleteCharacterSheetResponse = DeleteCharacterSheetResponses[keyof DeleteCharacterSheetResponses];
+
+export type GetCharacterSheetData = {
+    body?: never;
+    headers?: {
+        /**
+         * 当前用户 ID
+         */
+        'X-TRPG-User-Id'?: string;
+        /**
+         * 当前用户名
+         */
+        'X-TRPG-Username'?: string;
+        /**
+         * 公开模组进入密码，只有需要时才传
+         */
+        'X-TRPG-Campaign-Password'?: string;
+    };
+    path: {
+        /**
+         * 模组 ID
+         */
+        campaignId: string;
+        /**
+         * 角色卡 ID
+         */
+        sheetId: string;
+    };
+    query?: never;
+    url: '/api/campaigns/{campaignId}/character-sheets/{sheetId}';
+};
+
+export type GetCharacterSheetErrors = {
+    /**
+     * Bad Request
+     */
+    400: ErrorModel;
+    /**
+     * Forbidden
+     */
+    403: ErrorModel;
+    /**
+     * Not Found
+     */
+    404: ErrorModel;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorModel;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorModel;
+};
+
+export type GetCharacterSheetError = GetCharacterSheetErrors[keyof GetCharacterSheetErrors];
+
+export type GetCharacterSheetResponses = {
+    /**
+     * OK
+     */
+    200: CharacterSheetDocument;
+};
+
+export type GetCharacterSheetResponse = GetCharacterSheetResponses[keyof GetCharacterSheetResponses];
+
+export type UpdateCharacterSheetData = {
+    body: CharacterSheetUpdateRequestWritable;
+    headers?: {
+        /**
+         * 当前用户 ID
+         */
+        'X-TRPG-User-Id'?: string;
+        /**
+         * 当前用户名
+         */
+        'X-TRPG-Username'?: string;
+        /**
+         * 公开模组进入密码，只有需要时才传
+         */
+        'X-TRPG-Campaign-Password'?: string;
+    };
+    path: {
+        /**
+         * 模组 ID
+         */
+        campaignId: string;
+        /**
+         * 角色卡 ID
+         */
+        sheetId: string;
+    };
+    query?: never;
+    url: '/api/campaigns/{campaignId}/character-sheets/{sheetId}';
+};
+
+export type UpdateCharacterSheetErrors = {
+    /**
+     * Bad Request
+     */
+    400: ErrorModel;
+    /**
+     * Forbidden
+     */
+    403: ErrorModel;
+    /**
+     * Not Found
+     */
+    404: ErrorModel;
+    /**
+     * Conflict
+     */
+    409: ErrorModel;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorModel;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorModel;
+};
+
+export type UpdateCharacterSheetError = UpdateCharacterSheetErrors[keyof UpdateCharacterSheetErrors];
+
+export type UpdateCharacterSheetResponses = {
+    /**
+     * OK
+     */
+    200: CharacterSheetDocument;
+};
+
+export type UpdateCharacterSheetResponse = UpdateCharacterSheetResponses[keyof UpdateCharacterSheetResponses];
 
 export type GetCampaignConfigData = {
     body?: never;

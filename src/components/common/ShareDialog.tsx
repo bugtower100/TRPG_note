@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { CampaignMember, SharedPermission } from '../../types';
+import { getCampaignRoleLabel } from '../../utils/campaignRoles';
 
 interface ShareDialogProps {
   open: boolean;
@@ -73,7 +74,7 @@ const ShareDialog: React.FC<ShareDialogProps> = ({
                       }}
                     />
                     <span>{member.username}</span>
-                    <span className="text-xs theme-text-secondary">({member.role})</span>
+                    <span className="text-xs theme-text-secondary">({getCampaignRoleLabel(member.role)})</span>
                   </label>
                 );
               })}

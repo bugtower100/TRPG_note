@@ -5,11 +5,14 @@ import { dataService } from '../../services/dataService';
 import { useNavigate } from 'react-router-dom';
 import { Event } from '../../types';
 import { useReceivedShares } from '../../hooks/useReceivedShares';
+import { useCampaignMemberRole } from '../../hooks/useCampaignMemberRole';
 
 const EventList: React.FC = () => {
   const { campaignData, setCampaignData, reorderEntities } = useCampaignData();
   const navigate = useNavigate();
   const sharedEntries = useReceivedShares('events');
+  const { canManageCampaignContent } = useCampaignMemberRole();
+  const visibleEvents = canManageCampaignContent ? campaignData.events : [];
 
   const handleAdd = () => {
     const newEvent = dataService.createEntity<Event>({
@@ -31,10 +34,10 @@ const EventList: React.FC = () => {
   return (
     <EntityListLayout
       title="事件列表"
-      entities={campaignData.events}
+      entities={visibleEvents}
       entityType="events"
-      onAdd={handleAdd}
-      onReorder={(orderedIds) => reorderEntities('events', orderedIds)}
+      onAdd={canManageCampaignContent ? handleAdd : undefined}
+      onReorder={canManageCampaignContent ? ((orderedIds) => reorderEntities('events', orderedIds)) : undefined}
       sharedEntries={sharedEntries}
     />
   );

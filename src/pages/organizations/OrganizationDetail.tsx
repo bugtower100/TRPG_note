@@ -4,6 +4,7 @@ import { useCampaignData, useCampaignSession } from '../../context/CampaignConte
 import EntityDetailHeader from '../../features/entities/components/EntityDetailHeader';
 import SectionedEntityContent from '../../features/entities/components/SectionedEntityContent';
 import { useSectionedEntityDetail } from '../../features/entities/hooks/useSectionedEntityDetail';
+import { useCampaignMemberRole } from '../../hooks/useCampaignMemberRole';
 
 interface OrganizationDetailProps {
   entityId?: string;
@@ -15,6 +16,7 @@ const OrganizationDetail: React.FC<OrganizationDetailProps> = ({ entityId }) => 
   const navigate = useNavigate();
   const { campaignData, updateEntity, deleteEntity } = useCampaignData();
   const { saveCampaign } = useCampaignSession();
+  const { canManageCampaignContent } = useCampaignMemberRole();
   const sectionDefs = [
     { key: 'detail', title: '组织详情' },
   ];
@@ -36,7 +38,7 @@ const OrganizationDetail: React.FC<OrganizationDetailProps> = ({ entityId }) => 
     toggleAllSections,
   } = useSectionedEntityDetail({
     id,
-    items: campaignData.organizations,
+    items: canManageCampaignContent ? campaignData.organizations : [],
     navigate,
     listPath: '/organizations',
     initialCollapsed: { detail: true },

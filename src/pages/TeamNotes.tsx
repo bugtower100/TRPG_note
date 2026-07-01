@@ -11,6 +11,7 @@ import { CampaignConfig, TeamNoteDocument } from '../types';
 import { teamNotesService } from '../services/teamNotesService';
 import { VersionConflictError } from '../services/conflictError';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { getCampaignRoleLabel } from '../utils/campaignRoles';
 
 const TeamNotes: React.FC = () => {
   const { currentCampaignId, user } = useCampaignSession();
@@ -357,7 +358,7 @@ const TeamNotes: React.FC = () => {
           <div>
             <h2 className="text-xl sm:text-2xl font-bold">团队笔记</h2>
             <div className="text-sm theme-text-secondary mt-1">
-              当前身份：{memberRole} · 模组可见性：{config?.visibility === 'public' ? '公开' : '私密'}
+              当前身份：{getCampaignRoleLabel(memberRole)} · 模组可见性：{config?.visibility === 'public' ? '公开' : '私密'}
             </div>
           </div>
           <div className="text-sm theme-text-secondary">模组公开/私密请在主页设置</div>

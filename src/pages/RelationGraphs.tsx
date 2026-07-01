@@ -7,6 +7,7 @@ import {
   resourceService,
 } from '../services/resourceService';
 import { useReceivedShares } from '../hooks/useReceivedShares';
+import { useCampaignMemberRole } from '../hooks/useCampaignMemberRole';
 import RelationGraphEdgePanel from '../features/relation-graphs/components/RelationGraphEdgePanel';
 import RelationGraphNodePanel from '../features/relation-graphs/components/RelationGraphNodePanel';
 import RelationGraphResourcePickerModal from '../features/relation-graphs/components/RelationGraphResourcePickerModal';
@@ -33,6 +34,7 @@ const RelationGraphs: React.FC = () => {
   const { openInTab } = useCampaignTabs();
   const sharedCharacters = useReceivedShares('characters');
   const sharedMonsters = useReceivedShares('monsters');
+  const { canManageCampaignContent } = useCampaignMemberRole();
   const boardRef = useRef<HTMLDivElement>(null);
   const [selectedNodeIds, setSelectedNodeIds] = useState<string[]>([]);
   const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
@@ -49,12 +51,14 @@ const RelationGraphs: React.FC = () => {
 
   const entities = useMemo<GraphEntity[]>(() => {
     const res: GraphEntity[] = [];
-    campaignData.characters.forEach((item) => {
-      res.push({ id: item.id, openEntityId: item.id, type: 'characters', name: item.name || '未命名' });
-    });
-    campaignData.monsters.forEach((item) => {
-      res.push({ id: item.id, openEntityId: item.id, type: 'monsters', name: item.name || '未命名' });
-    });
+    if (canManageCampaignContent) {
+      campaignData.characters.forEach((item) => {
+        res.push({ id: item.id, openEntityId: item.id, type: 'characters', name: item.name || '未命名' });
+      });
+      campaignData.monsters.forEach((item) => {
+        res.push({ id: item.id, openEntityId: item.id, type: 'monsters', name: item.name || '未命名' });
+      });
+    }
     sharedCharacters.forEach((item) => {
       res.push({
         id: `shared:${item.id}`,
@@ -74,7 +78,7 @@ const RelationGraphs: React.FC = () => {
       });
     });
     return res;
-  }, [campaignData.characters, campaignData.monsters, sharedCharacters, sharedMonsters]);
+  }, [campaignData.characters, campaignData.monsters, canManageCampaignContent, sharedCharacters, sharedMonsters]);
 
   const filteredEntities = useMemo(
     () => entities.filter((e) => e.type === entityTypeFilter),
@@ -429,6 +433,16 @@ const RelationGraphs: React.FC = () => {
     setEdgeEditorId(null);
     setLinkingFromNodeId(null);
   };
+
+  if (!canManageCampaignContent) {
+    return (
+      <div className="min-h-[60vh] flex items-center justify-center">
+        <div className="max-w-xl text-center py-12 px-6 theme-text-secondary bg-theme-card rounded-lg border border-dashed border-theme">
+          关系图仅对 GM / 副GM 开放，PL 请通过分享内容查看可见实体。
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-[60vh] md:h-[calc(100vh-3.75rem)] md:-mt-6 flex flex-col gap-2 overflow-hidden px-2 md:px-0">

@@ -5,11 +5,14 @@ import { dataService } from '../../services/dataService';
 import { useNavigate } from 'react-router-dom';
 import { Monster } from '../../types';
 import { useReceivedShares } from '../../hooks/useReceivedShares';
+import { useCampaignMemberRole } from '../../hooks/useCampaignMemberRole';
 
 const MonsterList: React.FC = () => {
   const { campaignData, setCampaignData, reorderEntities } = useCampaignData();
   const navigate = useNavigate();
   const sharedEntries = useReceivedShares('monsters');
+  const { canManageCampaignContent } = useCampaignMemberRole();
+  const visibleMonsters = canManageCampaignContent ? campaignData.monsters : [];
 
   const handleAdd = () => {
     const newMonster = dataService.createEntity<Monster>({
@@ -34,10 +37,10 @@ const MonsterList: React.FC = () => {
   return (
     <EntityListLayout
       title="怪物图鉴"
-      entities={campaignData.monsters}
+      entities={visibleMonsters}
       entityType="monsters"
-      onAdd={handleAdd}
-      onReorder={(orderedIds) => reorderEntities('monsters', orderedIds)}
+      onAdd={canManageCampaignContent ? handleAdd : undefined}
+      onReorder={canManageCampaignContent ? ((orderedIds) => reorderEntities('monsters', orderedIds)) : undefined}
       sharedEntries={sharedEntries}
     />
   );

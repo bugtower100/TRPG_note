@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Kiwi+Maru:wght@400;500&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -12,19 +14,25 @@
     --border-color: #e9defe; /* Soft lilac border */
     --primary-color: #856eb5; /* Elegant soft purple (tailwind violet-500) */
     --primary-light: #f5f3ff; /* Very light purple background (violet-50) */
+    --primary-dark: #6f5a9a;
+    --scrollbar-thumb: #c6b7df;
+    --scrollbar-track: #f4ecfb;
     --font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   }
 
-  /* Scroll Theme (Parchment) */
+  /* Scroll Theme (Parchment + Sage) */
   [data-theme='scroll'] {
-    --bg-page: #f5e6d3; /* Old paper color */
-    --bg-card: #fdf6e3; /* Light parchment */
-    --text-primary: #5c4033; /* Dark brown */
-    --text-secondary: #8b5a2b; /* Brown */
-    --border-color: #d2b48c; /* Tan */
-    --primary-color: #800020; /* Burgundy/Deep Red */
-    --primary-light: #faebd7; /* AntiqueWhite */
-    --font-family: "Georgia", "Times New Roman", serif;
+    --bg-page: #f7f3f0;
+    --bg-card: #fcfaf4;
+    --text-primary: #4f463f;
+    --text-secondary: #6f7667;
+    --border-color: #d4d7c3;
+    --primary-color: #d4a373;
+    --primary-light: #ccd5ae;
+    --primary-dark: #bc8a5f;
+    --scrollbar-thumb: #bfc79f;
+    --scrollbar-track: #f7f3f0;
+    --font-family: "Kiwi Maru", "Hiragino Sans", "Meiryo", sans-serif;
   }
 
   /* Archive Theme (Future Tech) */
@@ -36,6 +44,9 @@
     --border-color: #475569; /* Slate-600 */
     --primary-color: #38bdf8; /* Sky-400 - Tech Blue */
     --primary-light: #0f172a; /* Slate-900 - Darker accent bg */
+    --primary-dark: #0284c7;
+    --scrollbar-thumb: #475569;
+    --scrollbar-track: #1e293b;
     --font-family: "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
   }
 
@@ -48,6 +59,9 @@
     --border-color: #614540; /* 薄巧棕色边框 */
     --primary-color: #4c312e; /* 薄巧绿色主色 */
     --primary-light: #f2eddf; /* 薄巧 chatIcBg */
+    --primary-dark: #3c2724;
+    --scrollbar-thumb: #8fa8a2;
+    --scrollbar-track: #d5eae3;
     --font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   }
 
@@ -56,6 +70,34 @@
     color: var(--text-primary);
     font-family: var(--font-family);
     transition: background-color 0.3s, color 0.3s;
+  }
+
+  input[type="number"]::-webkit-inner-spin-button,
+  input[type="number"]::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+
+  input[type="number"] {
+    -moz-appearance: textfield;
+  }
+
+  html {
+    scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+  }
+
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: var(--scrollbar-thumb);
+    border-radius: 999px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: var(--scrollbar-track);
   }
 }
 

@@ -1,6 +1,7 @@
 import React from 'react';
 import { Trash2, Download } from 'lucide-react';
-import { CampaignConfig, CampaignMember, CampaignSummary } from '../../../types';
+import { CampaignConfig, CampaignMember, CampaignMemberRole, CampaignSummary } from '../../../types';
+import { getCampaignRoleLabel, isCampaignManagerRole } from '../../../utils/campaignRoles';
 
 interface OwnedCampaignCardProps {
   campaign: CampaignSummary;
@@ -13,6 +14,8 @@ interface OwnedCampaignCardProps {
   onSaveConfig: (campaignId: string) => void;
   onUpdateJoinPassword: (campaignId: string) => void;
   onRemoveMember: (campaignId: string, memberUserId: string) => void;
+  onUpdateMemberRole: (campaignId: string, memberUserId: string, role: CampaignMemberRole) => void;
+  currentUserId: string;
   onEnter: (campaign: CampaignSummary) => void;
   onOpenExport: (campaignId: string) => void;
   onDelete: (campaignId: string) => void;
@@ -29,11 +32,17 @@ const OwnedCampaignCard: React.FC<OwnedCampaignCardProps> = ({
   onSaveConfig,
   onUpdateJoinPassword,
   onRemoveMember,
+  onUpdateMemberRole,
+  currentUserId,
   onEnter,
   onOpenExport,
   onDelete,
 }) => {
   const onlineMembers = previewMembers.filter((member) => onlineMemberIds.has(member.userId));
+  const currentMemberRole = config?.members.find((member) => member.userId === currentUserId)?.role || 'PL';
+  const canManageCampaign = isCampaignManagerRole(currentMemberRole);
+  const canManageRoles = config?.ownerUserId === currentUserId;
+  const canDeleteCampaign = config?.ownerUserId === currentUserId;
 
   return (
     <div data-tour="landing-campaign-card" className="flex flex-col p-4 rounded-lg border shadow-sm transition-shadow theme-card border-theme hover:shadow-md">
@@ -61,11 +70,14 @@ const OwnedCampaignCard: React.FC<OwnedCampaignCardProps> = ({
         <div data-tour="landing-campaign-members" className="mt-3 border border-theme rounded p-2.5 bg-theme-card/60">
           <div className="flex items-center justify-between gap-2 mb-2">
             <div className="text-xs font-semibold theme-text-secondary">成员列表</div>
-            <div className="text-[11px] theme-text-secondary">可移除 PL</div>
+            <div className="text-[11px] theme-text-secondary">
+              {canManageRoles ? '创建者可设置副GM' : canManageCampaign ? '副GM可移除 PL' : '查看成员信息'}
+            </div>
           </div>
           <div className="flex flex-wrap gap-1.5">
             {previewMembers.length > 0 ? previewMembers.map((member) => {
               const online = onlineMemberIds.has(member.userId);
+              const isOwner = config?.ownerUserId === member.userId;
               return (
                 <span
                   key={member.userId}
@@ -75,8 +87,28 @@ const OwnedCampaignCard: React.FC<OwnedCampaignCardProps> = ({
                       : 'border-theme theme-text-secondary'
                   }`}
                 >
-                  {member.username} · {member.role}
-                  {member.role === 'PL' && (
+                  {member.username} · {getCampaignRoleLabel(member.role)}
+                  {canManageRoles && !isOwner && member.role === 'PL' && (
+                    <button
+                      type="button"
+                      onClick={() => onUpdateMemberRole(campaign.id, member.userId, 'ASSISTANT_GM')}
+                      className="ml-1 text-blue-600 hover:text-blue-800"
+                      title="设为副GM"
+                    >
+                      副GM
+                    </button>
+                  )}
+                  {canManageRoles && !isOwner && member.role === 'ASSISTANT_GM' && (
+                    <button
+                      type="button"
+                      onClick={() => onUpdateMemberRole(campaign.id, member.userId, 'PL')}
+                      className="ml-1 text-amber-600 hover:text-amber-800"
+                      title="改回 PL"
+                    >
+                      改回PL
+                    </button>
+                  )}
+                  {canManageCampaign && member.role === 'PL' && (
                     <button
                       type="button"
                       onClick={() => onRemoveMember(campaign.id, member.userId)}
@@ -103,6 +135,7 @@ const OwnedCampaignCard: React.FC<OwnedCampaignCardProps> = ({
           <select
             value={config?.visibility || 'private'}
             onChange={(event) => onVisibilityChange(campaign.id, event.target.value as CampaignConfig['visibility'])}
+            disabled={!canManageCampaign}
             className="w-full px-3 py-1.5 border border-theme rounded bg-transparent text-sm"
           >
             <option value="private">私密模组</option>
@@ -111,7 +144,7 @@ const OwnedCampaignCard: React.FC<OwnedCampaignCardProps> = ({
           <button
             type="button"
             onClick={() => onSaveConfig(campaign.id)}
-            disabled={saving}
+            disabled={saving || !canManageCampaign}
             className="w-full px-3 py-1.5 rounded bg-primary text-white hover:bg-primary-dark disabled:opacity-60 text-sm"
           >
             保存公开设置
@@ -119,6 +152,7 @@ const OwnedCampaignCard: React.FC<OwnedCampaignCardProps> = ({
           <button
             type="button"
             onClick={() => onUpdateJoinPassword(campaign.id)}
+            disabled={!canManageCampaign}
             className="w-full px-3 py-1.5 rounded border border-theme hover:bg-primary-light text-sm"
           >
             {config?.joinPasswordConfigured ? '修改进入密码' : '设置进入密码'}
@@ -142,8 +176,9 @@ const OwnedCampaignCard: React.FC<OwnedCampaignCardProps> = ({
         </button>
         <button
           onClick={() => onDelete(campaign.id)}
-          className="flex items-center justify-center gap-1 py-1.5 border border-red-200 text-red-600 rounded hover:bg-red-50 text-xs"
-          title="删除模组"
+          disabled={!canDeleteCampaign}
+          className="flex items-center justify-center gap-1 py-1.5 border border-red-200 text-red-600 rounded hover:bg-red-50 text-xs disabled:opacity-50 disabled:hover:bg-transparent"
+          title={canDeleteCampaign ? '删除模组' : '仅创建者可删除模组'}
         >
           <Trash2 size={14} /> 删除
         </button>

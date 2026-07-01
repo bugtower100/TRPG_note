@@ -102,6 +102,20 @@ class TeamNotesService {
     return this.parseResponse<CampaignConfig>(response);
   }
 
+  async updateMemberRole(
+    campaignId: string,
+    memberUserId: string,
+    role: CampaignMemberRole,
+    user: UserProfile | null
+  ): Promise<CampaignConfig> {
+    const response = await fetch(`/api/campaigns/${campaignId}/members/${memberUserId}/role`, {
+      method: 'PUT',
+      headers: buildCollaborationHeaders(user, campaignId),
+      body: JSON.stringify({ role }),
+    });
+    return this.parseResponse<CampaignConfig>(response);
+  }
+
   async listTeamNotes(campaignId: string, user: UserProfile | null): Promise<TeamNoteDocument[]> {
     try {
       return (unwrapGeneratedResponse(await listGeneratedTeamNotes({

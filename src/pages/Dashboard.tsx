@@ -3,6 +3,7 @@ import { useCampaignData } from '../context/CampaignContext';
 import { useGuide } from '../components/common/InteractiveGuide';
 import { useReceivedShares } from '../hooks/useReceivedShares';
 import { useNavigate } from 'react-router-dom';
+import { useCampaignMemberRole } from '../hooks/useCampaignMemberRole';
 
 type SearchEntry = {
   id: string;
@@ -22,9 +23,17 @@ const Dashboard: React.FC = () => {
   const sharedMonsters = useReceivedShares('monsters');
   const sharedLocations = useReceivedShares('locations');
   const sharedOrganizations = useReceivedShares('organizations');
+  const { canManageCampaignContent } = useCampaignMemberRole();
   const [searchKeyword, setSearchKeyword] = useState('');
   const [searchEntries, setSearchEntries] = useState<SearchEntry[]>([]);
   const searchBuildVersionRef = useRef(0);
+  const visibleCharacters = canManageCampaignContent ? campaignData.characters : [];
+  const visibleMonsters = canManageCampaignContent ? campaignData.monsters : [];
+  const visibleLocations = canManageCampaignContent ? campaignData.locations : [];
+  const visibleOrganizations = canManageCampaignContent ? campaignData.organizations : [];
+  const visibleEvents = canManageCampaignContent ? campaignData.events : [];
+  const visibleClues = canManageCampaignContent ? campaignData.clues : [];
+  const visibleTimelines = canManageCampaignContent ? campaignData.timelines : [];
 
   useEffect(() => {
     setNotes(campaignData.notes || '');
@@ -45,7 +54,7 @@ const Dashboard: React.FC = () => {
     searchBuildVersionRef.current = buildVersion;
     const timer = window.setTimeout(() => {
       const nextEntries: SearchEntry[] = [
-        ...campaignData.characters.map((item) => ({
+        ...visibleCharacters.map((item) => ({
           id: item.id,
           entityType: '角色',
           entityName: item.name,
@@ -53,7 +62,7 @@ const Dashboard: React.FC = () => {
           content: [item.name, item.details, item.identity, item.appearance, item.desireOrGoal, item.attributes, ...(item.tags || [])].join(' ').toLowerCase(),
           updatedAt: item.updatedAt,
         })),
-        ...campaignData.monsters.map((item) => ({
+        ...visibleMonsters.map((item) => ({
           id: item.id,
           entityType: '怪物',
           entityName: item.name,
@@ -61,7 +70,7 @@ const Dashboard: React.FC = () => {
           content: [item.name, item.details, item.type, item.stats, item.abilities, item.drops, ...(item.tags || [])].join(' ').toLowerCase(),
           updatedAt: item.updatedAt,
         })),
-        ...campaignData.locations.map((item) => ({
+        ...visibleLocations.map((item) => ({
           id: item.id,
           entityType: '地点',
           entityName: item.name,
@@ -69,7 +78,7 @@ const Dashboard: React.FC = () => {
           content: [item.name, item.details, item.environment, ...(item.tags || [])].join(' ').toLowerCase(),
           updatedAt: item.updatedAt,
         })),
-        ...campaignData.organizations.map((item) => ({
+        ...visibleOrganizations.map((item) => ({
           id: item.id,
           entityType: '组织',
           entityName: item.name,
@@ -77,7 +86,7 @@ const Dashboard: React.FC = () => {
           content: [item.name, item.details, item.notes, ...(item.tags || [])].join(' ').toLowerCase(),
           updatedAt: item.updatedAt,
         })),
-        ...campaignData.events.map((item) => ({
+        ...visibleEvents.map((item) => ({
           id: item.id,
           entityType: '事件',
           entityName: item.name,
@@ -85,7 +94,7 @@ const Dashboard: React.FC = () => {
           content: [item.name, item.details, item.time, ...(item.tags || [])].join(' ').toLowerCase(),
           updatedAt: item.updatedAt,
         })),
-        ...campaignData.clues.map((item) => ({
+        ...visibleClues.map((item) => ({
           id: item.id,
           entityType: '线索',
           entityName: item.name,
@@ -93,7 +102,7 @@ const Dashboard: React.FC = () => {
           content: [item.name, item.details, item.type, item.revealTarget || '', ...(item.tags || [])].join(' ').toLowerCase(),
           updatedAt: item.updatedAt,
         })),
-        ...campaignData.timelines.map((item) => ({
+        ...visibleTimelines.map((item) => ({
           id: item.id,
           entityType: '时间线',
           entityName: item.name,
@@ -106,7 +115,7 @@ const Dashboard: React.FC = () => {
       setSearchEntries(nextEntries);
     }, 20);
     return () => window.clearTimeout(timer);
-  }, [campaignData]);
+  }, [visibleCharacters, visibleClues, visibleEvents, visibleLocations, visibleMonsters, visibleOrganizations, visibleTimelines]);
 
   const handleSearchEnter = (event: React.KeyboardEvent<HTMLInputElement>) => {
     if (event.key !== 'Enter') return;
@@ -132,6 +141,7 @@ const Dashboard: React.FC = () => {
   }, [searchEntries, searchKeyword]);
 
   const handleNotesChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    if (!canManageCampaignContent) return;
     const newNotes = e.target.value;
     setNotes(newNotes);
     setCampaignData({
@@ -152,19 +162,19 @@ const Dashboard: React.FC = () => {
       <div data-tour="dashboard-stat-grid" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
         <div className="bg-theme-card p-6 rounded-lg shadow-sm border border-theme">
           <h3 className="theme-text-secondary text-sm font-medium uppercase">角色</h3>
-          <p className="text-3xl font-bold mt-2">{campaignData.characters.length + sharedCharacters.length}</p>
+          <p className="text-3xl font-bold mt-2">{visibleCharacters.length + sharedCharacters.length}</p>
         </div>
         <div className="bg-theme-card p-6 rounded-lg shadow-sm border border-theme">
           <h3 className="theme-text-secondary text-sm font-medium uppercase">怪物</h3>
-          <p className="text-3xl font-bold mt-2">{campaignData.monsters.length + sharedMonsters.length}</p>
+          <p className="text-3xl font-bold mt-2">{visibleMonsters.length + sharedMonsters.length}</p>
         </div>
         <div className="bg-theme-card p-6 rounded-lg shadow-sm border border-theme">
           <h3 className="theme-text-secondary text-sm font-medium uppercase">地点</h3>
-          <p className="text-3xl font-bold mt-2">{campaignData.locations.length + sharedLocations.length}</p>
+          <p className="text-3xl font-bold mt-2">{visibleLocations.length + sharedLocations.length}</p>
         </div>
         <div className="bg-theme-card p-6 rounded-lg shadow-sm border border-theme">
           <h3 className="theme-text-secondary text-sm font-medium uppercase">组织</h3>
-          <p className="text-3xl font-bold mt-2">{campaignData.organizations.length + sharedOrganizations.length}</p>
+          <p className="text-3xl font-bold mt-2">{visibleOrganizations.length + sharedOrganizations.length}</p>
         </div>
         <div className="bg-theme-card p-6 rounded-lg shadow-sm border border-theme">
             <h3 className="theme-text-secondary text-sm font-medium uppercase">最后更新</h3>
@@ -213,8 +223,9 @@ const Dashboard: React.FC = () => {
         <textarea
             value={notes}
             onChange={handleNotesChange}
+            disabled={!canManageCampaignContent}
             className="w-full h-64 p-4 border border-theme rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 resize-y bg-transparent"
-            placeholder="在这里记录模组的大纲、待办事项或灵感..."
+            placeholder={canManageCampaignContent ? '在这里记录模组的大纲、待办事项或灵感...' : 'PL 不显示 GM 侧模组笔记'}
         />
       </div>
     </div>

@@ -7,6 +7,7 @@ import { queryKeys } from '../../query/queryKeys';
 import { BaseEntity, CampaignConfig, CustomSubItem, GraphEntityType, ShareScope, SharedPermission } from '../../types';
 import { sharingService } from '../../services/sharingService';
 import { buildSharedSnapshot } from '../../utils/shareSnapshot';
+import { isCampaignManagerRole } from '../../utils/campaignRoles';
 
 interface EntityShareActionsProps {
   entityType: GraphEntityType;
@@ -68,7 +69,7 @@ const EntityShareActions: React.FC<EntityShareActionsProps> = ({
     return () => window.removeEventListener('mousedown', handlePointerDown);
   }, [menuOpen]);
 
-  if (!currentCampaignId || !user || !config || memberRole !== 'GM') return null;
+  if (!currentCampaignId || !user || !config || !isCampaignManagerRole(memberRole)) return null;
 
   const buttonClass = compact
     ? 'text-xs px-2 py-1 border border-theme rounded hover:bg-primary-light flex items-center gap-1'

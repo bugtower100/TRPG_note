@@ -57,7 +57,7 @@ const ReleaseUpdateButton: React.FC<ReleaseUpdateButtonProps> = ({ className = '
         type="button"
         onClick={() => void handleCheckUpdate()}
         disabled={loading}
-        className={`inline-flex items-center gap-1 px-3 py-1.5 text-sm border rounded bg-white text-gray-600 border-gray-300 hover:bg-gray-50 disabled:opacity-50 ${className}`}
+        className={`inline-flex items-center gap-1 px-3 py-1.5 text-sm border rounded theme-card theme-text-secondary border-theme hover:bg-primary-light disabled:opacity-50 ${className}`}
       >
         <RefreshCw size={15} className={loading ? 'animate-spin' : ''} />
         检查更新
@@ -77,7 +77,7 @@ const ReleaseUpdateButton: React.FC<ReleaseUpdateButtonProps> = ({ className = '
               <button
                 type="button"
                 onClick={() => setDialogOpen(false)}
-                className="text-gray-400 hover:text-gray-700"
+                className="theme-text-secondary hover:text-primary"
                 aria-label="关闭更新提示"
               >
                 <X size={18} />

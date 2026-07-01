@@ -62,6 +62,12 @@ type CampaignConfigDoc struct {
 	UpdatedAt              int64            `json:"updatedAt"`
 }
 
+const (
+	campaignRoleGM          = "GM"
+	campaignRoleAssistantGM = "ASSISTANT_GM"
+	campaignRolePL          = "PL"
+)
+
 type TeamNoteLease struct {
 	UserID    string `json:"userId"`
 	Username  string `json:"username"`
@@ -411,6 +417,26 @@ func sanitizeCampaignConfig(cfg CampaignConfigDoc) CampaignConfigDoc {
 	return safe
 }
 
+func normalizeCampaignRole(raw string) string {
+	switch strings.TrimSpace(raw) {
+	case campaignRoleGM:
+		return campaignRoleGM
+	case campaignRoleAssistantGM:
+		return campaignRoleAssistantGM
+	default:
+		return campaignRolePL
+	}
+}
+
+func isCampaignManagerRole(role string) bool {
+	normalized := normalizeCampaignRole(role)
+	return normalized == campaignRoleGM || normalized == campaignRoleAssistantGM
+}
+
+func canManageCampaignRoles(cfg CampaignConfigDoc, userID string) bool {
+	return cfg.OwnerUserID == userID && normalizeCampaignRole(memberRole(cfg, userID)) == campaignRoleGM
+}
+
 func isCampaignMember(cfg CampaignConfigDoc, userID string) bool {
 	for _, member := range cfg.Members {
 		if member.UserID == userID {
@@ -421,6 +447,9 @@ func isCampaignMember(cfg CampaignConfigDoc, userID string) bool {
 }
 
 func saveCampaignConfigDoc(db *gorm.DB, cfg CampaignConfigDoc) error {
+	for index := range cfg.Members {
+		cfg.Members[index].Role = normalizeCampaignRole(cfg.Members[index].Role)
+	}
 	cfg.JoinPasswordConfigured = strings.TrimSpace(cfg.JoinPasswordHash) != ""
 	if _, err := kvSaveJSON(db, campaignConfigKey(cfg.CampaignID), cfg); err != nil {
 		return err
@@ -468,11 +497,11 @@ func ensureCampaignConfig(db *gorm.DB, campaignID, userID, username, campaignPas
 	}
 	cfg.JoinPasswordConfigured = strings.TrimSpace(cfg.JoinPasswordHash) != ""
 	existingRole := memberRole(cfg, userID)
-	isOwner := cfg.OwnerUserID == userID || existingRole == "GM"
-	if cfg.Visibility != "public" && !isOwner && !isCampaignMember(cfg, userID) {
+	isPrivilegedMember := cfg.OwnerUserID == userID || isCampaignManagerRole(existingRole)
+	if cfg.Visibility != "public" && !isPrivilegedMember && !isCampaignMember(cfg, userID) {
 		return CampaignConfigDoc{}, errCampaignForbidden
 	}
-	if cfg.Visibility == "public" && cfg.JoinPasswordConfigured && !isOwner {
+	if cfg.Visibility == "public" && cfg.JoinPasswordConfigured && !isPrivilegedMember {
 		if hashCampaignSecret(campaignPassword) != cfg.JoinPasswordHash {
 			return CampaignConfigDoc{}, errJoinPasswordRequired
 		}
@@ -489,11 +518,11 @@ func ensureCampaignConfig(db *gorm.DB, campaignID, userID, username, campaignPas
 		break
 	}
 	if !found && userID != "" {
-		role := "PL"
+		role := campaignRolePL
 		if userID == cfg.OwnerUserID {
-			role = "GM"
+			role = campaignRoleGM
 		}
-		if cfg.Visibility != "public" && role != "GM" {
+		if cfg.Visibility != "public" && role != campaignRoleGM {
 			return CampaignConfigDoc{}, errCampaignForbidden
 		}
 		cfg.Members = append(cfg.Members, CampaignMember{
@@ -530,10 +559,10 @@ func loadCampaignConfigForRequest(c *gin.Context, db *gorm.DB, campaignID, userI
 func memberRole(cfg CampaignConfigDoc, userID string) string {
 	for _, member := range cfg.Members {
 		if member.UserID == userID {
-			return member.Role
+			return normalizeCampaignRole(member.Role)
 		}
 	}
-	return "PL"
+	return campaignRolePL
 }
 
 func memberUsername(cfg CampaignConfigDoc, userID string) string {
@@ -1023,7 +1052,7 @@ func main() {
 		if !ok {
 			return
 		}
-		if memberRole(cfg, userID) != "GM" {
+		if !isCampaignManagerRole(memberRole(cfg, userID)) {
 			c.JSON(403, gin.H{"error": "forbidden"})
 			return
 		}
@@ -1084,7 +1113,7 @@ func main() {
 		if !ok {
 			return
 		}
-		if memberRole(cfg, userID) != "GM" {
+		if !isCampaignManagerRole(memberRole(cfg, userID)) {
 			c.JSON(403, gin.H{"error": "forbidden"})
 			return
 		}
@@ -1105,6 +1134,240 @@ func main() {
 			return
 		}
 		c.JSON(200, sanitizeCampaignConfig(cfg))
+	})
+
+	campaignAPI.PUT("/:campaignId/members/:memberUserId/role", func(c *gin.Context) {
+		campaignID := strings.TrimSpace(c.Param("campaignId"))
+		memberUserID := strings.TrimSpace(c.Param("memberUserId"))
+		userID, username := requestUser(c)
+		if campaignID == "" || memberUserID == "" || userID == "" || username == "" {
+			c.JSON(400, gin.H{"error": "missing_identity"})
+			return
+		}
+		cfg, ok := loadCampaignConfigForRequest(c, db, campaignID, userID, username)
+		if !ok {
+			return
+		}
+		if !canManageCampaignRoles(cfg, userID) {
+			c.JSON(403, gin.H{"error": "forbidden"})
+			return
+		}
+		var body struct {
+			Role string `json:"role"`
+		}
+		if err := c.ShouldBindJSON(&body); err != nil {
+			c.JSON(400, gin.H{"error": "invalid_payload"})
+			return
+		}
+		nextRole := normalizeCampaignRole(body.Role)
+		if nextRole == campaignRoleGM {
+			c.JSON(403, gin.H{"error": "forbidden"})
+			return
+		}
+		index := slices.IndexFunc(cfg.Members, func(member CampaignMember) bool { return member.UserID == memberUserID })
+		if index < 0 {
+			c.JSON(404, gin.H{"error": "not_found"})
+			return
+		}
+		target := cfg.Members[index]
+		if target.UserID == cfg.OwnerUserID || normalizeCampaignRole(target.Role) == campaignRoleGM {
+			c.JSON(403, gin.H{"error": "forbidden"})
+			return
+		}
+		cfg.Members[index].Role = nextRole
+		cfg.UpdatedAt = time.Now().UnixMilli()
+		if err := saveCampaignConfigDoc(db, cfg); err != nil {
+			c.JSON(500, gin.H{"error": "database_error"})
+			return
+		}
+		c.JSON(200, sanitizeCampaignConfig(cfg))
+	})
+
+	campaignAPI.GET("/:campaignId/character-sheets", func(c *gin.Context) {
+		campaignID := strings.TrimSpace(c.Param("campaignId"))
+		userID, username := requestUser(c)
+		if campaignID == "" || userID == "" || username == "" {
+			c.JSON(400, gin.H{"error": "missing_identity"})
+			return
+		}
+		cfg, ok := loadCampaignConfigForRequest(c, db, campaignID, userID, username)
+		if !ok {
+			return
+		}
+		items, err := listCharacterSheets(db, campaignID, userID, memberRole(cfg, userID))
+		if err != nil {
+			c.JSON(500, gin.H{"error": "database_error"})
+			return
+		}
+		c.JSON(200, items)
+	})
+
+	campaignAPI.POST("/:campaignId/character-sheets", func(c *gin.Context) {
+		campaignID := strings.TrimSpace(c.Param("campaignId"))
+		userID, username := requestUser(c)
+		if campaignID == "" || userID == "" || username == "" {
+			c.JSON(400, gin.H{"error": "missing_identity"})
+			return
+		}
+		cfg, ok := loadCampaignConfigForRequest(c, db, campaignID, userID, username)
+		if !ok {
+			return
+		}
+		if !isCampaignManagerRole(memberRole(cfg, userID)) {
+			c.JSON(403, gin.H{"error": "forbidden"})
+			return
+		}
+		var body CharacterSheetCreateRequest
+		if err := c.ShouldBindJSON(&body); err != nil {
+			c.JSON(400, gin.H{"error": "invalid_payload"})
+			return
+		}
+		doc, err := createCharacterSheet(db, campaignID, userID, username, body)
+		if err != nil {
+			c.JSON(500, gin.H{"error": "database_error"})
+			return
+		}
+		c.JSON(200, doc)
+	})
+
+	campaignAPI.POST("/:campaignId/character-sheets/import-text/preview", func(c *gin.Context) {
+		campaignID := strings.TrimSpace(c.Param("campaignId"))
+		userID, username := requestUser(c)
+		if campaignID == "" || userID == "" || username == "" {
+			c.JSON(400, gin.H{"error": "missing_identity"})
+			return
+		}
+		_, ok := loadCampaignConfigForRequest(c, db, campaignID, userID, username)
+		if !ok {
+			return
+		}
+		var body CharacterSheetImportPreviewRequest
+		if err := c.ShouldBindJSON(&body); err != nil {
+			c.JSON(400, gin.H{"error": "invalid_payload"})
+			return
+		}
+		if strings.TrimSpace(body.Text) == "" {
+			// #region debug-point D:route-empty
+			reportImportPreviewDebug("D", "main.go:character-sheets/import-text/preview:empty", "[DEBUG] preview route rejected empty text", map[string]any{
+				"campaignId": campaignID,
+				"userId":     userID,
+				"username":   username,
+			})
+			// #endregion
+			c.JSON(400, gin.H{"error": "empty_text"})
+			return
+		}
+		// #region debug-point D:route-entry
+		reportImportPreviewDebug("D", "main.go:character-sheets/import-text/preview:entry", "[DEBUG] preview route accepted request", map[string]any{
+			"campaignId": campaignID,
+			"userId":     userID,
+			"username":   username,
+			"systemHint": body.SystemHint,
+			"textLength": len(body.Text),
+		})
+		// #endregion
+		c.JSON(200, previewCharacterSheetImport(body))
+	})
+
+	campaignAPI.GET("/:campaignId/character-sheets/:sheetId", func(c *gin.Context) {
+		campaignID := strings.TrimSpace(c.Param("campaignId"))
+		sheetID := strings.TrimSpace(c.Param("sheetId"))
+		userID, username := requestUser(c)
+		if campaignID == "" || sheetID == "" || userID == "" || username == "" {
+			c.JSON(400, gin.H{"error": "missing_identity"})
+			return
+		}
+		cfg, ok := loadCampaignConfigForRequest(c, db, campaignID, userID, username)
+		if !ok {
+			return
+		}
+		doc, found, err := loadCharacterSheet(db, campaignID, sheetID)
+		if err != nil {
+			c.JSON(500, gin.H{"error": "database_error"})
+			return
+		}
+		if !found {
+			c.JSON(404, gin.H{"error": "not_found"})
+			return
+		}
+		if !canViewCharacterSheet(doc, userID, memberRole(cfg, userID)) {
+			c.JSON(403, gin.H{"error": "forbidden"})
+			return
+		}
+		c.JSON(200, doc)
+	})
+
+	campaignAPI.PUT("/:campaignId/character-sheets/:sheetId", func(c *gin.Context) {
+		campaignID := strings.TrimSpace(c.Param("campaignId"))
+		sheetID := strings.TrimSpace(c.Param("sheetId"))
+		userID, username := requestUser(c)
+		if campaignID == "" || sheetID == "" || userID == "" || username == "" {
+			c.JSON(400, gin.H{"error": "missing_identity"})
+			return
+		}
+		cfg, ok := loadCampaignConfigForRequest(c, db, campaignID, userID, username)
+		if !ok {
+			return
+		}
+		var body CharacterSheetUpdateRequest
+		if err := c.ShouldBindJSON(&body); err != nil {
+			c.JSON(400, gin.H{"error": "invalid_payload"})
+			return
+		}
+		doc, err := updateCharacterSheet(db, campaignID, sheetID, userID, username, body, cfg, memberRole(cfg, userID))
+		if err != nil {
+			if err == gorm.ErrRecordNotFound {
+				c.JSON(404, gin.H{"error": "not_found"})
+				return
+			}
+			if err == errCampaignForbidden {
+				c.JSON(403, gin.H{"error": "forbidden"})
+				return
+			}
+			var conflictErr *CharacterSheetConflictError
+			if errors.As(err, &conflictErr) {
+				c.JSON(409, gin.H{
+					"error": "conflict",
+					"sheet": conflictErr.Current,
+				})
+				return
+			}
+			c.JSON(500, gin.H{"error": "database_error"})
+			return
+		}
+		c.JSON(200, doc)
+	})
+
+	campaignAPI.DELETE("/:campaignId/character-sheets/:sheetId", func(c *gin.Context) {
+		campaignID := strings.TrimSpace(c.Param("campaignId"))
+		sheetID := strings.TrimSpace(c.Param("sheetId"))
+		userID, username := requestUser(c)
+		if campaignID == "" || sheetID == "" || userID == "" || username == "" {
+			c.JSON(400, gin.H{"error": "missing_identity"})
+			return
+		}
+		cfg, ok := loadCampaignConfigForRequest(c, db, campaignID, userID, username)
+		if !ok {
+			return
+		}
+		doc, found, err := loadCharacterSheet(db, campaignID, sheetID)
+		if err != nil {
+			c.JSON(500, gin.H{"error": "database_error"})
+			return
+		}
+		if !found {
+			c.Status(204)
+			return
+		}
+		if !canEditCharacterSheet(doc, userID, memberRole(cfg, userID)) {
+			c.JSON(403, gin.H{"error": "forbidden"})
+			return
+		}
+		if err := deleteCharacterSheet(db, campaignID, sheetID); err != nil {
+			c.JSON(500, gin.H{"error": "database_error"})
+			return
+		}
+		c.Status(204)
 	})
 
 	campaignAPI.GET("/:campaignId/shares", func(c *gin.Context) {
@@ -1129,11 +1392,11 @@ func main() {
 		for _, item := range items {
 			switch view {
 			case "managed":
-				if role == "GM" {
+				if isCampaignManagerRole(role) {
 					result = append(result, item)
 				}
 			default:
-				if item.TargetUserID == userID || role == "GM" {
+				if item.TargetUserID == userID || isCampaignManagerRole(role) {
 					result = append(result, item)
 				}
 			}
@@ -1153,7 +1416,7 @@ func main() {
 		if !accessOK {
 			return
 		}
-		if memberRole(cfg, userID) != "GM" {
+		if !isCampaignManagerRole(memberRole(cfg, userID)) {
 			c.JSON(403, gin.H{"error": "forbidden"})
 			return
 		}
@@ -1273,7 +1536,7 @@ func main() {
 		}
 		removed := items[index]
 		role := memberRole(cfg, userID)
-		if role != "GM" && removed.TargetUserID != userID {
+		if !isCampaignManagerRole(role) && removed.TargetUserID != userID {
 			c.JSON(403, gin.H{"error": "forbidden"})
 			return
 		}
@@ -1324,7 +1587,7 @@ func main() {
 		}
 		record := items[index]
 		role := memberRole(cfg, userID)
-		if record.Permission != "edit" || (record.TargetUserID != userID && role != "GM") {
+		if record.Permission != "edit" || (record.TargetUserID != userID && !isCampaignManagerRole(role)) {
 			c.JSON(403, gin.H{"error": "forbidden"})
 			return
 		}
@@ -1385,7 +1648,7 @@ func main() {
 		}
 		record := items[index]
 		role := memberRole(cfg, userID)
-		if record.Permission != "edit" || (record.TargetUserID != userID && role != "GM") {
+		if record.Permission != "edit" || (record.TargetUserID != userID && !isCampaignManagerRole(role)) {
 			c.JSON(403, gin.H{"error": "forbidden"})
 			return
 		}
@@ -1440,7 +1703,7 @@ func main() {
 		}
 		record := items[index]
 		role := memberRole(cfg, userID)
-		if record.Permission != "edit" || (record.TargetUserID != userID && role != "GM") {
+		if record.Permission != "edit" || (record.TargetUserID != userID && !isCampaignManagerRole(role)) {
 			c.JSON(403, gin.H{"error": "forbidden"})
 			return
 		}
@@ -1500,7 +1763,7 @@ func main() {
 		}
 		record := items[index]
 		role := memberRole(cfg, userID)
-		if record.Permission != "edit" || (record.TargetUserID != userID && role != "GM") {
+		if record.Permission != "edit" || (record.TargetUserID != userID && !isCampaignManagerRole(role)) {
 			c.JSON(403, gin.H{"error": "forbidden"})
 			return
 		}
@@ -1573,7 +1836,7 @@ func main() {
 		if !accessOK {
 			return
 		}
-		if memberRole(cfg, userID) != "GM" {
+		if !isCampaignManagerRole(memberRole(cfg, userID)) {
 			c.JSON(403, gin.H{"error": "forbidden"})
 			return
 		}
@@ -1597,7 +1860,7 @@ func main() {
 		if !accessOK {
 			return
 		}
-		if memberRole(cfg, userID) != "GM" {
+		if !isCampaignManagerRole(memberRole(cfg, userID)) {
 			c.JSON(403, gin.H{"error": "forbidden"})
 			return
 		}
@@ -1890,7 +2153,7 @@ func main() {
 			c.Status(204)
 			return
 		}
-		if role != "GM" && note.CreatedBy != userID {
+		if !isCampaignManagerRole(role) && note.CreatedBy != userID {
 			c.JSON(403, gin.H{"error": "forbidden"})
 			return
 		}
@@ -2107,7 +2370,7 @@ func main() {
 				return
 			}
 		}
-		if role != "GM" && doc.PLCanView != nil && !*doc.PLCanView {
+		if !isCampaignManagerRole(role) && doc.PLCanView != nil && !*doc.PLCanView {
 			c.JSON(403, gin.H{"error": "forbidden_view"})
 			return
 		}
@@ -2145,7 +2408,7 @@ func main() {
 			}
 		}
 		ensureTaskBoardPermissions(&doc)
-		if role != "GM" && doc.PLCanEdit != nil && !*doc.PLCanEdit {
+		if !isCampaignManagerRole(role) && doc.PLCanEdit != nil && !*doc.PLCanEdit {
 			c.JSON(403, gin.H{"error": "forbidden_edit"})
 			return
 		}
@@ -2209,7 +2472,7 @@ func main() {
 				UpdatedAt:   updatedAt,
 			})
 		}
-		if role != "GM" {
+		if !isCampaignManagerRole(role) {
 			for _, original := range doc.Tasks {
 				if _, exists := nextTaskIDs[original.ID]; !exists {
 					c.JSON(403, gin.H{"error": "forbidden_delete"})
@@ -2221,7 +2484,7 @@ func main() {
 		doc.UpdatedBy = userID
 		doc.UpdatedByName = username
 		doc.UpdatedAt = now
-		if role == "GM" {
+		if isCampaignManagerRole(role) {
 			if body.PLCanView != nil {
 				value := *body.PLCanView
 				doc.PLCanView = &value
@@ -2291,7 +2554,7 @@ func main() {
 			}
 		}
 		ensureTaskBoardPermissions(&doc)
-		if role != "GM" && doc.PLCanEdit != nil && !*doc.PLCanEdit {
+		if !isCampaignManagerRole(role) && doc.PLCanEdit != nil && !*doc.PLCanEdit {
 			c.JSON(403, gin.H{"error": "forbidden_edit"})
 			return
 		}
@@ -2336,7 +2599,7 @@ func main() {
 			return
 		}
 		ensureTaskBoardPermissions(&doc)
-		if role != "GM" && doc.PLCanEdit != nil && !*doc.PLCanEdit {
+		if !isCampaignManagerRole(role) && doc.PLCanEdit != nil && !*doc.PLCanEdit {
 			c.JSON(403, gin.H{"error": "forbidden_edit"})
 			return
 		}
@@ -2420,7 +2683,8 @@ func main() {
 			c.JSON(400, gin.H{"error": "missing_identity"})
 			return
 		}
-		if _, accessOK := loadCampaignConfigForRequest(c, db, campaignID, userID, username); !accessOK {
+		cfg, accessOK := loadCampaignConfigForRequest(c, db, campaignID, userID, username)
+		if !accessOK {
 			return
 		}
 
@@ -2428,6 +2692,9 @@ func main() {
 		if err != nil {
 			c.JSON(500, gin.H{"error": "database_error"})
 			return
+		}
+		if !isCampaignManagerRole(memberRole(cfg, userID)) {
+			bundle = redactV2CampaignBundleForPL(bundle)
 		}
 		c.JSON(200, bundle)
 	})
@@ -2472,7 +2739,12 @@ func main() {
 			c.JSON(400, gin.H{"error": "missing_identity"})
 			return
 		}
-		if _, accessOK := loadCampaignConfigForRequest(c, db, campaignID, userID, username); !accessOK {
+		cfg, accessOK := loadCampaignConfigForRequest(c, db, campaignID, userID, username)
+		if !accessOK {
+			return
+		}
+		if !isCampaignManagerRole(memberRole(cfg, userID)) {
+			c.JSON(403, gin.H{"error": "forbidden"})
 			return
 		}
 
@@ -2963,21 +3235,25 @@ func main() {
 		if p == "" || p == "/" {
 			p = "/index.html"
 		}
-		data, err := webFS.ReadFile("resource" + p)
-		if err != nil {
-			ext := filepath.Ext(p)
-			if ext == "" || ext == ".html" {
-				indexData, indexErr := webFS.ReadFile("resource/index.html")
-				if indexErr != nil {
-					c.Status(404)
+		data, ok := readRuntimeWebAsset(p)
+		if !ok {
+			embeddedData, err := webFS.ReadFile("resource" + p)
+			if err != nil {
+				ext := filepath.Ext(p)
+				if ext == "" || ext == ".html" {
+					indexData, indexErr := webFS.ReadFile("resource/index.html")
+					if indexErr != nil {
+						c.Status(404)
+						return
+					}
+					c.Header("Cache-Control", "no-cache, must-revalidate")
+					c.Data(200, "text/html; charset=utf-8", indexData)
 					return
 				}
-				c.Header("Cache-Control", "no-cache, must-revalidate")
-				c.Data(200, "text/html; charset=utf-8", indexData)
+				c.Status(404)
 				return
 			}
-			c.Status(404)
-			return
+			data = embeddedData
 		}
 		ctype := mime.TypeByExtension(filepath.Ext(p))
 		if ctype == "" {

@@ -11,6 +11,7 @@ import ConflictResolveDialog from '../components/common/ConflictResolveDialog';
 import { Lock, Unlock, History, AlertCircle, GripVertical } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import EntityTagEditor from '../components/common/EntityTagEditor';
+import { getCampaignRoleLabel, isCampaignManagerRole } from '../utils/campaignRoles';
 
 const statusOrder: SessionTaskStatus[] = ['todo', 'in_progress', 'done'];
 const statusLabel: Record<SessionTaskStatus, string> = {
@@ -148,7 +149,7 @@ const SessionTaskBoard: React.FC = () => {
     const tasksChanged = JSON.stringify(taskDrafts) !== JSON.stringify(boardDoc.tasks);
     const currentPermissions = resolvePermissions(boardDoc);
     const permissionsChanged =
-      memberRole === 'GM' &&
+      isCampaignManagerRole(memberRole) &&
       (permissionDraft.plCanView !== currentPermissions.plCanView ||
         permissionDraft.plCanEdit !== currentPermissions.plCanEdit);
     if (!tasksChanged && !permissionsChanged) return;
@@ -158,7 +159,7 @@ const SessionTaskBoard: React.FC = () => {
         tasks: taskDrafts,
         expectedVersion: boardDoc.version,
         leaseStartedAt,
-        ...(memberRole === 'GM' ? permissionDraft : {}),
+        ...(isCampaignManagerRole(memberRole) ? permissionDraft : {}),
       }).then((saved) => {
         setBoardDoc(saved);
         setTaskDrafts(saved.tasks);
@@ -282,8 +283,8 @@ const SessionTaskBoard: React.FC = () => {
 
   const deleteTask = (taskId: string) => {
     if (!editing) return;
-    if (memberRole !== 'GM') {
-      setStatusText('仅 GM 可以删除任务');
+    if (!isCampaignManagerRole(memberRole)) {
+      setStatusText('仅管理者可以删除任务');
       return;
     }
     if (!window.confirm('确定删除这条任务吗？')) return;
@@ -318,7 +319,7 @@ const SessionTaskBoard: React.FC = () => {
     const tasksChanged = JSON.stringify(taskDrafts) !== JSON.stringify(boardDoc.tasks);
     const currentPermissions = resolvePermissions(boardDoc);
     const permissionsChanged =
-      memberRole === 'GM' &&
+      isCampaignManagerRole(memberRole) &&
       (permissionDraft.plCanView !== currentPermissions.plCanView ||
         permissionDraft.plCanEdit !== currentPermissions.plCanEdit);
     if (!tasksChanged && !permissionsChanged) return boardDoc;
@@ -330,7 +331,7 @@ const SessionTaskBoard: React.FC = () => {
       tasks: taskDrafts,
       expectedVersion: boardDoc.version,
       leaseStartedAt,
-      ...(memberRole === 'GM' ? permissionDraft : {}),
+      ...(isCampaignManagerRole(memberRole) ? permissionDraft : {}),
     });
     setBoardDoc(saved);
     setTaskDrafts(saved.tasks);
@@ -393,7 +394,7 @@ const SessionTaskBoard: React.FC = () => {
         tasks: taskDrafts,
         expectedVersion: conflictDoc.version,
         leaseStartedAt,
-        ...(memberRole === 'GM' ? permissionDraft : {}),
+        ...(isCampaignManagerRole(memberRole) ? permissionDraft : {}),
       });
       setBoardDoc(saved);
       setTaskDrafts(saved.tasks);
@@ -425,8 +426,8 @@ const SessionTaskBoard: React.FC = () => {
     : boardDoc?.activeLease?.userId === user?.id
       ? '你正在编辑'
       : '';
-  const canViewBoard = memberRole === 'GM' || permissionDraft.plCanView;
-  const canEditBoard = memberRole === 'GM' || permissionDraft.plCanEdit;
+  const canViewBoard = isCampaignManagerRole(memberRole) || permissionDraft.plCanView;
+  const canEditBoard = isCampaignManagerRole(memberRole) || permissionDraft.plCanEdit;
   const canReorderTasks = editing && canEditBoard;
 
   const clearTaskDragState = () => {
@@ -484,10 +485,10 @@ const SessionTaskBoard: React.FC = () => {
         <h2 className="text-2xl font-bold">跑团任务看板</h2>
         <p className="text-sm theme-text-secondary mt-1">GM 主导协作：统一编辑锁、版本冲突保护、成员协作记录。</p>
         <div data-tour="task-board-header" className="text-sm theme-text-secondary mt-2">
-          当前身份：{memberRole}
+          当前身份：{getCampaignRoleLabel(memberRole)}
           {boardDoc ? ` · 版本：${boardDoc.version}` : ''}
         </div>
-        {memberRole === 'GM' && (
+        {isCampaignManagerRole(memberRole) && (
           <div data-tour="task-board-permissions" className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
             <label className="inline-flex items-center gap-2">
               <input
@@ -760,8 +761,8 @@ const SessionTaskBoard: React.FC = () => {
                           <button
                             type="button"
                             onClick={() => deleteTask(task.id)}
-                            disabled={!editing || memberRole !== 'GM'}
-                            title={memberRole === 'GM' ? '删除任务' : '仅 GM 可删除任务'}
+                            disabled={!editing || !isCampaignManagerRole(memberRole)}
+                            title={isCampaignManagerRole(memberRole) ? '删除任务' : '仅管理者可删除任务'}
                             className="text-xs text-red-600 hover:text-red-700"
                           >
                             删除

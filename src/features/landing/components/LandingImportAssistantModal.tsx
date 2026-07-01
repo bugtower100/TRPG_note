@@ -34,7 +34,7 @@ const LandingImportAssistantModal: React.FC<LandingImportAssistantModalProps> = 
           <button
             type="button"
             onClick={onClose}
-            className="rounded border border-theme p-2 theme-text-secondary hover:bg-gray-50"
+            className="rounded border border-theme p-2 theme-text-secondary hover:bg-primary-light"
             aria-label="关闭导入助手"
           >
             <X size={18} />

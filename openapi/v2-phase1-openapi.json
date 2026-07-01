@@ -104,6 +104,374 @@
         ],
         "type": "object"
       },
+      "CharacterSheetBaseInfo": {
+        "additionalProperties": false,
+        "properties": {
+          "age": {
+            "type": "string"
+          },
+          "avatarAssetPath": {
+            "type": "string"
+          },
+          "background": {
+            "type": "string"
+          },
+          "gender": {
+            "type": "string"
+          },
+          "notes": {
+            "type": "string"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "CharacterSheetCreateRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/schemas/CharacterSheetCreateRequest.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "linkedEntityId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "summary": {
+            "type": "string"
+          },
+          "system": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "system",
+          "summary"
+        ],
+        "type": "object"
+      },
+      "CharacterSheetDocument": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/schemas/CharacterSheetDocument.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "assignedUserIds": {
+            "items": {
+              "type": "string"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "avatarAssetPath": {
+            "type": "string"
+          },
+          "campaignId": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "id": {
+            "type": "string"
+          },
+          "linkedEntityId": {
+            "type": "string"
+          },
+          "linkedEntityType": {
+            "type": "string"
+          },
+          "memberPermissions": {
+            "items": {
+              "$ref": "#/components/schemas/CharacterSheetMemberPermission"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "ownerUserId": {
+            "type": "string"
+          },
+          "ownerUsername": {
+            "type": "string"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/CharacterSheetPayload"
+          },
+          "summary": {
+            "type": "string"
+          },
+          "system": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "updatedBy": {
+            "type": "string"
+          },
+          "updatedByName": {
+            "type": "string"
+          },
+          "version": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "visibility": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "campaignId",
+          "name",
+          "system",
+          "visibility",
+          "ownerUserId",
+          "ownerUsername",
+          "createdAt",
+          "updatedAt",
+          "updatedBy",
+          "updatedByName",
+          "version",
+          "payload"
+        ],
+        "type": "object"
+      },
+      "CharacterSheetImportPreview": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/schemas/CharacterSheetImportPreview.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "confidence": {
+            "format": "double",
+            "type": "number"
+          },
+          "detectedSystem": {
+            "type": "string"
+          },
+          "missingFields": {
+            "items": {
+              "type": "string"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/CharacterSheetPayload"
+          },
+          "summary": {
+            "type": "string"
+          },
+          "system": {
+            "type": "string"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "detectedSystem",
+          "system",
+          "confidence",
+          "warnings",
+          "missingFields",
+          "name",
+          "payload"
+        ],
+        "type": "object"
+      },
+      "CharacterSheetImportPreviewRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/schemas/CharacterSheetImportPreviewRequest.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "systemHint": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "text"
+        ],
+        "type": "object"
+      },
+      "CharacterSheetMemberPermission": {
+        "additionalProperties": false,
+        "properties": {
+          "permission": {
+            "type": "string"
+          },
+          "userId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "userId",
+          "permission"
+        ],
+        "type": "object"
+      },
+      "CharacterSheetPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "base": {
+            "$ref": "#/components/schemas/CharacterSheetBaseInfo"
+          },
+          "coc7": {
+            "additionalProperties": {},
+            "type": "object"
+          },
+          "dnd5e": {
+            "additionalProperties": {},
+            "type": "object"
+          }
+        },
+        "required": [
+          "base"
+        ],
+        "type": "object"
+      },
+      "CharacterSheetSummary": {
+        "additionalProperties": false,
+        "properties": {
+          "campaignId": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "linkedEntityId": {
+            "type": "string"
+          },
+          "linkedEntityType": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "ownerUserId": {
+            "type": "string"
+          },
+          "ownerUsername": {
+            "type": "string"
+          },
+          "summary": {
+            "type": "string"
+          },
+          "system": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "updatedBy": {
+            "type": "string"
+          },
+          "visibility": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "campaignId",
+          "name",
+          "system",
+          "summary",
+          "visibility",
+          "ownerUserId",
+          "ownerUsername",
+          "updatedAt",
+          "updatedBy"
+        ],
+        "type": "object"
+      },
+      "CharacterSheetUpdateRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/schemas/CharacterSheetUpdateRequest.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "expectedVersion": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "sheet": {
+            "$ref": "#/components/schemas/CharacterSheetDocument"
+          }
+        },
+        "required": [
+          "sheet"
+        ],
+        "type": "object"
+      },
       "ErrorDetail": {
         "additionalProperties": false,
         "properties": {
@@ -990,7 +1358,7 @@
   "info": {
     "description": "Phase 1 V2 migration and campaign bundle contract. Runtime business logic remains on Gin handlers; Huma is introduced here to generate OpenAPI incrementally.",
     "title": "TRPG Module Notes API",
-    "version": "v1.5.1"
+    "version": "v1.5.4"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -1057,6 +1425,705 @@
           }
         },
         "summary": "获取公开模组列表",
+        "tags": [
+          "campaigns-collaboration"
+        ]
+      }
+    },
+    "/api/campaigns/{campaignId}/character-sheets": {
+      "get": {
+        "description": "按当前用户权限返回模组内可见的角色卡摘要列表。",
+        "operationId": "listCharacterSheets",
+        "parameters": [
+          {
+            "description": "当前用户 ID",
+            "in": "header",
+            "name": "X-TRPG-User-Id",
+            "schema": {
+              "description": "当前用户 ID",
+              "type": "string"
+            }
+          },
+          {
+            "description": "当前用户名",
+            "in": "header",
+            "name": "X-TRPG-Username",
+            "schema": {
+              "description": "当前用户名",
+              "type": "string"
+            }
+          },
+          {
+            "description": "公开模组进入密码，只有需要时才传",
+            "in": "header",
+            "name": "X-TRPG-Campaign-Password",
+            "schema": {
+              "description": "公开模组进入密码，只有需要时才传",
+              "type": "string"
+            }
+          },
+          {
+            "description": "模组 ID",
+            "in": "path",
+            "name": "campaignId",
+            "required": true,
+            "schema": {
+              "description": "模组 ID",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CharacterSheetSummary"
+                  },
+                  "type": [
+                    "array",
+                    "null"
+                  ]
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "summary": "获取角色卡列表",
+        "tags": [
+          "campaigns-collaboration"
+        ]
+      },
+      "post": {
+        "description": "创建一张新的角色卡文档，首版支持 CoC7 与 DND5e。",
+        "operationId": "createCharacterSheet",
+        "parameters": [
+          {
+            "description": "当前用户 ID",
+            "in": "header",
+            "name": "X-TRPG-User-Id",
+            "schema": {
+              "description": "当前用户 ID",
+              "type": "string"
+            }
+          },
+          {
+            "description": "当前用户名",
+            "in": "header",
+            "name": "X-TRPG-Username",
+            "schema": {
+              "description": "当前用户名",
+              "type": "string"
+            }
+          },
+          {
+            "description": "公开模组进入密码，只有需要时才传",
+            "in": "header",
+            "name": "X-TRPG-Campaign-Password",
+            "schema": {
+              "description": "公开模组进入密码，只有需要时才传",
+              "type": "string"
+            }
+          },
+          {
+            "description": "模组 ID",
+            "in": "path",
+            "name": "campaignId",
+            "required": true,
+            "schema": {
+              "description": "模组 ID",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CharacterSheetCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CharacterSheetDocument"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "summary": "创建角色卡",
+        "tags": [
+          "campaigns-collaboration"
+        ]
+      }
+    },
+    "/api/campaigns/{campaignId}/character-sheets/import-text/preview": {
+      "post": {
+        "description": "解析文本中的角色卡数值与字段，返回识别结果与规范化草稿，不直接落库。",
+        "operationId": "previewCharacterSheetImport",
+        "parameters": [
+          {
+            "description": "当前用户 ID",
+            "in": "header",
+            "name": "X-TRPG-User-Id",
+            "schema": {
+              "description": "当前用户 ID",
+              "type": "string"
+            }
+          },
+          {
+            "description": "当前用户名",
+            "in": "header",
+            "name": "X-TRPG-Username",
+            "schema": {
+              "description": "当前用户名",
+              "type": "string"
+            }
+          },
+          {
+            "description": "公开模组进入密码，只有需要时才传",
+            "in": "header",
+            "name": "X-TRPG-Campaign-Password",
+            "schema": {
+              "description": "公开模组进入密码，只有需要时才传",
+              "type": "string"
+            }
+          },
+          {
+            "description": "模组 ID",
+            "in": "path",
+            "name": "campaignId",
+            "required": true,
+            "schema": {
+              "description": "模组 ID",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CharacterSheetImportPreviewRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CharacterSheetImportPreview"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "summary": "预览角色卡文本导入",
+        "tags": [
+          "campaigns-collaboration"
+        ]
+      }
+    },
+    "/api/campaigns/{campaignId}/character-sheets/{sheetId}": {
+      "delete": {
+        "description": "删除一张角色卡文档。",
+        "operationId": "deleteCharacterSheet",
+        "parameters": [
+          {
+            "description": "当前用户 ID",
+            "in": "header",
+            "name": "X-TRPG-User-Id",
+            "schema": {
+              "description": "当前用户 ID",
+              "type": "string"
+            }
+          },
+          {
+            "description": "当前用户名",
+            "in": "header",
+            "name": "X-TRPG-Username",
+            "schema": {
+              "description": "当前用户名",
+              "type": "string"
+            }
+          },
+          {
+            "description": "公开模组进入密码，只有需要时才传",
+            "in": "header",
+            "name": "X-TRPG-Campaign-Password",
+            "schema": {
+              "description": "公开模组进入密码，只有需要时才传",
+              "type": "string"
+            }
+          },
+          {
+            "description": "模组 ID",
+            "in": "path",
+            "name": "campaignId",
+            "required": true,
+            "schema": {
+              "description": "模组 ID",
+              "type": "string"
+            }
+          },
+          {
+            "description": "角色卡 ID",
+            "in": "path",
+            "name": "sheetId",
+            "required": true,
+            "schema": {
+              "description": "角色卡 ID",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "summary": "删除角色卡",
+        "tags": [
+          "campaigns-collaboration"
+        ]
+      },
+      "get": {
+        "description": "返回一张角色卡的完整内容。",
+        "operationId": "getCharacterSheet",
+        "parameters": [
+          {
+            "description": "当前用户 ID",
+            "in": "header",
+            "name": "X-TRPG-User-Id",
+            "schema": {
+              "description": "当前用户 ID",
+              "type": "string"
+            }
+          },
+          {
+            "description": "当前用户名",
+            "in": "header",
+            "name": "X-TRPG-Username",
+            "schema": {
+              "description": "当前用户名",
+              "type": "string"
+            }
+          },
+          {
+            "description": "公开模组进入密码，只有需要时才传",
+            "in": "header",
+            "name": "X-TRPG-Campaign-Password",
+            "schema": {
+              "description": "公开模组进入密码，只有需要时才传",
+              "type": "string"
+            }
+          },
+          {
+            "description": "模组 ID",
+            "in": "path",
+            "name": "campaignId",
+            "required": true,
+            "schema": {
+              "description": "模组 ID",
+              "type": "string"
+            }
+          },
+          {
+            "description": "角色卡 ID",
+            "in": "path",
+            "name": "sheetId",
+            "required": true,
+            "schema": {
+              "description": "角色卡 ID",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CharacterSheetDocument"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "summary": "获取角色卡详情",
+        "tags": [
+          "campaigns-collaboration"
+        ]
+      },
+      "put": {
+        "description": "使用 expectedVersion 执行角色卡更新，冲突时返回 409。",
+        "operationId": "updateCharacterSheet",
+        "parameters": [
+          {
+            "description": "当前用户 ID",
+            "in": "header",
+            "name": "X-TRPG-User-Id",
+            "schema": {
+              "description": "当前用户 ID",
+              "type": "string"
+            }
+          },
+          {
+            "description": "当前用户名",
+            "in": "header",
+            "name": "X-TRPG-Username",
+            "schema": {
+              "description": "当前用户名",
+              "type": "string"
+            }
+          },
+          {
+            "description": "公开模组进入密码，只有需要时才传",
+            "in": "header",
+            "name": "X-TRPG-Campaign-Password",
+            "schema": {
+              "description": "公开模组进入密码，只有需要时才传",
+              "type": "string"
+            }
+          },
+          {
+            "description": "模组 ID",
+            "in": "path",
+            "name": "campaignId",
+            "required": true,
+            "schema": {
+              "description": "模组 ID",
+              "type": "string"
+            }
+          },
+          {
+            "description": "角色卡 ID",
+            "in": "path",
+            "name": "sheetId",
+            "required": true,
+            "schema": {
+              "description": "角色卡 ID",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CharacterSheetUpdateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CharacterSheetDocument"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "summary": "更新角色卡",
         "tags": [
           "campaigns-collaboration"
         ]

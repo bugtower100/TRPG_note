@@ -31,7 +31,7 @@ export interface StoredCustomThemes {
 
 export const BUILTIN_THEME_OPTIONS: ThemeOption[] = [
   { id: 'default', label: '默认风格', desc: '淡雅的紫色调，柔和且适合现代阅读。' },
-  { id: 'scroll', label: '复古羊皮纸', desc: '温暖的黄色调，带来经典 TRPG 氛围。' },
+  { id: 'scroll', label: '羊皮纸与鼠尾草', desc: '暖米色纸页搭配鼠尾草绿，更接近手写卡面与安静阅读。' },
   { id: 'archive', label: '未来科技', desc: '高对比度深色调，适合科幻或调查模组。' },
   { id: 'nature', label: '薄巧清新', desc: '薄荷绿主调搭配棕色文字与边框，清新耐看。' },
   { id: 'custom', label: '自定义主题', desc: '通过 JSON 上传你自己的颜色和字体方案。' },
@@ -124,6 +124,9 @@ export const applyThemeToDocument = (
   root.style.setProperty('--border-color', hasCustomTheme ? customTheme.borderColor : '');
   root.style.setProperty('--primary-color', hasCustomTheme ? customTheme.primaryColor : '');
   root.style.setProperty('--primary-light', hasCustomTheme ? customTheme.primaryLight : '');
+  root.style.setProperty('--primary-dark', hasCustomTheme ? customTheme.primaryColor : '');
+  root.style.setProperty('--scrollbar-thumb', hasCustomTheme ? customTheme.borderColor : '');
+  root.style.setProperty('--scrollbar-track', hasCustomTheme ? customTheme.bgPage : '');
   root.style.setProperty('--font-family', hasCustomTheme ? customTheme.fontFamily || '' : '');
 };
 

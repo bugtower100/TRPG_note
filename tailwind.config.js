@@ -8,9 +8,9 @@ export default {
     extend: {
       colors: {
         primary: {
-          DEFAULT: '#8b5cf6', // violet-500
-          light: '#ede9fe', // violet-100
-          dark: '#6d28d9', // violet-700
+          DEFAULT: 'var(--primary-color)',
+          light: 'var(--primary-light)',
+          dark: 'var(--primary-dark)',
         }
       }
     },

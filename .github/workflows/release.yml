@@ -248,9 +248,8 @@ jobs:
           make_latest: true
           body: |
             ## ${{ steps.version.outputs.name }} 更新内容
-            - 为时间线节点添加了节点后添加节点按钮
-            - 延长了自动保存时间，防止保存过快使用不便
-            - 修复了导入识别成功但实际失败问题
+            - 为GM管理增加了副GM选项，副GM和GM除去不可删除模组外功能一致；
+            - 增加了角色卡管理页面，同时可以快速配置角色关联和角色跳转
           files: |
             TRPG模组笔记-${{ steps.version.outputs.app_version }}-windows-amd64.zip
             TRPG模组笔记-${{ steps.version.outputs.app_version }}-windows-arm64.zip

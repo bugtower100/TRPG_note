@@ -32,7 +32,7 @@ class SessionTaskBoardService {
       return '你没有权限执行这个操作';
     }
     if (payload.error === 'forbidden_delete') {
-      return '仅 GM 可以删除任务';
+      return '仅管理者可以删除任务';
     }
     if (payload.error === 'forbidden_view') {
       return 'GM 已将任务看板设置为 PL 不可查看';

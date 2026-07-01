@@ -1,0 +1,2001 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>综合角色卡管理器</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Kiwi+Maru:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+body { 
+    background-color: #f7f3f0; 
+    font-family: 'Kiwi Maru', 'Hiragino Sans', 'Meiryo', sans-serif;
+    color: #5d534a;
+}
+.btn-primary { background-color: #d4a373; color: white; }
+.btn-primary:hover { background-color: #bc8a5f; }
+.btn-secondary { background-color: #a3b18a; color: white; }
+.btn-secondary:hover { background-color: #84a98c; }
+.btn-accent { background-color: #ccd5ae; color: #5d534a; }
+.btn-accent:hover { background-color: #b5c096; }
+.btn-danger { background-color: #fae1dd; color: #e5989b; font-weight: bold; border: 2px solid #ffb5a7;}
+.btn-danger:hover { background-color: #ffb5a7; color: white; }
+
+.hide-scrollbar::-webkit-scrollbar { display: none; }
+.hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-thumb { background: #dcd0c9; border-radius: 10px; }
+::-webkit-scrollbar-track { background: #f7f3f0; }
+
+input[type="number"]::-webkit-inner-spin-button, 
+input[type="number"]::-webkit-outer-spin-button { 
+    -webkit-appearance: none; 
+    margin: 0; 
+}
+
+/* Tabs */
+.tab-btn {
+    padding: 8px 16px; font-weight: bold; color: #a89a8e; border-bottom: 2px solid transparent; transition: all 0.2s;
+}
+.tab-btn.active {
+    color: #d4a373; border-bottom: 2px solid #d4a373;
+}
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+</style>
+</head>
+<body class="p-3 md:p-6 flex flex-col min-h-screen">
+
+<!-- Header -->
+<div class="sticky top-0 z-40 px-4 py-3 bg-white border-b-2 border-[#e9e0d9] rounded-3xl mb-6 shadow-sm flex flex-wrap justify-between items-center gap-4">
+  <div class="flex flex-col">
+    <h1 class="text-xl font-bold text-[#5d534a]">角色卡管理器</h1>
+    <p class="text-[#a89a8e] text-[10px] font-medium">CoC & DND Edition</p>
+  </div>
+  
+  <div class="flex items-center gap-2 flex-wrap">
+    <div class="bg-[#f0e9e4] rounded-full px-3 py-1 flex items-center gap-2 shadow-inner">
+      <span class="text-[#7d6f64] text-xs font-bold">切换角色</span>
+      <select id="charSelector" onchange="switchCharacter(this.value)" class="bg-transparent outline-none text-sm font-bold text-[#d4a373] w-32 md:w-48 cursor-pointer truncate">
+      </select>
+    </div>
+    <button onclick="createNewCharacter()" class="btn-primary rounded-full px-4 py-1.5 text-xs font-bold shadow-sm">新建</button>
+    <button onclick="openTextImportModal()" class="btn-primary rounded-full px-4 py-1.5 text-xs font-bold shadow-sm" style="background-color: #a3b18a;">文本导入</button>
+    <button onclick="openTextExportModal()" class="btn-primary rounded-full px-4 py-1.5 text-xs font-bold shadow-sm" style="background-color: #b08968;">文本导出</button>
+    <button id="multiViewToggleBtn" onclick="toggleMultiView()" class="btn-secondary rounded-full px-4 py-1.5 text-xs font-bold shadow-sm">打开多卡视图</button>
+    <button onclick="deleteCharacter()" class="btn-danger rounded-full px-4 py-1.5 text-xs font-bold shadow-sm">删除</button>
+  </div>
+</div>
+
+<!-- Main Workspace -->
+<div id="workspace" class="flex-1 w-full max-w-6xl mx-auto bg-white rounded-[32px] p-5 md:p-8 border-4 border-[#f0e9e4] shadow-xl relative hidden">
+  <div id="exportArea" class="bg-white rounded-2xl">
+      <div class="grid md:grid-cols-[280px_1fr] lg:grid-cols-[300px_1fr] gap-6 md:gap-8">
+        
+        <!-- Left Column: Avatar & Radar -->
+        <div class="flex flex-col gap-4">
+          <div class="relative w-full aspect-square rounded-[32px] overflow-hidden bg-[#f7f3f0] border-4 border-[#f0e9e4] shadow-inner flex items-center justify-center group">
+            <img id="detailImage" class="w-full h-full object-cover bg-[#f7f3f0] hidden" />
+            <span id="noImageText" class="text-[#a89a8e] text-sm font-bold absolute pointer-events-none">点击上传图片</span>
+            <input type="file" accept="image/*" onchange="uploadImage(event)" class="absolute inset-0 opacity-0 cursor-pointer" data-html2canvas-ignore="true" />
+          </div>
+          
+          <div class="bg-[#fdfaf8] rounded-[24px] p-4 border-2 border-[#f0e9e4]">
+             <select id="detailSystem" onchange="switchSystem()" class="w-full bg-[#f0e9e4] rounded-full px-3 py-1 outline-none text-sm font-bold text-[#7d6f64] focus:border-[#d4a373] text-center cursor-pointer mb-3">
+                <option value="CoC">CoC（克苏鲁的呼唤）</option>
+                <option value="DND">DND（龙与地下城）</option>
+             </select>
+             <div class="relative w-full aspect-square flex items-center justify-center">
+                 <canvas id="radarChart"></canvas>
+             </div>
+          </div>
+
+          <!-- Left side summary stats (HP, SAN, AC) -->
+          <div class="grid grid-cols-3 gap-2">
+             <div class="coc-only bg-[#fae1dd] rounded-xl p-2 text-center border border-[#ffb5a7]"><span class="block text-[10px] font-bold text-[#e5989b]">HP (生命)</span><input type="text" id="coc-hp" onchange="saveData()" class="w-full bg-transparent text-center font-bold text-lg text-[#c87679] outline-none" placeholder="当前/最大"></div>
+             <div class="coc-only bg-[#e9f5db] rounded-xl p-2 text-center border border-[#ccd5ae]"><span class="block text-[10px] font-bold text-[#84a98c]">SAN (理智)</span><input type="text" id="coc-san" onchange="saveData()" class="w-full bg-transparent text-center font-bold text-lg text-[#5c8a66] outline-none" placeholder="当前/最大"></div>
+             <div class="coc-only bg-[#e0f2f1] rounded-xl p-2 text-center border border-[#b2dfdb]"><span class="block text-[10px] font-bold text-[#4db6ac]">MP (魔法)</span><input type="text" id="coc-mp" onchange="saveData()" class="w-full bg-transparent text-center font-bold text-lg text-[#3a8b83] outline-none" placeholder="当前/最大"></div>
+             
+             <div class="dnd-only hidden col-span-1 bg-[#fae1dd] rounded-xl p-2 text-center border border-[#ffb5a7]"><span class="block text-[10px] font-bold text-[#e5989b]">最大 HP</span><input type="number" id="dnd-hp" onchange="saveData()" class="w-full bg-transparent text-center font-bold text-lg text-[#c87679] outline-none"></div>
+             <div class="dnd-only hidden col-span-2 bg-[#e0f2f1] rounded-xl p-2 text-center border border-[#b2dfdb]"><span class="block text-[10px] font-bold text-[#4db6ac]">AC</span><input type="number" id="dnd-ac" onchange="saveData()" class="w-full bg-transparent text-center font-bold text-lg text-[#3a8b83] outline-none"></div>
+          </div>
+        </div>
+
+        <!-- Right Column: Tabs and Content -->
+        <div class="flex flex-col min-h-[600px]">
+          
+          <!-- Basic Info Header (Always visible) -->
+          <div class="flex gap-3 mb-4">
+            <input type="text" id="inputName" oninput="saveData()" class="flex-1 bg-transparent border-b-2 border-[#d4a373] text-2xl md:text-3xl font-bold text-[#5d534a] outline-none pb-1 placeholder-[#dcd0c9]" placeholder="角色姓名">
+          </div>
+          <div class="grid grid-cols-3 md:grid-cols-5 gap-3 mb-6">
+            <div class="flex flex-col"><span class="text-[10px] font-bold text-[#a89a8e]">年龄</span><input type="number" id="inputAge" onchange="saveData()" class="bg-[#fdfaf8] border border-[#f0e9e4] rounded-lg px-2 py-1 text-sm outline-none"></div>
+            <div class="flex flex-col"><span class="text-[10px] font-bold text-[#a89a8e]">性别</span><input type="text" id="inputGender" onchange="saveData()" class="bg-[#fdfaf8] border border-[#f0e9e4] rounded-lg px-2 py-1 text-sm outline-none"></div>
+            
+            <div class="coc-only flex flex-col"><span class="text-[10px] font-bold text-[#a89a8e]">职业</span><input type="text" id="inputOccupation" onchange="saveData()" class="bg-[#fdfaf8] border border-[#f0e9e4] rounded-lg px-2 py-1 text-sm outline-none"></div>
+            
+            <div class="dnd-only hidden flex flex-col"><span class="text-[10px] font-bold text-[#a89a8e]">种族</span><input type="text" id="inputRace" onchange="saveData()" class="bg-[#fdfaf8] border border-[#f0e9e4] rounded-lg px-2 py-1 text-sm outline-none"></div>
+            <div class="dnd-only hidden flex flex-col"><span class="text-[10px] font-bold text-[#a89a8e]">职业</span><input type="text" id="inputClass" onchange="saveData()" class="bg-[#fdfaf8] border border-[#f0e9e4] rounded-lg px-2 py-1 text-sm outline-none"></div>
+            <div class="dnd-only hidden flex flex-col"><span class="text-[10px] font-bold text-[#a89a8e]">等级</span><input type="number" id="inputLevel" onchange="saveData()" class="bg-[#fdfaf8] border border-[#f0e9e4] rounded-lg px-2 py-1 text-sm outline-none"></div>
+          </div>
+
+          <!-- Tabs Navigation -->
+          <div class="flex gap-2 border-b border-[#e9e0d9] mb-4 overflow-x-auto hide-scrollbar" data-html2canvas-ignore="true">
+             <button class="tab-btn active whitespace-nowrap" onclick="switchTab('base')">属性与技能</button>
+             <button class="tab-btn whitespace-nowrap" onclick="switchTab('inventory')">物品与装备</button>
+             <button class="tab-btn dnd-only hidden whitespace-nowrap" onclick="switchTab('spells')">法术书</button>
+             <button class="tab-btn coc-only whitespace-nowrap" onclick="switchTab('mythos')">神话与资产</button>
+             <button class="tab-btn whitespace-nowrap" onclick="switchTab('story')">背景与笔记</button>
+          </div>
+
+          <!-- Tab Content: Base & Skills -->
+          <div id="tab-base" class="tab-content active flex-1">
+             <!-- CoC Stats -->
+             <div class="coc-only grid grid-cols-4 md:grid-cols-8 gap-2 mb-6">
+                <div class="flex flex-col items-center bg-[#fdfaf8] border border-[#f0e9e4] rounded-xl p-2"><span class="text-[10px] font-bold text-[#a89a8e]">STR</span><input type="number" id="coc-str" onchange="saveData()" class="w-full text-center outline-none font-bold text-lg text-[#d4a373] bg-transparent"></div>
+                <div class="flex flex-col items-center bg-[#fdfaf8] border border-[#f0e9e4] rounded-xl p-2"><span class="text-[10px] font-bold text-[#a89a8e]">CON</span><input type="number" id="coc-con" onchange="saveData()" class="w-full text-center outline-none font-bold text-lg text-[#d4a373] bg-transparent"></div>
+                <div class="flex flex-col items-center bg-[#fdfaf8] border border-[#f0e9e4] rounded-xl p-2"><span class="text-[10px] font-bold text-[#a89a8e]">SIZ</span><input type="number" id="coc-siz" onchange="saveData()" class="w-full text-center outline-none font-bold text-lg text-[#d4a373] bg-transparent"></div>
+                <div class="flex flex-col items-center bg-[#fdfaf8] border border-[#f0e9e4] rounded-xl p-2"><span class="text-[10px] font-bold text-[#a89a8e]">DEX</span><input type="number" id="coc-dex" onchange="saveData()" class="w-full text-center outline-none font-bold text-lg text-[#d4a373] bg-transparent"></div>
+                <div class="flex flex-col items-center bg-[#fdfaf8] border border-[#f0e9e4] rounded-xl p-2"><span class="text-[10px] font-bold text-[#a89a8e]">APP</span><input type="number" id="coc-app" onchange="saveData()" class="w-full text-center outline-none font-bold text-lg text-[#d4a373] bg-transparent"></div>
+                <div class="flex flex-col items-center bg-[#fdfaf8] border border-[#f0e9e4] rounded-xl p-2"><span class="text-[10px] font-bold text-[#a89a8e]">INT</span><input type="number" id="coc-int" onchange="saveData()" class="w-full text-center outline-none font-bold text-lg text-[#d4a373] bg-transparent"></div>
+                <div class="flex flex-col items-center bg-[#fdfaf8] border border-[#f0e9e4] rounded-xl p-2"><span class="text-[10px] font-bold text-[#a89a8e]">POW</span><input type="number" id="coc-pow" onchange="saveData()" class="w-full text-center outline-none font-bold text-lg text-[#d4a373] bg-transparent"></div>
+                <div class="flex flex-col items-center bg-[#fdfaf8] border border-[#f0e9e4] rounded-xl p-2"><span class="text-[10px] font-bold text-[#a89a8e]">EDU</span><input type="number" id="coc-edu" onchange="saveData()" class="w-full text-center outline-none font-bold text-lg text-[#d4a373] bg-transparent"></div>
+             </div>
+
+             <!-- DND Stats -->
+             <div class="dnd-only hidden grid grid-cols-3 md:grid-cols-6 gap-2 mb-6">
+                <div class="flex flex-col items-center bg-[#fdfaf8] border border-[#f0e9e4] rounded-xl p-2"><span class="text-[10px] font-bold text-[#a89a8e]">力量 (STR)</span><input type="number" id="dnd-str" onchange="saveData()" class="w-full text-center outline-none font-bold text-lg text-[#d4a373] bg-transparent"><div id="dnd-str-mod" class="text-xs font-bold text-[#8b5a2b]"></div></div>
+                <div class="flex flex-col items-center bg-[#fdfaf8] border border-[#f0e9e4] rounded-xl p-2"><span class="text-[10px] font-bold text-[#a89a8e]">敏捷 (DEX)</span><input type="number" id="dnd-dex" onchange="saveData()" class="w-full text-center outline-none font-bold text-lg text-[#d4a373] bg-transparent"><div id="dnd-dex-mod" class="text-xs font-bold text-[#8b5a2b]"></div></div>
+                <div class="flex flex-col items-center bg-[#fdfaf8] border border-[#f0e9e4] rounded-xl p-2"><span class="text-[10px] font-bold text-[#a89a8e]">体质 (CON)</span><input type="number" id="dnd-con" onchange="saveData()" class="w-full text-center outline-none font-bold text-lg text-[#d4a373] bg-transparent"><div id="dnd-con-mod" class="text-xs font-bold text-[#8b5a2b]"></div></div>
+                <div class="flex flex-col items-center bg-[#fdfaf8] border border-[#f0e9e4] rounded-xl p-2"><span class="text-[10px] font-bold text-[#a89a8e]">智力 (INT)</span><input type="number" id="dnd-int" onchange="saveData()" class="w-full text-center outline-none font-bold text-lg text-[#d4a373] bg-transparent"><div id="dnd-int-mod" class="text-xs font-bold text-[#8b5a2b]"></div></div>
+                <div class="flex flex-col items-center bg-[#fdfaf8] border border-[#f0e9e4] rounded-xl p-2"><span class="text-[10px] font-bold text-[#a89a8e]">感知 (WIS)</span><input type="number" id="dnd-wis" onchange="saveData()" class="w-full text-center outline-none font-bold text-lg text-[#d4a373] bg-transparent"><div id="dnd-wis-mod" class="text-xs font-bold text-[#8b5a2b]"></div></div>
+                <div class="flex flex-col items-center bg-[#fdfaf8] border border-[#f0e9e4] rounded-xl p-2"><span class="text-[10px] font-bold text-[#a89a8e]">魅力 (CHA)</span><input type="number" id="dnd-cha" onchange="saveData()" class="w-full text-center outline-none font-bold text-lg text-[#d4a373] bg-transparent"><div id="dnd-cha-mod" class="text-xs font-bold text-[#8b5a2b]"></div></div>
+             </div>
+
+             <!-- DND Spellcasting Stats -->
+             <div class="dnd-only hidden grid grid-cols-3 gap-2 mb-6">
+                <div class="flex flex-col items-center bg-[#fdfaf8] border border-[#f0e9e4] rounded-xl p-2">
+                    <span class="text-[10px] font-bold text-[#a89a8e]">施法属性</span>
+                    <select id="dnd-spellcasting-ability" onchange="saveData()" class="w-full bg-transparent text-center outline-none font-bold text-[#8e44ad] mt-1">
+                        <option value="INT">智力</option>
+                        <option value="WIS">感知</option>
+                        <option value="CHA">魅力</option>
+                        <option value="NONE">无</option>
+                    </select>
+                </div>
+                <div class="flex flex-col items-center bg-[#fdfaf8] border border-[#f0e9e4] rounded-xl p-2">
+                    <span class="text-[10px] font-bold text-[#a89a8e]">法术豁免 DC</span>
+                    <input type="number" id="dnd-spell-save-dc" onchange="saveData()" class="w-full text-center outline-none font-bold text-lg text-[#8e44ad] bg-transparent">
+                </div>
+                <div class="flex flex-col items-center bg-[#fdfaf8] border border-[#f0e9e4] rounded-xl p-2">
+                    <span class="text-[10px] font-bold text-[#a89a8e]">法术攻击加值</span>
+                    <input type="number" id="dnd-spell-attack-bonus" onchange="saveData()" class="w-full text-center outline-none font-bold text-lg text-[#8e44ad] bg-transparent">
+                </div>
+             </div>
+
+             <div class="dnd-only hidden grid grid-cols-2 md:grid-cols-5 gap-2 mb-6">
+                <div class="bg-[#fdfaf8] border border-[#f0e9e4] rounded-xl p-2 text-center">
+                    <div class="text-[10px] font-bold text-[#a89a8e]">熟练加值</div>
+                    <div id="dnd-proficiency" class="font-bold text-lg text-[#8b5a2b]">+2</div>
+                </div>
+                <div class="bg-[#fdfaf8] border border-[#f0e9e4] rounded-xl p-2 text-center">
+                    <div class="text-[10px] font-bold text-[#a89a8e]">先攻</div>
+                    <div id="dnd-initiative" class="font-bold text-lg text-[#8b5a2b]">+0</div>
+                </div>
+                <div class="bg-[#fdfaf8] border border-[#f0e9e4] rounded-xl p-2 text-center">
+                    <div class="text-[10px] font-bold text-[#a89a8e]">自动 AC</div>
+                    <div id="dnd-auto-ac" class="font-bold text-lg text-[#3a8b83]">10</div>
+                </div>
+                <div class="bg-[#fdfaf8] border border-[#f0e9e4] rounded-xl p-2 text-center">
+                    <div class="text-[10px] font-bold text-[#a89a8e]">生命骰</div>
+                    <div id="dnd-hit-dice" class="font-bold text-sm text-[#c87679]">d8 · 0/1</div>
+                </div>
+                <button type="button" onclick="useHitDice()" class="dnd-only hidden btn-accent rounded-xl px-3 py-2 text-xs font-bold shadow-sm">
+                    使用生命骰
+                </button>
+             </div>
+
+             <div class="dnd-only hidden bg-[#fdfaf8] rounded-2xl p-4 border border-[#f0e9e4] mb-6">
+                <div class="flex justify-between items-center mb-3">
+                   <h4 class="font-bold text-[#7d6f64] text-sm">技能</h4>
+                   <span class="text-[10px] font-bold text-[#a89a8e]">自动按属性和熟练计算修正值</span>
+                </div>
+                <div id="dndSkillsContainer" class="grid md:grid-cols-2 gap-2"></div>
+             </div>
+
+             <!-- CoC Skill List -->
+             <div class="coc-only bg-[#fdfaf8] rounded-2xl p-4 border border-[#f0e9e4]">
+                <div class="flex justify-between items-center mb-3">
+                   <h4 class="font-bold text-[#7d6f64] text-sm">技能列表</h4>
+                   <div class="flex gap-2">
+                     <input type="text" id="cocSkillSearch" oninput="renderCocSkills()" placeholder="搜索技能..." class="text-xs px-2 py-1 rounded border border-[#e9e0d9] outline-none" data-html2canvas-ignore="true">
+                     <button onclick="addCocSkill()" class="btn-primary px-2 py-1 text-xs rounded shadow-sm" data-html2canvas-ignore="true">+ 添加技能</button>
+                   </div>
+                </div>
+                <div id="cocSkillsContainer" class="grid grid-cols-2 md:grid-cols-3 gap-2"></div>
+             </div>
+          </div>
+
+          <!-- Tab Content: Inventory -->
+          <div id="tab-inventory" class="tab-content flex-1">
+             
+             <!-- CoC Weapons -->
+             <div class="coc-only bg-[#fdfaf8] rounded-2xl p-4 border border-[#f0e9e4] mb-4">
+                <div class="flex justify-between items-center mb-3">
+                   <h4 class="font-bold text-[#7d6f64] text-sm">武器与战斗</h4>
+                   <button onclick="addCocWeapon()" class="btn-primary px-2 py-1 text-xs rounded shadow-sm" data-html2canvas-ignore="true">+ 添加</button>
+                </div>
+                <div id="cocWeaponsContainer" class="flex flex-col gap-2"></div>
+             </div>
+
+             <!-- DND Currency & Weight -->
+             <div class="dnd-only hidden bg-[#fdfaf8] rounded-2xl p-4 border border-[#f0e9e4] mb-4">
+                <h4 class="font-bold text-[#7d6f64] text-sm mb-3">货币与负重</h4>
+                <div class="flex flex-wrap gap-2 mb-3">
+                   <div class="flex items-center gap-1 bg-white border border-[#e9e0d9] rounded px-2 py-1"><span class="text-xs font-bold text-[#d2691e]">CP</span><input type="number" id="dnd-cp" onchange="saveData()" class="w-12 bg-transparent text-center text-xs outline-none"></div>
+                   <div class="flex items-center gap-1 bg-white border border-[#e9e0d9] rounded px-2 py-1"><span class="text-xs font-bold text-[#868e96]">SP</span><input type="number" id="dnd-sp" onchange="saveData()" class="w-12 bg-transparent text-center text-xs outline-none"></div>
+                   <div class="flex items-center gap-1 bg-[#fff9e6] border border-[#f39c12] rounded px-2 py-1"><span class="text-xs font-bold text-[#f39c12]">GP</span><input type="number" id="dnd-gp" onchange="saveData()" class="w-12 bg-transparent text-center text-xs outline-none font-bold text-[#5d534a]"></div>
+                   <div class="flex items-center gap-1 bg-white border border-[#e9e0d9] rounded px-2 py-1"><span class="text-xs font-bold text-[#c9a227]">EP</span><input type="number" id="dnd-ep" onchange="saveData()" class="w-12 bg-transparent text-center text-xs outline-none"></div>
+                   <div class="flex items-center gap-1 bg-white border border-[#e9e0d9] rounded px-2 py-1"><span class="text-xs font-bold text-[#7986cb]">PP</span><input type="number" id="dnd-pp" onchange="saveData()" class="w-12 bg-transparent text-center text-xs outline-none"></div>
+                </div>
+                <div class="text-xs font-bold px-2 py-1 bg-[#e9f5db] text-[#84a98c] rounded inline-block">当前总负重: <span id="dnd-weight" class="text-[#5d534a]">0</span> lb / 负重上限: <span id="dnd-max-weight" class="text-[#5d534a]">150</span> lb</div>
+             </div>
+
+             <!-- DND Weapons -->
+             <div class="dnd-only hidden bg-[#fdfaf8] rounded-2xl p-4 border border-[#f0e9e4] mb-4">
+                <div class="flex justify-between items-center mb-3">
+                   <h4 class="font-bold text-[#7d6f64] text-sm">武器</h4>
+                   <button onclick="addDndWeapon()" class="btn-primary px-2 py-1 text-xs rounded shadow-sm" data-html2canvas-ignore="true">+ 添加</button>
+                </div>
+                <div id="dndWeaponsContainer" class="flex flex-col gap-2"></div>
+             </div>
+
+             <!-- DND Armors -->
+             <div class="dnd-only hidden bg-[#fdfaf8] rounded-2xl p-4 border border-[#f0e9e4] mb-4">
+                <div class="flex justify-between items-center mb-3">
+                   <h4 class="font-bold text-[#7d6f64] text-sm">护甲</h4>
+                   <button onclick="addDndArmor()" class="btn-primary px-2 py-1 text-xs rounded shadow-sm" data-html2canvas-ignore="true">+ 添加</button>
+                </div>
+                <div id="dndArmorsContainer" class="flex flex-col gap-2"></div>
+             </div>
+
+             <!-- General Inventory -->
+             <div class="bg-[#fdfaf8] rounded-2xl p-4 border border-[#f0e9e4]">
+                <div class="flex justify-between items-center mb-3">
+                   <h4 class="font-bold text-[#7d6f64] text-sm">随身物品</h4>
+                   <button onclick="addInventoryItem()" class="btn-primary px-2 py-1 text-xs rounded shadow-sm" data-html2canvas-ignore="true">+ 添加</button>
+                </div>
+                <div id="inventoryContainer" class="flex flex-col gap-2"></div>
+             </div>
+          </div>
+
+          <!-- Tab Content: Spells (DND) -->
+          <div id="tab-spells" class="tab-content flex-1">
+             <div class="dnd-only hidden bg-[#fdfaf8] rounded-2xl p-4 border border-[#f0e9e4] mb-4">
+                <div class="flex justify-between items-center mb-3">
+                   <h4 class="font-bold text-[#7d6f64] text-sm">法术位</h4>
+                   <button onclick="autoFillCurrentDndSpellSlots()" class="btn-accent px-2 py-1 text-xs rounded shadow-sm" data-html2canvas-ignore="true">自动填充</button>
+                </div>
+                <div id="dndSpellSlotsContainer" class="flex flex-col gap-2"></div>
+             </div>
+             <div class="bg-[#fdfaf8] rounded-2xl p-4 border border-[#f0e9e4]">
+                <div class="flex justify-between items-center mb-3">
+                   <h4 class="font-bold text-[#7d6f64] text-sm">法术书</h4>
+                   <button onclick="addDndSpell()" class="btn-primary px-2 py-1 text-xs rounded shadow-sm" data-html2canvas-ignore="true">+ 添加法术</button>
+                </div>
+                <div id="dndSpellsContainer" class="flex flex-col gap-3"></div>
+             </div>
+          </div>
+
+          <!-- Tab Content: Mythos & Assets (CoC) -->
+          <div id="tab-mythos" class="tab-content flex-1">
+             <div class="grid md:grid-cols-2 gap-4">
+                <!-- Assets -->
+                <div class="bg-[#fdfaf8] rounded-2xl p-4 border border-[#f0e9e4]">
+                   <h4 class="font-bold text-[#7d6f64] text-sm mb-3">资产与财务</h4>
+                   <div class="flex flex-col gap-2">
+                       <div class="flex items-center gap-2"><span class="w-16 text-xs font-bold text-[#a89a8e]">消费水平</span><input type="text" id="coc-spending" onchange="saveData()" class="flex-1 border-b border-[#e9e0d9] outline-none text-[#5d534a] text-sm bg-transparent"></div>
+                       <div class="flex items-center gap-2"><span class="w-16 text-xs font-bold text-[#a89a8e]">现金</span><input type="text" id="coc-cash" onchange="saveData()" class="flex-1 border-b border-[#e9e0d9] outline-none text-[#5d534a] text-sm bg-transparent"></div>
+                       <div class="flex items-center gap-2"><span class="w-16 text-xs font-bold text-[#a89a8e]">其他资产</span><textarea id="coc-assets" onchange="saveData()" class="flex-1 border border-[#e9e0d9] rounded p-1 outline-none text-[#5d534a] text-xs resize-none bg-white" rows="2"></textarea></div>
+                   </div>
+                </div>
+                <!-- Mythos -->
+                <div class="bg-[#fdfaf8] rounded-2xl p-4 border border-[#f0e9e4]">
+                   <h4 class="font-bold text-[#7d6f64] text-sm mb-3">神话、法术与典籍</h4>
+                   <textarea id="coc-mythos" onchange="saveData()" class="w-full h-32 bg-white border border-[#e9e0d9] rounded p-2 outline-none text-[#5d534a] text-sm resize-none focus:border-[#d4a373]"></textarea>
+                </div>
+                <!-- Companions -->
+                <div class="bg-[#fdfaf8] rounded-2xl p-4 border border-[#f0e9e4] md:col-span-2">
+                   <div class="flex justify-between items-center mb-3">
+                       <h4 class="font-bold text-[#7d6f64] text-sm">调查员同伴</h4>
+                       <button onclick="addCocCompanion()" class="btn-primary px-2 py-1 text-xs rounded shadow-sm" data-html2canvas-ignore="true">+ 添加同伴</button>
+                   </div>
+                   <div id="cocCompanionsContainer" class="grid grid-cols-2 md:grid-cols-3 gap-2"></div>
+                </div>
+             </div>
+          </div>
+
+          <!-- Tab Content: Story & Notes -->
+          <div id="tab-story" class="tab-content flex-1">
+             <!-- CoC Detailed Backstory -->
+             <div class="coc-only grid md:grid-cols-2 gap-4 mb-4">
+                 <div class="bg-[#fdfaf8] rounded-2xl p-4 border border-[#f0e9e4]">
+                     <h4 class="font-bold text-[#7d6f64] text-sm mb-2">形象描述</h4>
+                     <textarea id="coc-appearance" onchange="saveData()" class="w-full h-16 bg-white border border-[#e9e0d9] rounded p-2 outline-none text-[#5d534a] text-xs resize-none focus:border-[#d4a373]"></textarea>
+                 </div>
+                 <div class="bg-[#fdfaf8] rounded-2xl p-4 border border-[#f0e9e4]">
+                     <h4 class="font-bold text-[#7d6f64] text-sm mb-2">思想与信念</h4>
+                     <textarea id="coc-beliefs" onchange="saveData()" class="w-full h-16 bg-white border border-[#e9e0d9] rounded p-2 outline-none text-[#5d534a] text-xs resize-none focus:border-[#d4a373]"></textarea>
+                 </div>
+                 <div class="bg-[#fdfaf8] rounded-2xl p-4 border border-[#f0e9e4]">
+                     <h4 class="font-bold text-[#7d6f64] text-sm mb-2">重要之人</h4>
+                     <textarea id="coc-significant" onchange="saveData()" class="w-full h-16 bg-white border border-[#e9e0d9] rounded p-2 outline-none text-[#5d534a] text-xs resize-none focus:border-[#d4a373]"></textarea>
+                 </div>
+                 <div class="bg-[#fdfaf8] rounded-2xl p-4 border border-[#f0e9e4]">
+                     <h4 class="font-bold text-[#7d6f64] text-sm mb-2">意义非凡之地</h4>
+                     <textarea id="coc-locations" onchange="saveData()" class="w-full h-16 bg-white border border-[#e9e0d9] rounded p-2 outline-none text-[#5d534a] text-xs resize-none focus:border-[#d4a373]"></textarea>
+                 </div>
+                 <div class="bg-[#fdfaf8] rounded-2xl p-4 border border-[#f0e9e4]">
+                     <h4 class="font-bold text-[#7d6f64] text-sm mb-2">宝贵之物</h4>
+                     <textarea id="coc-possessions" onchange="saveData()" class="w-full h-16 bg-white border border-[#e9e0d9] rounded p-2 outline-none text-[#5d534a] text-xs resize-none focus:border-[#d4a373]"></textarea>
+                 </div>
+                 <div class="bg-[#fdfaf8] rounded-2xl p-4 border border-[#f0e9e4]">
+                     <h4 class="font-bold text-[#7d6f64] text-sm mb-2">特质</h4>
+                     <textarea id="coc-traits" onchange="saveData()" class="w-full h-16 bg-white border border-[#e9e0d9] rounded p-2 outline-none text-[#5d534a] text-xs resize-none focus:border-[#d4a373]"></textarea>
+                 </div>
+                 <div class="bg-[#fdfaf8] rounded-2xl p-4 border border-[#f0e9e4]">
+                     <h4 class="font-bold text-[#7d6f64] text-sm mb-2">伤疤与创伤</h4>
+                     <textarea id="coc-injuries" onchange="saveData()" class="w-full h-16 bg-white border border-[#e9e0d9] rounded p-2 outline-none text-[#5d534a] text-xs resize-none focus:border-[#d4a373]"></textarea>
+                 </div>
+                 <div class="bg-[#fdfaf8] rounded-2xl p-4 border border-[#f0e9e4]">
+                     <h4 class="font-bold text-[#7d6f64] text-sm mb-2">恐惧与狂躁</h4>
+                     <textarea id="coc-phobias" onchange="saveData()" class="w-full h-16 bg-white border border-[#e9e0d9] rounded p-2 outline-none text-[#5d534a] text-xs resize-none focus:border-[#d4a373]"></textarea>
+                 </div>
+             </div>
+
+             <div class="bg-[#fdfaf8] rounded-2xl p-4 border border-[#f0e9e4] h-full flex flex-col min-h-[300px]">
+                <h4 class="font-bold text-[#7d6f64] text-sm mb-3">其他笔记</h4>
+                <textarea id="detailMemo" onchange="saveData()" class="flex-1 w-full bg-white border border-[#f0e9e4] rounded-xl p-3 outline-none text-sm text-[#5d534a] font-sans focus:border-[#d4a373] resize-none" placeholder="在这里记录更多背景故事、重要线索或备忘录..."></textarea>
+             </div>
+          </div>
+
+        </div>
+      </div>
+  </div>
+</div>
+
+<div id="multiViewSection" class="hidden w-full max-w-6xl mx-auto mt-6 bg-white rounded-[32px] p-5 md:p-8 border-4 border-[#f0e9e4] shadow-xl">
+  <div class="flex flex-col gap-4">
+    <div class="flex flex-wrap items-center justify-between gap-3">
+      <div>
+        <h2 class="text-lg font-bold text-[#5d534a]">多角色检阅</h2>
+        <p class="text-xs text-[#a89a8e]">勾选要一起查看的角色卡</p>
+      </div>
+      <button onclick="toggleMultiView()" class="btn-danger rounded-full px-4 py-1.5 text-xs font-bold shadow-sm">关闭多卡视图</button>
+    </div>
+    <div class="bg-[#fdfaf8] rounded-2xl p-4 border border-[#f0e9e4]">
+      <div class="flex items-center gap-3 mb-3">
+        <button id="multiViewAll" type="button" onclick="toggleAllMultiView()" class="px-3 py-1.5 rounded-full bg-white border border-[#e9e0d9] text-sm font-bold text-[#7d6f64]">
+          全选
+        </button>
+      </div>
+      <div id="multiViewSelectorList" class="flex flex-wrap gap-2"></div>
+    </div>
+    <div id="multiViewGrid" class="grid md:grid-cols-2 xl:grid-cols-3 gap-4"></div>
+  </div>
+</div>
+
+<div id="emptyState" class="flex-1 flex flex-col items-center justify-center text-center py-20">
+    <h2 class="text-xl font-bold text-[#7d6f64] mb-2">没有选择角色</h2>
+    <p class="text-[#a89a8e] text-sm">请从右上角选择一个角色，或者新建一个角色。</p>
+</div>
+
+<!-- 文本导入弹窗 -->
+<div id="textImportModal" onclick="outsideCloseTextImport(event)" class="hidden fixed inset-0 bg-[#5d534a]/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+    <div id="textImportContent" class="bg-white rounded-[32px] p-6 md:p-8 w-full max-w-3xl shadow-2xl border-4 border-[#f0e9e4]">
+      <h2 class="text-2xl font-bold mb-4 text-[#5d534a]">快速导入角色属性</h2>
+      <p class="text-sm text-[#a89a8e] mb-4">请将跑团机器人生成的角色属性文本（如：&lt;名字&gt;的个人属性为...）粘贴到下方文本框中：</p>
+      <textarea id="importTextInput" class="w-full h-48 md:h-64 bg-[#fdfaf8] border-2 border-[#f0e9e4] rounded-2xl p-4 outline-none text-sm text-[#5d534a] font-sans focus:border-[#d4a373] resize-y mb-4" placeholder="粘贴文本内容..."></textarea>
+      <div class="flex justify-end gap-3">
+        <button onclick="closeTextImportModal()" class="px-6 py-2 rounded-full bg-[#f0e9e4] font-bold text-[#7d6f64]">取消</button>
+        <button onclick="processTextImport()" class="btn-primary px-8 py-2 rounded-full font-bold shadow-sm">导入到当前角色</button>
+      </div>
+    </div>
+</div>
+
+<div id="textExportModal" onclick="outsideCloseTextExport(event)" class="hidden fixed inset-0 bg-[#5d534a]/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+    <div class="bg-white rounded-[32px] p-6 md:p-8 w-full max-w-3xl shadow-2xl border-4 border-[#f0e9e4]">
+      <h2 class="text-2xl font-bold mb-4 text-[#5d534a]">导出角色文本</h2>
+      <p class="text-sm text-[#a89a8e] mb-4">已按当前系统生成导出模板，可直接复制使用。</p>
+      <textarea id="exportTextOutput" readonly class="w-full h-48 md:h-64 bg-[#fdfaf8] border-2 border-[#f0e9e4] rounded-2xl p-4 outline-none text-sm text-[#5d534a] font-sans resize-y mb-4"></textarea>
+      <div class="flex justify-end gap-3">
+        <button onclick="closeTextExportModal()" class="px-6 py-2 rounded-full bg-[#f0e9e4] font-bold text-[#7d6f64]">关闭</button>
+        <button onclick="copyExportText()" class="btn-primary px-8 py-2 rounded-full font-bold shadow-sm">复制文本</button>
+      </div>
+    </div>
+</div>
+
+<script>
+let characters = JSON.parse(localStorage.getItem("characters") || "[]");
+let selectedCharId = localStorage.getItem("selectedCharId") || (characters.length > 0 ? characters[0].id : null);
+let selectedChar = null;
+let radarChartInstance = null;
+let multiViewSelectedIds = JSON.parse(localStorage.getItem("multiViewSelectedIds") || "[]");
+
+const DND_CLASS_SPELL_ABILITY = {
+    "法师": "INT", "wizard": "INT", "术士": "CHA", "sorcerer": "CHA",
+    "吟游诗人": "CHA", "bard": "CHA", "牧师": "WIS", "cleric": "WIS",
+    "德鲁伊": "WIS", "druid": "WIS", "圣武士": "CHA", "paladin": "CHA",
+    "游侠": "WIS", "ranger": "WIS", "邪术师": "CHA", "warlock": "CHA",
+    "工匠": "INT", "artificer": "INT"
+};
+
+const DND_HIT_DIE_TYPES = {
+    "野蛮人": "d12", "barbarian": "d12", "战士": "d10", "fighter": "d10",
+    "圣武士": "d10", "paladin": "d10", "游侠": "d10", "ranger": "d10",
+    "吟游诗人": "d8", "bard": "d8", "牧师": "d8", "cleric": "d8",
+    "德鲁伊": "d8", "druid": "d8", "武僧": "d8", "monk": "d8",
+    "游荡者": "d8", "rogue": "d8", "术士": "d6", "sorcerer": "d6",
+    "法师": "d6", "wizard": "d6", "邪术师": "d8", "warlock": "d8",
+    "工匠": "d8", "artificer": "d8"
+};
+
+const FULL_CASTER_SLOTS = {
+    1:[2],2:[3],3:[4,2],4:[4,3],5:[4,3,2],6:[4,3,3],7:[4,3,3,1],8:[4,3,3,2],9:[4,3,3,3,1],10:[4,3,3,3,2],
+    11:[4,3,3,3,2,1],12:[4,3,3,3,2,1],13:[4,3,3,3,2,1,1],14:[4,3,3,3,2,1,1],15:[4,3,3,3,2,1,1,1],
+    16:[4,3,3,3,2,1,1,1],17:[4,3,3,3,2,1,1,1,1],18:[4,3,3,3,3,1,1,1,1],19:[4,3,3,3,3,2,1,1,1],20:[4,3,3,3,3,2,2,1,1]
+};
+
+const HALF_CASTER_SLOTS = {
+    1:[],2:[2],3:[3],4:[3],5:[4,2],6:[4,2],7:[4,3],8:[4,3],9:[4,3,2],10:[4,3,2],
+    11:[4,3,3],12:[4,3,3],13:[4,3,3,1],14:[4,3,3,1],15:[4,3,3,2],16:[4,3,3,2],
+    17:[4,3,3,3,1],18:[4,3,3,3,1],19:[4,3,3,3,2],20:[4,3,3,3,2]
+};
+
+const DND_SKILL_DEFINITIONS = [
+    { name: "运动", ability: "str" },
+    { name: "体操", ability: "dex" },
+    { name: "巧手", ability: "dex" },
+    { name: "隐匿", ability: "dex" },
+    { name: "调查", ability: "int" },
+    { name: "奥秘", ability: "int" },
+    { name: "历史", ability: "int" },
+    { name: "自然", ability: "int" },
+    { name: "宗教", ability: "int" },
+    { name: "察觉", ability: "wis" },
+    { name: "洞悉", ability: "wis" },
+    { name: "驯兽", ability: "wis" },
+    { name: "医药", ability: "wis" },
+    { name: "求生", ability: "wis" },
+    { name: "游说", ability: "cha" },
+    { name: "欺瞒", ability: "cha" },
+    { name: "威吓", ability: "cha" },
+    { name: "表演", ability: "cha" }
+];
+
+const DND_ABILITY_LABELS = {
+    str: "力量",
+    dex: "敏捷",
+    con: "体质",
+    int: "智力",
+    wis: "感知",
+    cha: "魅力"
+};
+
+const COC_EXPORT_SEGMENTS = [
+    { key: "str", labels: ["力量", "str"] },
+    { key: "dex", labels: ["敏捷", "dex"] },
+    { key: "pow", labels: ["意志", "pow"] },
+    { key: "con", labels: ["体质", "con"] },
+    { key: "app", labels: ["外貌", "app"] },
+    { key: "edu", labels: ["教育", "edu"] },
+    { key: "siz", labels: ["体型", "siz"] },
+    { key: "int", labels: ["智力", "灵感", "int"] }
+];
+
+const COC_EXPORT_STATUS_MAP = [
+    { key: "san", labels: ["san", "san值", "理智", "理智值"] },
+    { key: "luck", labels: ["幸运", "运气"] },
+    { key: "mp", labels: ["mp", "魔法"] },
+    { key: "hp", labels: ["hp", "体力"] }
+];
+
+const COC_SKILL_ALIAS_MAP = {
+    "会计": ["会计"],
+    "人类学": ["人类学"],
+    "估价": ["估价"],
+    "考古学": ["考古学"],
+    "取悦": ["取悦", "魅惑"],
+    "攀爬": ["攀爬"],
+    "计算机使用": ["计算机", "计算机使用", "电脑"],
+    "信用评级": ["信用", "信誉", "信用评级"],
+    "克苏鲁神话": ["克苏鲁", "克苏鲁神话", "cm"],
+    "乔装": ["乔装"],
+    "闪避": ["闪避"],
+    "汽车驾驶": ["汽车", "驾驶", "汽车驾驶"],
+    "电气维修": ["电气维修"],
+    "电子学": ["电子学"],
+    "话术": ["话术"],
+    "斗殴": ["斗殴"],
+    "射击:手枪": ["手枪"],
+    "急救": ["急救"],
+    "历史": ["历史"],
+    "恐吓": ["恐吓"],
+    "跳跃": ["跳跃"],
+    "母语": ["母语"],
+    "法律": ["法律"],
+    "图书馆使用": ["图书馆", "图书馆使用"],
+    "聆听": ["聆听"],
+    "开锁": ["开锁", "撬锁", "锁匠"],
+    "机械维修": ["机械维修"],
+    "医学": ["医学"],
+    "博物学": ["博物学", "自然学"],
+    "领航": ["领航", "导航"],
+    "神秘学": ["神秘学"],
+    "操作重型机械": ["重型操作", "重型机械", "操作重型机械", "重型"],
+    "说服": ["说服"],
+    "精神分析": ["精神分析"],
+    "心理学": ["心理学"],
+    "骑术": ["骑术"],
+    "妙手": ["妙手"],
+    "侦查": ["侦查"],
+    "潜行": ["潜行"],
+    "生存": ["生存"],
+    "游泳": ["游泳"],
+    "投掷": ["投掷"],
+    "追踪": ["追踪"],
+    "动物驯养": ["动物驯养"],
+    "潜水": ["潜水"],
+    "爆破": ["爆破"],
+    "读唇": ["读唇"],
+    "催眠": ["催眠"],
+    "炮术": ["炮术"],
+    "地质学": ["地质", "地质学"]
+};
+
+function createEmptySpellSlots() {
+    const slots = {};
+    for (let level = 1; level <= 9; level++) {
+        slots[level] = { total: 0, used: 0 };
+    }
+    return slots;
+}
+
+function normalizeClassKey(value) {
+    return String(value || "").trim().toLowerCase();
+}
+
+function createDefaultDndSkills() {
+    const skills = {};
+    DND_SKILL_DEFINITIONS.forEach(skill => {
+        skills[skill.name] = 0;
+    });
+    return skills;
+}
+
+function getSpellcastingAbilityByClass(value) {
+    return DND_CLASS_SPELL_ABILITY[String(value || "").trim()] || DND_CLASS_SPELL_ABILITY[normalizeClassKey(value)] || "INT";
+}
+
+function getHitDieTypeByClass(value) {
+    return DND_HIT_DIE_TYPES[String(value || "").trim()] || DND_HIT_DIE_TYPES[normalizeClassKey(value)] || "d8";
+}
+
+function calculateAbilityModifier(score) {
+    return Math.floor(((parseInt(score, 10) || 10) - 10) / 2);
+}
+
+function calculateProficiencyBonus(level) {
+    const lvl = parseInt(level, 10) || 0;
+    return lvl <= 0 ? 0 : Math.floor((lvl - 1) / 4) + 2;
+}
+
+function getSpellSlotTableByClass(playerClass) {
+    const raw = String(playerClass || "").trim();
+    const key = normalizeClassKey(playerClass);
+    if (["法师","术士","吟游诗人","牧师","德鲁伊"].includes(raw) || ["wizard","sorcerer","bard","cleric","druid"].includes(key)) {
+        return FULL_CASTER_SLOTS;
+    }
+    if (["圣武士","游侠","工匠"].includes(raw) || ["paladin","ranger","artificer"].includes(key)) {
+        return HALF_CASTER_SLOTS;
+    }
+    return null;
+}
+
+function autoFillDndSpellSlots(character) {
+    if (!character.dndMeta) character.dndMeta = {};
+    if (!character.dndMeta.spellSlots) character.dndMeta.spellSlots = createEmptySpellSlots();
+    const slots = createEmptySpellSlots();
+    const table = getSpellSlotTableByClass(character.class);
+    const row = table ? table[parseInt(character.level, 10) || 0] || [] : [];
+    row.forEach((count, index) => {
+        slots[index + 1] = { total: count || 0, used: 0 };
+    });
+    character.dndMeta.spellSlots = slots;
+}
+
+function ensureDndMeta(character) {
+    if (!character.dndMeta) character.dndMeta = {};
+    if (!character.dndMeta.spellSlots) {
+        character.dndMeta.spellSlots = createEmptySpellSlots();
+        autoFillDndSpellSlots(character);
+    }
+    if (!character.dndMeta.hitDice) {
+        character.dndMeta.hitDice = { type: getHitDieTypeByClass(character.class), used: 0 };
+    }
+    if (!character.dndMeta.hitDice.type) {
+        character.dndMeta.hitDice.type = getHitDieTypeByClass(character.class);
+    }
+}
+
+function calculateDndArmorClass(character) {
+    const dexBonus = calculateAbilityModifier(character.dndStats.dex);
+    let baseAC = 10 + dexBonus;
+    let shieldBonus = 0;
+    if (character.armors && character.armors.length > 0) {
+        baseAC = 10;
+        character.armors.forEach(armor => {
+            if ((armor.name || "").includes("盾")) {
+                shieldBonus += parseInt(armor.ac, 10) || 2;
+                return;
+            }
+            const acStr = String(armor.ac || "");
+            if (acStr.includes("+敏捷调整值")) {
+                let actualDex = dexBonus;
+                if (acStr.includes("最大2")) actualDex = Math.min(actualDex, 2);
+                const match = acStr.match(/(\d+)/);
+                baseAC = (match ? parseInt(match[1], 10) : 10) + actualDex;
+            } else {
+                const match = acStr.match(/(\d+)/);
+                if (match) baseAC = parseInt(match[1], 10);
+            }
+        });
+        if (baseAC === 10) baseAC += dexBonus;
+    }
+    return baseAC + shieldBonus;
+}
+
+function formatModifier(value) {
+    return value >= 0 ? `+${value}` : `${value}`;
+}
+
+function save() {
+    localStorage.setItem("characters", JSON.stringify(characters));
+    if(selectedCharId) localStorage.setItem("selectedCharId", selectedCharId);
+    localStorage.setItem("multiViewSelectedIds", JSON.stringify(multiViewSelectedIds));
+}
+
+function updateMainViewMode() {
+    const workspace = document.getElementById("workspace");
+    const emptyState = document.getElementById("emptyState");
+    const multiView = document.getElementById("multiViewSection");
+    const multiOpen = isMultiViewOpen();
+    if (multiOpen) {
+        workspace.classList.add("hidden");
+        emptyState.classList.add("hidden");
+        multiView.classList.remove("hidden");
+        return;
+    }
+    multiView.classList.add("hidden");
+    if (selectedChar) {
+        workspace.classList.remove("hidden");
+        emptyState.classList.add("hidden");
+    } else {
+        workspace.classList.add("hidden");
+        emptyState.classList.remove("hidden");
+    }
+}
+
+function init() {
+    if (multiViewSelectedIds.length === 0 && selectedCharId) {
+        multiViewSelectedIds = [selectedCharId];
+    }
+    renderCharSelector();
+    switchCharacter(selectedCharId);
+    updateMainViewMode();
+}
+
+function renderCharSelector() {
+    const sel = document.getElementById("charSelector");
+    sel.innerHTML = "";
+    if (characters.length === 0) {
+        const opt = document.createElement("option");
+        opt.value = ""; opt.textContent = "无角色";
+        sel.appendChild(opt);
+    } else {
+        characters.forEach(c => {
+            const opt = document.createElement("option");
+            opt.value = c.id;
+            opt.textContent = `${c.system === 'CoC' ? '[COC]' : '[DND]'} ${c.name || '未命名'}`;
+            if (c.id === selectedCharId) opt.selected = true;
+            sel.appendChild(opt);
+        });
+    }
+    renderMultiViewSelector();
+}
+
+function switchCharacter(id) {
+    if (!id || characters.length === 0) {
+        selectedChar = null;
+        selectedCharId = null;
+        updateMainViewMode();
+        return;
+    }
+    selectedCharId = id;
+    selectedChar = characters.find(c => c.id === id);
+    if (!selectedChar) return switchCharacter(characters[0]?.id);
+    
+    // 初始化缺失的数据结构
+    if(!selectedChar.cocStats) selectedChar.cocStats = { str: 50, con: 50, siz: 50, dex: 50, app: 50, int: 50, pow: 50, edu: 50, san: "50/50", hp: "10/10", mp: "10/10" };
+    if(!selectedChar.dndStats) selectedChar.dndStats = { str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10, hp: 10, ac: 10 };
+    if(!selectedChar.dndSkills) selectedChar.dndSkills = createDefaultDndSkills();
+    if(!selectedChar.skills) selectedChar.skills = []; // CoC skills
+    if(!selectedChar.weapons) selectedChar.weapons = []; // DND weapons
+    if(!selectedChar.armors) selectedChar.armors = []; // DND armors
+    if(!selectedChar.inventory) selectedChar.inventory = []; // Generic items
+    if(!selectedChar.spells) selectedChar.spells = []; // DND spells
+    if(!selectedChar.currency) selectedChar.currency = {cp:0, sp:0, gp:0, ep:0, pp:0};
+    
+    // CoC Ext
+    if(!selectedChar.cocWeapons) selectedChar.cocWeapons = [];
+    if(!selectedChar.assets) selectedChar.assets = {spending: "", cash: "", other: ""};
+    if(!selectedChar.mythos) selectedChar.mythos = "";
+    if(!selectedChar.companions) selectedChar.companions = [];
+    if(!selectedChar.backstory) selectedChar.backstory = {
+        appearance: "", beliefs: "", significant: "", locations: "", 
+        possessions: "", traits: "", injuries: "", phobias: ""
+    };
+    ensureDndMeta(selectedChar);
+
+    save();
+    renderCharSelector();
+    updateMainViewMode();
+    document.getElementById("charSelector").value = id;
+
+    // 填充数据
+    document.getElementById("detailSystem").value = selectedChar.system || "CoC";
+    document.getElementById("inputName").value = selectedChar.name || "";
+    document.getElementById("inputAge").value = selectedChar.age || "";
+    document.getElementById("inputGender").value = selectedChar.gender || "";
+    document.getElementById("detailMemo").value = selectedChar.memo || "";
+
+    if(selectedChar.image) {
+        document.getElementById("detailImage").src = selectedChar.image;
+        document.getElementById("detailImage").classList.remove("hidden");
+        document.getElementById("noImageText").classList.add("hidden");
+    } else {
+        document.getElementById("detailImage").src = "";
+        document.getElementById("detailImage").classList.add("hidden");
+        document.getElementById("noImageText").classList.remove("hidden");
+    }
+
+    // CoC
+    document.getElementById("inputOccupation").value = selectedChar.occupation || "";
+    ["str","con","siz","dex","app","int","pow","edu"].forEach(stat => {
+        document.getElementById("coc-"+stat).value = selectedChar.cocStats[stat];
+    });
+    ["hp","san","mp"].forEach(stat => {
+        document.getElementById("coc-"+stat).value = selectedChar.cocStats[stat] || "";
+    });
+
+    document.getElementById("coc-spending").value = selectedChar.assets.spending || "";
+    document.getElementById("coc-cash").value = selectedChar.assets.cash || "";
+    document.getElementById("coc-assets").value = selectedChar.assets.other || "";
+    document.getElementById("coc-mythos").value = selectedChar.mythos || "";
+    
+    ["appearance", "beliefs", "significant", "locations", "possessions", "traits", "injuries", "phobias"].forEach(field => {
+        document.getElementById("coc-"+field).value = selectedChar.backstory[field] || "";
+    });
+
+    // DND
+    document.getElementById("inputRace").value = selectedChar.race || "";
+    document.getElementById("inputClass").value = selectedChar.class || "";
+    document.getElementById("inputLevel").value = selectedChar.level || 1;
+    ["str","dex","con","int","wis","cha","hp","ac"].forEach(stat => {
+        document.getElementById("dnd-"+stat).value = selectedChar.dndStats[stat];
+    });
+    document.getElementById("dnd-spellcasting-ability").value = selectedChar.dndStats.spellcastingAbility || getSpellcastingAbilityByClass(selectedChar.class);
+    document.getElementById("dnd-spell-save-dc").value = selectedChar.dndStats.spellSaveDC || 10;
+    document.getElementById("dnd-spell-attack-bonus").value = selectedChar.dndStats.spellAttackBonus || 0;
+
+    ["cp","sp","gp","ep","pp"].forEach(coin => {
+        document.getElementById("dnd-"+coin).value = selectedChar.currency[coin] || 0;
+    });
+
+    switchSystem(true);
+    renderDynamicLists();
+    renderMultiViewCards();
+}
+
+function createNewCharacter() {
+    const newChar = {
+        id: crypto.randomUUID(),
+        name: "新角色",
+        system: "CoC",
+        age: "", gender: "", image: "", memo: "",
+        occupation: "", cocStats: { str: 50, con: 50, siz: 50, dex: 50, app: 50, int: 50, pow: 50, edu: 50, san: "50/50", hp: "10/10", mp: "10/10" },
+        race: "", class: "", level: 1, dndStats: { str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10, hp: 10, ac: 10 },
+        dndSkills: createDefaultDndSkills(),
+        skills: [], weapons: [], armors: [], inventory: [], spells: [], currency: {cp:0, sp:0, gp:0, ep:0, pp:0},
+        dndMeta: { spellSlots: createEmptySpellSlots(), hitDice: { type: "d8", used: 0 } }
+    };
+    ensureDndMeta(newChar);
+    characters.push(newChar);
+    if (!multiViewSelectedIds.includes(newChar.id)) multiViewSelectedIds.push(newChar.id);
+    save();
+    renderCharSelector();
+    switchCharacter(newChar.id);
+}
+
+function deleteCharacter() { 
+    if (!selectedChar) return;
+    if (confirm(`确认要删除 ${selectedChar.name || '未命名'} 吗？`)) { 
+        characters = characters.filter(c => c.id !== selectedChar.id);
+        multiViewSelectedIds = multiViewSelectedIds.filter(id => id !== selectedChar.id);
+        selectedCharId = characters.length > 0 ? characters[0].id : null;
+        save();
+        renderCharSelector();
+        switchCharacter(selectedCharId);
+    } 
+}
+
+function switchSystem(skipSave = false) {
+    const sys = document.getElementById("detailSystem").value;
+    if(!skipSave && selectedChar) {
+        selectedChar.system = sys;
+        save();
+        renderCharSelector();
+    }
+    
+    if (sys === "CoC") {
+        document.querySelectorAll(".coc-only").forEach(el => el.classList.remove("hidden"));
+        document.querySelectorAll(".dnd-only").forEach(el => el.classList.add("hidden"));
+    } else {
+        document.querySelectorAll(".coc-only").forEach(el => el.classList.add("hidden"));
+        document.querySelectorAll(".dnd-only").forEach(el => el.classList.remove("hidden"));
+    }
+    
+    // 如果在不兼容的tab下切换系统，强行切回base
+    if (sys === "CoC" && document.getElementById("tab-spells").classList.contains("active")) {
+        switchTab('base');
+    }
+    if (sys === "DND" && document.getElementById("tab-mythos").classList.contains("active")) {
+        switchTab('base');
+    }
+
+    updateChart();
+    updateDndModifiers();
+}
+
+function switchTab(tabName) {
+    document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+    
+    // Find the button and content corresponding to the tab
+    const tabs = {
+        'base': { btnIndex: 0, id: 'tab-base' },
+        'inventory': { btnIndex: 1, id: 'tab-inventory' },
+        'spells': { btnIndex: 2, id: 'tab-spells' },
+        'mythos': { btnIndex: 3, id: 'tab-mythos' },
+        'story': { btnIndex: 4, id: 'tab-story' }
+    };
+    
+    document.querySelectorAll('.tab-btn')[tabs[tabName].btnIndex].classList.add('active');
+    document.getElementById(tabs[tabName].id).classList.add('active');
+}
+
+function getDndMod(val) {
+    const mod = Math.floor((val - 10) / 2);
+    return mod >= 0 ? `+${mod}` : `${mod}`;
+}
+
+function updateDndModifiers() {
+    if(!selectedChar || selectedChar.system !== 'DND') return;
+    ["str","dex","con","int","wis","cha"].forEach(stat => {
+        const val = selectedChar.dndStats[stat];
+        document.getElementById(`dnd-${stat}-mod`).textContent = getDndMod(val);
+    });
+    
+    // Update DND weight
+    const c = selectedChar.currency;
+    const coinWeight = (c.cp + c.sp + c.gp + c.ep + c.pp) * 0.02;
+    
+    let itemsWeight = 0;
+    selectedChar.weapons.forEach(w => itemsWeight += parseFloat(w.weight) || 0);
+    selectedChar.armors.forEach(a => itemsWeight += parseFloat(a.weight) || 0);
+    selectedChar.inventory.forEach(i => itemsWeight += (parseFloat(i.weight) || 0) * (parseInt(i.quantity) || 1));
+    
+    const totalWeight = coinWeight + itemsWeight;
+    document.getElementById("dnd-weight").textContent = totalWeight.toFixed(2);
+    document.getElementById("dnd-max-weight").textContent = selectedChar.dndStats.str * 15;
+    document.getElementById("dnd-proficiency").textContent = formatModifier(calculateProficiencyBonus(selectedChar.level));
+    document.getElementById("dnd-initiative").textContent = formatModifier(calculateAbilityModifier(selectedChar.dndStats.dex));
+    document.getElementById("dnd-auto-ac").textContent = calculateDndArmorClass(selectedChar);
+    document.getElementById("dnd-hit-dice").textContent = `${selectedChar.dndMeta.hitDice.type} · ${selectedChar.dndMeta.hitDice.used}/${selectedChar.level || 1}`;
+
+    // 自动计算法术DC和攻击加值
+    const spellAbility = selectedChar.dndStats.spellcastingAbility || getSpellcastingAbilityByClass(selectedChar.class);
+    if (spellAbility && spellAbility !== "NONE") {
+        const abilityScore = selectedChar.dndStats[spellAbility.toLowerCase()] || 10;
+        const abilityMod = calculateAbilityModifier(abilityScore);
+        const pb = calculateProficiencyBonus(selectedChar.level || 1);
+        const autoDC = 8 + pb + abilityMod;
+        const autoAtk = pb + abilityMod;
+        const dcInput = document.getElementById("dnd-spell-save-dc");
+        const atkInput = document.getElementById("dnd-spell-attack-bonus");
+        dcInput.placeholder = String(autoDC);
+        atkInput.placeholder = formatModifier(autoAtk);
+    } else {
+        document.getElementById("dnd-spell-save-dc").placeholder = "";
+        document.getElementById("dnd-spell-attack-bonus").placeholder = "";
+    }
+}
+
+function saveData() {
+    if (!selectedChar) return;
+
+    const prevClass = selectedChar.class;
+    const prevLevel = selectedChar.level;
+    selectedChar.name = document.getElementById("inputName").value;
+    selectedChar.age = document.getElementById("inputAge").value;
+    selectedChar.gender = document.getElementById("inputGender").value;
+    selectedChar.memo = document.getElementById("detailMemo").value;
+
+    selectedChar.occupation = document.getElementById("inputOccupation").value;
+    ["str","con","siz","dex","app","int","pow","edu"].forEach(stat => {
+        selectedChar.cocStats[stat] = parseInt(document.getElementById("coc-"+stat).value) || 0;
+    });
+    ["hp","san","mp"].forEach(stat => {
+        selectedChar.cocStats[stat] = document.getElementById("coc-"+stat).value;
+    });
+
+    selectedChar.assets.spending = document.getElementById("coc-spending").value;
+    selectedChar.assets.cash = document.getElementById("coc-cash").value;
+    selectedChar.assets.other = document.getElementById("coc-assets").value;
+    selectedChar.mythos = document.getElementById("coc-mythos").value;
+    
+    ["appearance", "beliefs", "significant", "locations", "possessions", "traits", "injuries", "phobias"].forEach(field => {
+        selectedChar.backstory[field] = document.getElementById("coc-"+field).value;
+    });
+
+    selectedChar.race = document.getElementById("inputRace").value;
+    selectedChar.class = document.getElementById("inputClass").value;
+    selectedChar.level = parseInt(document.getElementById("inputLevel").value) || 1;
+    ["str","dex","con","int","wis","cha","hp","ac"].forEach(stat => {
+        selectedChar.dndStats[stat] = parseInt(document.getElementById("dnd-"+stat).value) || 0;
+    });
+    selectedChar.dndStats.spellcastingAbility = document.getElementById("dnd-spellcasting-ability").value;
+    selectedChar.dndStats.spellSaveDC = parseInt(document.getElementById("dnd-spell-save-dc").value) || 0;
+    selectedChar.dndStats.spellAttackBonus = parseInt(document.getElementById("dnd-spell-attack-bonus").value) || 0;
+    ensureDndMeta(selectedChar);
+    if (prevClass !== selectedChar.class || prevLevel !== selectedChar.level) {
+        selectedChar.dndMeta.hitDice.type = getHitDieTypeByClass(selectedChar.class);
+        autoFillDndSpellSlots(selectedChar);
+        if (!selectedChar.dndStats.spellcastingAbility || selectedChar.dndStats.spellcastingAbility === "INT" || selectedChar.dndStats.spellcastingAbility === "WIS" || selectedChar.dndStats.spellcastingAbility === "CHA") {
+            selectedChar.dndStats.spellcastingAbility = getSpellcastingAbilityByClass(selectedChar.class);
+        }
+    }
+    
+    ["cp","sp","gp","ep","pp"].forEach(coin => {
+        selectedChar.currency[coin] = parseInt(document.getElementById("dnd-"+coin).value) || 0;
+    });
+
+    save();
+    renderCharSelector();
+    updateChart();
+    updateDndModifiers();
+    renderDynamicLists();
+    renderMultiViewCards();
+}
+
+function updateChart() {
+    if(!selectedChar) return;
+    const ctx = document.getElementById('radarChart').getContext('2d');
+    if (radarChartInstance) radarChartInstance.destroy();
+
+    let labels = [];
+    let data = [];
+    let maxVal = 100;
+    let color = 'rgba(212, 163, 115, 0.5)';
+    let borderColor = 'rgba(212, 163, 115, 1)';
+
+    if (selectedChar.system === "CoC") {
+        labels = ['力量', '体质', '体型', '敏捷', '外貌', '智力', '意志', '教育'];
+        data = ['str', 'con', 'siz', 'dex', 'app', 'int', 'pow', 'edu'].map(l => selectedChar.cocStats[l]);
+        maxVal = 100;
+        color = 'rgba(132, 169, 140, 0.4)';
+        borderColor = 'rgba(132, 169, 140, 1)';
+    } else {
+        labels = ['力量', '敏捷', '体质', '智力', '感知', '魅力'];
+        data = ['str', 'dex', 'con', 'int', 'wis', 'cha'].map(l => selectedChar.dndStats[l]);
+        maxVal = 20;
+        color = 'rgba(77, 182, 172, 0.4)';
+        borderColor = 'rgba(77, 182, 172, 1)';
+    }
+
+    radarChartInstance = new Chart(ctx, {
+        type: 'radar',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: '属性分布',
+                data: data,
+                backgroundColor: color,
+                borderColor: borderColor,
+                pointBackgroundColor: borderColor,
+                borderWidth: 2
+            }]
+        },
+        options: {
+            scales: {
+                r: {
+                    angleLines: { color: 'rgba(0,0,0,0.1)' },
+                    grid: { color: 'rgba(0,0,0,0.1)' },
+                    pointLabels: { font: { family: 'Kiwi Maru', size: 11 }, color: '#7d6f64' },
+                    min: 0,
+                    max: maxVal,
+                    beginAtZero: true,
+                    ticks: { 
+                        display: false, 
+                        stepSize: maxVal === 100 ? 10 : 2
+                    }
+                }
+            },
+            plugins: { legend: { display: false } },
+            animation: false,
+            maintainAspectRatio: false
+        }
+    });
+}
+
+function uploadImage(ev) {
+    const file = ev.target.files[0]; 
+    if (!file || !selectedChar) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+        const img = new Image();
+        img.onload = () => {
+            const cv = document.createElement('canvas'); 
+            const maxSize = 400;
+            let w = img.width; let h = img.height;
+            if(w > h) { if(w > maxSize) { h *= maxSize / w; w = maxSize; } }
+            else { if(h > maxSize) { w *= maxSize / h; h = maxSize; } }
+            cv.width = w; cv.height = h; 
+            cv.getContext('2d').drawImage(img, 0, 0, w, h);
+            
+            selectedChar.image = cv.toDataURL('image/jpeg', 0.8); 
+            save(); 
+            document.getElementById("detailImage").src = selectedChar.image;
+            document.getElementById("detailImage").classList.remove("hidden");
+            document.getElementById("noImageText").classList.add("hidden");
+        };
+        img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+}
+
+// ---- Dynamic Lists Render & Actions ----
+
+function renderDynamicLists() {
+    renderCocSkills();
+    renderCocWeapons();
+    renderCocCompanions();
+    renderDndSkills();
+    renderDndWeapons();
+    renderDndArmors();
+    renderInventory();
+    renderDndSpells();
+    renderDndSpellSlots();
+}
+
+// CoC Skills
+function renderCocSkills() {
+    if(!selectedChar) return;
+    const container = document.getElementById("cocSkillsContainer");
+    const term = document.getElementById("cocSkillSearch").value.toLowerCase();
+    
+    let html = '';
+    selectedChar.skills.forEach((s, idx) => {
+        if(term && !s.name.toLowerCase().includes(term)) return;
+        html += `
+            <div class="bg-white border border-[#f0e9e4] p-2 rounded-xl flex items-center justify-between shadow-sm">
+                <input type="text" value="${s.name}" onchange="updateArrayItem('skills', ${idx}, 'name', this.value)" class="w-20 text-xs font-bold text-[#7d6f64] outline-none bg-transparent">
+                <div class="flex items-center gap-1">
+                    <input type="number" value="${s.value}" onchange="updateArrayItem('skills', ${idx}, 'value', this.value)" class="w-10 text-xs font-bold text-[#d4a373] text-right outline-none bg-transparent">%
+                    <button onclick="removeArrayItem('skills', ${idx})" class="text-[#e5989b] font-bold ml-1 hover:text-red-500" data-html2canvas-ignore="true">×</button>
+                </div>
+            </div>
+        `;
+    });
+    container.innerHTML = html;
+}
+function addCocSkill() {
+    selectedChar.skills.push({name: "新技能", value: 50});
+    save(); renderCocSkills();
+}
+
+// CoC Weapons
+function renderCocWeapons() {
+    if(!selectedChar) return;
+    const container = document.getElementById("cocWeaponsContainer");
+    let html = '';
+    selectedChar.cocWeapons.forEach((w, idx) => {
+        html += `
+            <div class="bg-white border border-[#f0e9e4] p-2 rounded-xl flex flex-col gap-1 shadow-sm text-xs">
+                <div class="flex justify-between items-center border-b border-[#e9e0d9] pb-1">
+                    <input type="text" value="${w.name}" onchange="updateArrayItem('cocWeapons', ${idx}, 'name', this.value)" class="font-bold text-[#5d534a] outline-none bg-transparent w-32" placeholder="武器名称">
+                    <button onclick="removeArrayItem('cocWeapons', ${idx})" class="text-[#e5989b] font-bold hover:text-red-500" data-html2canvas-ignore="true">×</button>
+                </div>
+                <div class="flex gap-2 text-[#a89a8e] flex-wrap mt-1">
+                    <div class="flex items-center gap-1">技能 <input type="text" value="${w.skill||''}" onchange="updateArrayItem('cocWeapons', ${idx}, 'skill', this.value)" class="w-16 border-b border-[#e9e0d9] outline-none text-[#d4a373] text-center"></div>
+                    <div class="flex items-center gap-1">伤害 <input type="text" value="${w.damage||''}" onchange="updateArrayItem('cocWeapons', ${idx}, 'damage', this.value)" class="w-16 border-b border-[#e9e0d9] outline-none text-[#d4a373] font-bold text-center"></div>
+                    <div class="flex items-center gap-1">射程 <input type="text" value="${w.range||''}" onchange="updateArrayItem('cocWeapons', ${idx}, 'range', this.value)" class="w-12 border-b border-[#e9e0d9] outline-none text-center"></div>
+                    <div class="flex items-center gap-1">攻击次数 <input type="text" value="${w.attacks||''}" onchange="updateArrayItem('cocWeapons', ${idx}, 'attacks', this.value)" class="w-8 border-b border-[#e9e0d9] outline-none text-center"></div>
+                    <div class="flex items-center gap-1">装弹 <input type="text" value="${w.ammo||''}" onchange="updateArrayItem('cocWeapons', ${idx}, 'ammo', this.value)" class="w-8 border-b border-[#e9e0d9] outline-none text-center"></div>
+                    <div class="flex items-center gap-1">故障 <input type="text" value="${w.malfunction||''}" onchange="updateArrayItem('cocWeapons', ${idx}, 'malfunction', this.value)" class="w-8 border-b border-[#e9e0d9] outline-none text-center"></div>
+                </div>
+            </div>
+        `;
+    });
+    container.innerHTML = html;
+}
+function addCocWeapon() {
+    selectedChar.cocWeapons.push({name: "新武器", skill: "斗殴", damage: "1d3", range: "-", attacks: "1", ammo: "-", malfunction: "-"});
+    save(); renderCocWeapons();
+}
+
+// CoC Companions
+function renderCocCompanions() {
+    if(!selectedChar) return;
+    const container = document.getElementById("cocCompanionsContainer");
+    let html = '';
+    selectedChar.companions.forEach((c, idx) => {
+        html += `
+            <div class="bg-white border border-[#f0e9e4] p-2 rounded-xl flex items-center justify-between shadow-sm">
+                <input type="text" value="${c.name}" onchange="updateArrayItem('companions', ${idx}, 'name', this.value)" class="w-full text-xs font-bold text-[#7d6f64] outline-none bg-transparent" placeholder="同伴/玩家名">
+                <button onclick="removeArrayItem('companions', ${idx})" class="text-[#e5989b] font-bold ml-1 hover:text-red-500" data-html2canvas-ignore="true">×</button>
+            </div>
+        `;
+    });
+    container.innerHTML = html;
+}
+function addCocCompanion() {
+    selectedChar.companions.push({name: "新同伴"});
+    save(); renderCocCompanions();
+}
+
+function getDndSkillModifier(character, skillName) {
+    const definition = DND_SKILL_DEFINITIONS.find(skill => skill.name === skillName);
+    if (!definition) return 0;
+    const abilityMod = calculateAbilityModifier(character.dndStats[definition.ability] || 10);
+    const proficiencyFactor = parseFloat(character.dndSkills?.[skillName] || 0);
+    const proficiencyBonus = calculateProficiencyBonus(character.level || 1);
+    return abilityMod + Math.floor(proficiencyBonus * proficiencyFactor);
+}
+
+function renderDndSkills() {
+    const container = document.getElementById("dndSkillsContainer");
+    if (!container || !selectedChar) return;
+    let html = "";
+    DND_SKILL_DEFINITIONS.forEach(skill => {
+        const proficiency = String(selectedChar.dndSkills?.[skill.name] ?? 0);
+        const modifier = getDndSkillModifier(selectedChar, skill.name);
+        html += `
+            <div class="bg-white border border-[#f0e9e4] p-2 rounded-xl flex items-center justify-between gap-2 text-xs">
+                <div class="min-w-0">
+                    <div class="font-bold text-[#5d534a]">${skill.name}</div>
+                    <div class="text-[#a89a8e]">${DND_ABILITY_LABELS[skill.ability]}</div>
+                </div>
+                <div class="flex items-center gap-2">
+                    <select onchange="updateDndSkillProficiency('${skill.name}', this.value)" class="outline-none bg-[#fdfaf8] border border-[#e9e0d9] rounded px-1 py-1 text-[#7d6f64]">
+                        <option value="0" ${proficiency === "0" ? "selected" : ""}>无</option>
+                        <option value="0.5" ${proficiency === "0.5" ? "selected" : ""}>半</option>
+                        <option value="1" ${proficiency === "1" ? "selected" : ""}>熟练</option>
+                    </select>
+                    <div class="w-10 text-center font-bold text-[#8b5a2b]">${formatModifier(modifier)}</div>
+                </div>
+            </div>
+        `;
+    });
+    container.innerHTML = html;
+}
+
+function updateDndSkillProficiency(skillName, value) {
+    if (!selectedChar) return;
+    if (!selectedChar.dndSkills) selectedChar.dndSkills = createDefaultDndSkills();
+    selectedChar.dndSkills[skillName] = parseFloat(value) || 0;
+    save();
+    renderDndSkills();
+    renderMultiViewCards();
+}
+
+// DND Weapons
+function renderDndWeapons() {
+    if(!selectedChar) return;
+    const container = document.getElementById("dndWeaponsContainer");
+    let html = '';
+    selectedChar.weapons.forEach((w, idx) => {
+        html += `
+            <div class="bg-white border border-[#f0e9e4] p-2 rounded-xl flex flex-col gap-1 shadow-sm text-xs">
+                <div class="flex justify-between items-center border-b border-[#e9e0d9] pb-1">
+                    <input type="text" value="${w.name}" onchange="updateArrayItem('weapons', ${idx}, 'name', this.value)" class="font-bold text-[#5d534a] outline-none bg-transparent w-32" placeholder="武器名称">
+                    <button onclick="removeArrayItem('weapons', ${idx})" class="text-[#e5989b] font-bold hover:text-red-500" data-html2canvas-ignore="true">×</button>
+                </div>
+                <div class="flex gap-2 text-[#a89a8e] flex-wrap">
+                    <div class="flex items-center gap-1">伤害 <input type="text" value="${w.damage||''}" onchange="updateArrayItem('weapons', ${idx}, 'damage', this.value)" class="w-12 border-b border-[#e9e0d9] outline-none text-[#d4a373] font-bold text-center"></div>
+                    <div class="flex items-center gap-1">加值 <input type="text" value="${w.attack||''}" onchange="updateArrayItem('weapons', ${idx}, 'attack', this.value)" class="w-8 border-b border-[#e9e0d9] outline-none text-[#d4a373] font-bold text-center"></div>
+                    <div class="flex items-center gap-1">射程 <input type="text" value="${w.range||''}" onchange="updateArrayItem('weapons', ${idx}, 'range', this.value)" class="w-12 border-b border-[#e9e0d9] outline-none text-center"></div>
+                    <div class="flex items-center gap-1">重量 <input type="number" value="${w.weight||0}" onchange="updateArrayItem('weapons', ${idx}, 'weight', this.value)" class="w-8 border-b border-[#e9e0d9] outline-none text-[#7d6f64] text-center"> lb</div>
+                </div>
+                <input type="text" value="${w.properties||''}" onchange="updateArrayItem('weapons', ${idx}, 'properties', this.value)" placeholder="武器特性..." class="w-full mt-1 outline-none text-[#7d6f64] border-b border-transparent focus:border-[#e9e0d9] transition-all">
+            </div>
+        `;
+    });
+    container.innerHTML = html;
+    updateDndModifiers();
+}
+function addDndWeapon() {
+    selectedChar.weapons.push({name: "新武器", damage: "1d8", attack: "+0", range: "5尺", weight: 2, properties: ""});
+    save(); renderDndWeapons();
+}
+
+// DND Armors
+function renderDndArmors() {
+    if(!selectedChar) return;
+    const container = document.getElementById("dndArmorsContainer");
+    let html = '';
+    selectedChar.armors.forEach((a, idx) => {
+        html += `
+            <div class="bg-white border border-[#f0e9e4] p-2 rounded-xl flex flex-col gap-1 shadow-sm text-xs">
+                <div class="flex justify-between items-center border-b border-[#e9e0d9] pb-1">
+                    <input type="text" value="${a.name}" onchange="updateArrayItem('armors', ${idx}, 'name', this.value)" class="font-bold text-[#5d534a] outline-none bg-transparent w-32" placeholder="护甲名称">
+                    <button onclick="removeArrayItem('armors', ${idx})" class="text-[#e5989b] font-bold hover:text-red-500" data-html2canvas-ignore="true">×</button>
+                </div>
+                <div class="flex gap-2 text-[#a89a8e] flex-wrap">
+                    <div class="flex items-center gap-1">AC <input type="text" value="${a.ac||10}" onchange="updateArrayItem('armors', ${idx}, 'ac', this.value)" class="w-16 border-b border-[#e9e0d9] outline-none text-[#3a8b83] font-bold text-center"></div>
+                    <div class="flex items-center gap-1">重量 <input type="number" value="${a.weight||0}" onchange="updateArrayItem('armors', ${idx}, 'weight', this.value)" class="w-10 border-b border-[#e9e0d9] outline-none text-[#7d6f64] text-center"> lb</div>
+                    <div class="flex items-center gap-1">力量需求 <input type="number" value="${a.strengthReq||''}" onchange="updateArrayItem('armors', ${idx}, 'strengthReq', this.value)" class="w-10 border-b border-[#e9e0d9] outline-none text-center"></div>
+                </div>
+                <input type="text" value="${a.properties||''}" onchange="updateArrayItem('armors', ${idx}, 'properties', this.value)" placeholder="护甲特性..." class="w-full mt-1 outline-none text-[#7d6f64] border-b border-transparent focus:border-[#e9e0d9] transition-all">
+            </div>
+        `;
+    });
+    container.innerHTML = html;
+    updateDndModifiers();
+}
+function addDndArmor() {
+    selectedChar.armors.push({name: "新护甲", ac: "11", weight: 10, strengthReq: "", properties: ""});
+    save(); renderDndArmors();
+}
+
+// Generic Inventory
+function renderInventory() {
+    if(!selectedChar) return;
+    const container = document.getElementById("inventoryContainer");
+    let html = '';
+    selectedChar.inventory.forEach((i, idx) => {
+        html += `
+            <div class="bg-white border border-[#f0e9e4] p-2 rounded-xl flex flex-col gap-1 shadow-sm text-xs">
+                <div class="flex justify-between items-center">
+                    <input type="text" value="${i.name}" onchange="updateArrayItem('inventory', ${idx}, 'name', this.value)" class="font-bold text-[#5d534a] outline-none bg-transparent w-32" placeholder="物品名称">
+                    <button onclick="removeArrayItem('inventory', ${idx})" class="text-[#e5989b] font-bold hover:text-red-500" data-html2canvas-ignore="true">×</button>
+                </div>
+                <div class="flex gap-2 text-[#a89a8e] items-center flex-wrap">
+                    数量 <input type="number" value="${i.quantity||1}" onchange="updateArrayItem('inventory', ${idx}, 'quantity', this.value)" class="w-10 border-b border-[#e9e0d9] outline-none text-[#d4a373] text-center font-bold">
+                    ${selectedChar.system === 'DND' ? `<button type="button" onclick="modifyItemQuantity(${idx}, -1)" class="px-2 rounded bg-[#f0e9e4]" data-html2canvas-ignore="true">-</button><button type="button" onclick="modifyItemQuantity(${idx}, 1)" class="px-2 rounded bg-[#f0e9e4]" data-html2canvas-ignore="true">+</button>` : ''}
+                    ${selectedChar.system === 'DND' ? `重量/个 <input type="number" value="${i.weight||0}" onchange="updateArrayItem('inventory', ${idx}, 'weight', this.value)" class="w-10 border-b border-[#e9e0d9] outline-none text-[#7d6f64] text-center"> lb` : ''}
+                </div>
+                <input type="text" value="${i.description||''}" onchange="updateArrayItem('inventory', ${idx}, 'description', this.value)" placeholder="物品详情 / 备注..." class="w-full mt-1 outline-none text-[#7d6f64] border-b border-transparent focus:border-[#e9e0d9] transition-all">
+            </div>
+        `;
+    });
+    container.innerHTML = html;
+    updateDndModifiers();
+}
+function addInventoryItem() {
+    selectedChar.inventory.push({name: "新物品", quantity: 1, weight: 0, description: ""});
+    save(); renderInventory();
+}
+
+// DND Spells
+function renderDndSpells() {
+    if(!selectedChar) return;
+    const container = document.getElementById("dndSpellsContainer");
+    let html = '';
+    selectedChar.spells.forEach((s, idx) => {
+        html += `
+            <div class="bg-white border border-[#f0e9e4] p-2 rounded-xl flex flex-col gap-1 shadow-sm text-xs">
+                <div class="flex justify-between items-center border-b border-[#e9e0d9] pb-1">
+                    <div class="flex items-center gap-2">
+                        <select onchange="updateArrayItem('spells', ${idx}, 'level', this.value)" class="outline-none text-[#8e44ad] font-bold bg-[#f5e6f3] rounded px-1 cursor-pointer">
+                            <option value="0" ${s.level == 0 ? 'selected' : ''}>戏法</option>
+                            <option value="1" ${s.level == 1 ? 'selected' : ''}>1环</option>
+                            <option value="2" ${s.level == 2 ? 'selected' : ''}>2环</option>
+                            <option value="3" ${s.level == 3 ? 'selected' : ''}>3环</option>
+                            <option value="4" ${s.level == 4 ? 'selected' : ''}>4环</option>
+                            <option value="5" ${s.level == 5 ? 'selected' : ''}>5环</option>
+                            <option value="6" ${s.level == 6 ? 'selected' : ''}>6环</option>
+                            <option value="7" ${s.level == 7 ? 'selected' : ''}>7环</option>
+                            <option value="8" ${s.level == 8 ? 'selected' : ''}>8环</option>
+                            <option value="9" ${s.level == 9 ? 'selected' : ''}>9环</option>
+                        </select>
+                        <input type="text" value="${s.name}" onchange="updateArrayItem('spells', ${idx}, 'name', this.value)" class="font-bold text-[#5d534a] outline-none bg-transparent w-32" placeholder="法术名称">
+                    </div>
+                    <button onclick="removeArrayItem('spells', ${idx})" class="text-[#e5989b] font-bold hover:text-red-500" data-html2canvas-ignore="true">×</button>
+                </div>
+                <div class="flex gap-2 text-[#a89a8e] flex-wrap mt-1">
+                    <input type="text" value="${s.school||''}" onchange="updateArrayItem('spells', ${idx}, 'school', this.value)" placeholder="学派" class="w-16 border-b border-[#e9e0d9] outline-none text-center">
+                    <input type="text" value="${s.castingTime||''}" onchange="updateArrayItem('spells', ${idx}, 'castingTime', this.value)" placeholder="施法时间" class="w-16 border-b border-[#e9e0d9] outline-none text-center">
+                    <input type="text" value="${s.range||''}" onchange="updateArrayItem('spells', ${idx}, 'range', this.value)" placeholder="距离" class="w-16 border-b border-[#e9e0d9] outline-none text-center">
+                    <input type="text" value="${s.components||''}" onchange="updateArrayItem('spells', ${idx}, 'components', this.value)" placeholder="成分" class="w-16 border-b border-[#e9e0d9] outline-none text-center">
+                    <input type="text" value="${s.duration||''}" onchange="updateArrayItem('spells', ${idx}, 'duration', this.value)" placeholder="持续时间" class="w-16 border-b border-[#e9e0d9] outline-none text-center">
+                </div>
+                <input type="text" value="${s.classes||''}" onchange="updateArrayItem('spells', ${idx}, 'classes', this.value)" placeholder="适用职业..." class="w-full mt-1 outline-none text-[#7d6f64] border-b border-transparent focus:border-[#e9e0d9] transition-all">
+                <input type="text" value="${s.description||''}" onchange="updateArrayItem('spells', ${idx}, 'description', this.value)" placeholder="法术效果简述..." class="w-full mt-1 outline-none text-[#7d6f64] border-b border-transparent focus:border-[#e9e0d9] transition-all">
+            </div>
+        `;
+    });
+    container.innerHTML = html;
+}
+function addDndSpell() {
+    selectedChar.spells.push({name: "新法术", level: 0, school: "", classes: "", castingTime: "1动作", range: "60尺", components: "", duration: "瞬间", description: ""});
+    save(); renderDndSpells();
+}
+
+function updateArrayItem(arrName, index, key, value) {
+    if(selectedChar && selectedChar[arrName] && selectedChar[arrName][index]) {
+        selectedChar[arrName][index][key] = value;
+        save();
+        if(arrName === 'weapons' || arrName === 'armors' || arrName === 'inventory' || arrName === 'spells') {
+            updateDndModifiers();
+        }
+        renderMultiViewCards();
+    }
+}
+
+function removeArrayItem(arrName, index) {
+    if(selectedChar && selectedChar[arrName]) {
+        selectedChar[arrName].splice(index, 1);
+        save();
+        if(arrName === 'skills') renderCocSkills();
+        else if(arrName === 'cocWeapons') renderCocWeapons();
+        else if(arrName === 'companions') renderCocCompanions();
+        else if(arrName === 'weapons') renderDndWeapons();
+        else if(arrName === 'armors') renderDndArmors();
+        else if(arrName === 'inventory') renderInventory();
+        else if(arrName === 'spells') renderDndSpells();
+        renderMultiViewCards();
+    }
+}
+
+function renderDndSpellSlots() {
+    if (!selectedChar || !selectedChar.dndMeta) return;
+    const container = document.getElementById("dndSpellSlotsContainer");
+    if (!container) return;
+    let html = "";
+    for (let level = 1; level <= 9; level++) {
+        const slot = selectedChar.dndMeta.spellSlots[level] || { total: 0, used: 0 };
+        const dots = Array.from({ length: slot.total }, (_, idx) => {
+            const used = idx < slot.used;
+            return `<button type="button" onclick="toggleSpellSlot(${level}, ${idx})" class="w-5 h-5 rounded-full border ${used ? 'bg-[#8e44ad] border-[#8e44ad]' : 'bg-white border-[#d7c5e5]'}" data-html2canvas-ignore="true"></button>`;
+        }).join("");
+        html += `
+            <div class="flex items-center justify-between gap-3 bg-white border border-[#f0e9e4] rounded-xl px-3 py-2 text-xs">
+                <div class="font-bold text-[#7d6f64] w-10">${level}环</div>
+                <div class="flex items-center gap-1 flex-wrap">${dots || '<span class="text-[#c5b6aa]">无</span>'}</div>
+                <div class="flex items-center gap-1" data-html2canvas-ignore="true">
+                    <button type="button" onclick="changeSpellSlotTotal(${level}, -1)" class="px-2 rounded bg-[#f0e9e4]">-</button>
+                    <span class="w-6 text-center font-bold text-[#8e44ad]">${slot.total}</span>
+                    <button type="button" onclick="changeSpellSlotTotal(${level}, 1)" class="px-2 rounded bg-[#f0e9e4]">+</button>
+                </div>
+            </div>
+        `;
+    }
+    container.innerHTML = html;
+}
+
+function changeSpellSlotTotal(level, delta) {
+    if (!selectedChar) return;
+    ensureDndMeta(selectedChar);
+    const slot = selectedChar.dndMeta.spellSlots[level];
+    slot.total = Math.max(0, (slot.total || 0) + delta);
+    slot.used = Math.min(slot.used || 0, slot.total);
+    save();
+    renderDndSpellSlots();
+    renderMultiViewCards();
+}
+
+function toggleSpellSlot(level, slotIndex) {
+    if (!selectedChar) return;
+    ensureDndMeta(selectedChar);
+    const slot = selectedChar.dndMeta.spellSlots[level];
+    if (slotIndex < slot.used) slot.used--;
+    else if (slot.used < slot.total) slot.used++;
+    save();
+    renderDndSpellSlots();
+    renderMultiViewCards();
+}
+
+function autoFillCurrentDndSpellSlots() {
+    if (!selectedChar) return;
+    autoFillDndSpellSlots(selectedChar);
+    save();
+    renderDndSpellSlots();
+    renderMultiViewCards();
+}
+
+function useHitDice() {
+    if (!selectedChar || selectedChar.system !== "DND") return;
+    ensureDndMeta(selectedChar);
+    const available = Math.max(0, (selectedChar.level || 1) - (selectedChar.dndMeta.hitDice.used || 0));
+    if (available <= 0) {
+        alert("没有可用的生命骰了！");
+        return;
+    }
+    const conMod = calculateAbilityModifier(selectedChar.dndStats.con);
+    const value = prompt(`使用生命骰，输入恢复值（将自动加上体质调整值 ${formatModifier(conMod)}）：`);
+    if (value === null) return;
+    const heal = (parseInt(value, 10) || 0) + conMod;
+    if (heal <= 0) {
+        alert("恢复值必须大于 0。");
+        return;
+    }
+    selectedChar.dndMeta.hitDice.used += 1;
+    selectedChar.dndStats.hp = Math.min((selectedChar.dndStats.hp || 0) + heal, selectedChar.dndStats.hp || 0);
+    save();
+    updateDndModifiers();
+}
+
+function modifyItemQuantity(index, delta) {
+    if (!selectedChar || !selectedChar.inventory[index]) return;
+    const next = (parseInt(selectedChar.inventory[index].quantity, 10) || 1) + delta;
+    if (next < 1) {
+        if (confirm("数量将归零，是否删除该物品？")) {
+            selectedChar.inventory.splice(index, 1);
+        }
+    } else {
+        selectedChar.inventory[index].quantity = next;
+    }
+    save();
+    renderInventory();
+    renderMultiViewCards();
+}
+
+function escapeHtml(value) {
+    return String(value ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+}
+
+function isMultiViewOpen() {
+    return !document.getElementById("multiViewSection").classList.contains("hidden");
+}
+
+function toggleMultiView() {
+    const section = document.getElementById("multiViewSection");
+    const toggleBtn = document.getElementById("multiViewToggleBtn");
+    const willOpen = section.classList.contains("hidden");
+    if (toggleBtn) {
+        toggleBtn.textContent = willOpen ? "关闭多卡视图" : "打开多卡视图";
+    }
+    if (willOpen) {
+        renderMultiViewSelector();
+        renderMultiViewCards();
+        section.classList.remove("hidden");
+        updateMainViewMode();
+        section.scrollIntoView({ behavior: "smooth", block: "start" });
+    } else {
+        section.classList.add("hidden");
+        updateMainViewMode();
+    }
+}
+
+function renderMultiViewSelector() {
+    const list = document.getElementById("multiViewSelectorList");
+    const all = document.getElementById("multiViewAll");
+    if (!list || !all) return;
+    list.innerHTML = characters.map(char => `
+        <button
+            type="button"
+            onclick="toggleMultiViewCharacter('${char.id}')"
+            class="px-3 py-2 rounded-full border text-sm font-bold transition-colors ${multiViewSelectedIds.includes(char.id) ? 'bg-[#d4a373] text-white border-[#d4a373]' : 'bg-white text-[#7d6f64] border-[#e9e0d9]'}"
+        >
+            ${char.system === "CoC" ? "[COC]" : "[DND]"} ${char.name || "未命名"}
+        </button>
+    `).join("");
+    all.textContent = characters.length > 0 && multiViewSelectedIds.length === characters.length ? "取消全选" : "全选";
+}
+
+function toggleMultiViewCharacter(id) {
+    if (multiViewSelectedIds.includes(id)) {
+        multiViewSelectedIds = multiViewSelectedIds.filter(item => item !== id);
+    } else {
+        multiViewSelectedIds.push(id);
+    }
+    save();
+    renderMultiViewSelector();
+    renderMultiViewCards();
+}
+
+function toggleAllMultiView() {
+    const allSelected = characters.length > 0 && multiViewSelectedIds.length === characters.length;
+    multiViewSelectedIds = allSelected ? [] : characters.map(char => char.id);
+    save();
+    renderMultiViewSelector();
+    renderMultiViewCards();
+}
+
+function renderMiniList(items, emptyText) {
+    if (!items || items.length === 0) {
+        return `<div class="text-xs text-[#a89a8e]">${escapeHtml(emptyText)}</div>`;
+    }
+    return items.map(text => `<div class="bg-white rounded-lg border border-[#eee4dc] px-2 py-1 text-xs text-[#6f6258]">${escapeHtml(text)}</div>`).join("");
+}
+
+function renderMultiViewDndCard(char) {
+    const dnd = char.dndStats || {};
+    const spells = (char.spells || []).slice(0, 8).map(spell => {
+        const level = parseInt(spell.level, 10) || 0;
+        return `${level === 0 ? "戏法" : `${level}环`} ${spell.name || "未命名法术"}`;
+    });
+    const skills = DND_SKILL_DEFINITIONS
+        .map(skill => `${skill.name} ${formatModifier(getDndSkillModifier(char, skill.name))}`)
+        .filter(item => !item.endsWith(" +0") && !item.endsWith(" -0"))
+        .slice(0, 12);
+    const weapons = (char.weapons || []).map(w => `${w.name || "未命名"} ${w.damage ? `· ${w.damage}` : ""}${w.attack ? ` · ${w.attack}` : ""}`);
+    const armors = (char.armors || []).map(a => `${a.name || "未命名"} · AC ${a.ac || "-"}`);
+    const inventory = (char.inventory || []).slice(0, 8).map(i => `${i.name || "未命名"} ×${i.quantity || 1}`);
+    let activeSlots = [];
+    if (char.dndMeta && char.dndMeta.spellSlots) {
+        for (let level = 1; level <= 9; level++) {
+            const slot = char.dndMeta.spellSlots[level];
+            if (slot && slot.total > 0) {
+                activeSlots.push(`${level}环 ${slot.used || 0}/${slot.total}`);
+            }
+        }
+    }
+    return `
+        <div class="grid grid-cols-3 gap-2 mb-3">
+            ${[
+                ["AC", calculateDndArmorClass(char)],
+                ["HP", dnd.hp || 0],
+                ["熟练", formatModifier(calculateProficiencyBonus(char.level))],
+                ["力量", dnd.str ?? "-"],
+                ["敏捷", dnd.dex ?? "-"],
+                ["体质", dnd.con ?? "-"],
+                ["智力", dnd.int ?? "-"],
+                ["感知", dnd.wis ?? "-"],
+                ["魅力", dnd.cha ?? "-"]
+            ].map(([label, value]) => `<div class="bg-white rounded-xl px-2 py-1 border border-[#eee4dc] text-center"><div class="text-[10px] text-[#a89a8e]">${label}</div><div class="font-bold text-[#8b5a2b]">${escapeHtml(value)}</div></div>`).join("")}
+        </div>
+        <div class="space-y-3">
+            <div>
+                <div class="text-xs font-bold text-[#7d6f64] mb-1">技能</div>
+                <div class="grid gap-1">${renderMiniList(skills, "暂无技能")}</div>
+            </div>
+            <div>
+                <div class="text-xs font-bold text-[#7d6f64] mb-1">武器</div>
+                <div class="grid gap-1">${renderMiniList(weapons, "无武器")}</div>
+            </div>
+            <div>
+                <div class="text-xs font-bold text-[#7d6f64] mb-1">护甲</div>
+                <div class="grid gap-1">${renderMiniList(armors, "无护甲")}</div>
+            </div>
+            <div>
+                <div class="text-xs font-bold text-[#7d6f64] mb-1">背包与货币</div>
+                <div class="grid gap-1">
+                    ${renderMiniList(inventory, "无物品")}
+                    <div class="bg-white rounded-lg border border-[#eee4dc] px-2 py-1 text-xs text-[#6f6258]">
+                        CP ${char.currency?.cp || 0} / SP ${char.currency?.sp || 0} / GP ${char.currency?.gp || 0} / EP ${char.currency?.ep || 0} / PP ${char.currency?.pp || 0}
+                    </div>
+                </div>
+            </div>
+            <div>
+                <div class="text-xs font-bold text-[#7d6f64] mb-1">法术位</div>
+                <div class="grid gap-1">${renderMiniList(activeSlots, "暂无法术位")}</div>
+            </div>
+            <div>
+                <div class="text-xs font-bold text-[#7d6f64] mb-1">法术书</div>
+                <div class="grid gap-1">${renderMiniList(spells, "暂无法术")}</div>
+            </div>
+        </div>
+    `;
+}
+
+function renderMultiViewCocCard(char) {
+    const coc = char.cocStats || {};
+    const skills = (char.skills || []).slice(0, 16).map(skill => `${skill.name || "未命名"} ${skill.value || 0}`);
+    const weapons = (char.cocWeapons || []).map(w => `${w.name || "未命名"}${w.damage ? ` · ${w.damage}` : ""}${w.skill ? ` · ${w.skill}` : ""}`);
+    const inventory = (char.inventory || []).slice(0, 12).map(i => `${i.name || "未命名"} ×${i.quantity || 1}${i.description ? ` · ${i.description}` : ""}`);
+    return `
+        <div class="grid grid-cols-4 gap-2 mb-3">
+            ${[
+                ["STR", coc.str ?? "-"], ["CON", coc.con ?? "-"], ["SIZ", coc.siz ?? "-"], ["DEX", coc.dex ?? "-"],
+                ["APP", coc.app ?? "-"], ["INT", coc.int ?? "-"], ["POW", coc.pow ?? "-"], ["EDU", coc.edu ?? "-"],
+                ["HP", coc.hp || "-"], ["SAN", coc.san || "-"], ["MP", coc.mp || "-"], ["职业", char.occupation || "-"]
+            ].map(([label, value]) => `<div class="bg-white rounded-xl px-2 py-1 border border-[#eee4dc] text-center"><div class="text-[10px] text-[#a89a8e]">${label}</div><div class="font-bold text-[#8b5a2b]">${escapeHtml(value)}</div></div>`).join("")}
+        </div>
+        <div class="space-y-3">
+            <div>
+                <div class="text-xs font-bold text-[#7d6f64] mb-1">技能</div>
+                <div class="grid gap-1">${renderMiniList(skills, "暂无技能")}</div>
+            </div>
+            <div>
+                <div class="text-xs font-bold text-[#7d6f64] mb-1">装备</div>
+                <div class="grid gap-1">${renderMiniList(weapons, "暂无装备")}</div>
+            </div>
+            <div>
+                <div class="text-xs font-bold text-[#7d6f64] mb-1">随身物品</div>
+                <div class="grid gap-1">${renderMiniList(inventory, "暂无物品")}</div>
+            </div>
+        </div>
+    `;
+}
+
+function renderMultiViewCards() {
+    const grid = document.getElementById("multiViewGrid");
+    if (!grid) return;
+    const selected = characters.filter(char => multiViewSelectedIds.includes(char.id));
+    if (selected.length === 0) {
+        grid.innerHTML = '<div class="text-sm text-[#a89a8e]">尚未选择要一起查看的角色。</div>';
+        return;
+    }
+    grid.innerHTML = selected.map(char => {
+        const coc = char.cocStats || {};
+        const dnd = char.dndStats || {};
+        const infoLine = char.system === "CoC"
+            ? `${char.occupation || "未填职业"} · HP ${coc.hp || "-"} · SAN ${coc.san || "-"} · MP ${coc.mp || "-"}`
+            : `${char.race || "未填种族"} / ${char.class || "未填职业"} Lv.${char.level || 1} · HP ${dnd.hp || 0} · AC ${calculateDndArmorClass(char)}`;
+        return `
+            <div class="bg-[#fdfaf8] rounded-[24px] p-4 border border-[#f0e9e4] shadow-sm">
+                <div class="flex items-center justify-between gap-3 mb-3">
+                    <div>
+                        <div class="text-lg font-bold text-[#5d534a]">${escapeHtml(char.name || "未命名")}</div>
+                        <div class="text-xs text-[#a89a8e]">${escapeHtml(char.system)} · ${escapeHtml(char.age || "-")}岁 · ${escapeHtml(char.gender || "-")}</div>
+                    </div>
+                    ${char.image ? `<img src="${char.image}" class="w-14 h-14 rounded-xl object-cover border-2 border-[#f0e9e4]">` : '<div class="w-14 h-14 rounded-xl bg-[#f0e9e4]"></div>'}
+                </div>
+                <div class="text-xs font-bold text-[#7d6f64] mb-3">${escapeHtml(infoLine)}</div>
+                ${char.system === "CoC" ? renderMultiViewCocCard(char) : renderMultiViewDndCard(char)}
+                <div class="text-xs text-[#7d6f64] mt-3">${escapeHtml(char.memo || "暂无备注")}</div>
+            </div>
+        `;
+    }).join("");
+}
+
+function windowOnLoadInit() {
+    init();
+}
+
+// ---- Text Import ----
+function openTextImportModal() {
+    if (!selectedChar) {
+        alert("请先选择或新建一个角色！");
+        return;
+    }
+    document.getElementById("importTextInput").value = "";
+    document.getElementById("textImportModal").classList.remove("hidden");
+}
+
+function closeTextImportModal() {
+    document.getElementById("textImportModal").classList.add("hidden");
+}
+
+function outsideCloseTextImport(e) {
+    if (e.target.id === "textImportModal") closeTextImportModal();
+}
+
+function openTextExportModal() {
+    if (!selectedChar) {
+        alert("请先选择一个角色！");
+        return;
+    }
+    const output = document.getElementById("exportTextOutput");
+    output.value = selectedChar.system === "DND" ? generateDndExportText(selectedChar) : generateCocExportText(selectedChar);
+    document.getElementById("textExportModal").classList.remove("hidden");
+    output.focus();
+    output.select();
+}
+
+function closeTextExportModal() {
+    document.getElementById("textExportModal").classList.add("hidden");
+}
+
+function outsideCloseTextExport(e) {
+    if (e.target.id === "textExportModal") closeTextExportModal();
+}
+
+async function copyExportText() {
+    const output = document.getElementById("exportTextOutput");
+    if (!output.value) return;
+    try {
+        await navigator.clipboard.writeText(output.value);
+        alert("已复制到剪贴板。");
+    } catch (err) {
+        output.focus();
+        output.select();
+        document.execCommand("copy");
+        alert("已复制到剪贴板。");
+    }
+}
+
+function getTrackCurrentValue(value) {
+    const text = String(value ?? "").trim();
+    if (!text) return 0;
+    const match = text.match(/^(\d+)/);
+    return match ? parseInt(match[1], 10) : (parseInt(text, 10) || 0);
+}
+
+function appendLabelsWithValue(parts, labels, value) {
+    labels.forEach(label => {
+        parts.push(`${label}${value}`);
+    });
+}
+
+function generateCocExportText(character) {
+    const coc = character.cocStats || {};
+    const parts = [".st"];
+    COC_EXPORT_SEGMENTS.forEach(segment => {
+        appendLabelsWithValue(parts, segment.labels, parseInt(coc[segment.key], 10) || 0);
+    });
+    const statusValues = {
+        san: getTrackCurrentValue(coc.san),
+        luck: parseInt(coc.luck, 10) || 0,
+        mp: getTrackCurrentValue(coc.mp),
+        hp: getTrackCurrentValue(coc.hp)
+    };
+    COC_EXPORT_STATUS_MAP.forEach(segment => {
+        appendLabelsWithValue(parts, segment.labels, statusValues[segment.key] || 0);
+    });
+    (character.skills || []).forEach(skill => {
+        const value = parseInt(skill.value, 10) || 0;
+        const labels = COC_SKILL_ALIAS_MAP[skill.name] || [skill.name];
+        appendLabelsWithValue(parts, labels, value);
+    });
+    return parts.join("");
+}
+
+function getDndSkillExportToken(character, skillName) {
+    const proficiency = parseFloat(character.dndSkills?.[skillName] || 0);
+    if (proficiency === 1) return `${skillName}*:0`;
+    if (proficiency === 0.5) return `${skillName}*0.5:0`;
+    return `${skillName}:0`;
+}
+
+function generateDndExportText(character) {
+    const dnd = character.dndStats || {};
+    const pb = calculateProficiencyBonus(character.level || 1);
+    const dc = parseInt(dnd.spellSaveDC, 10) || (8 + pb + calculateAbilityModifier(dnd[getSpellcastingAbilityByClass(character.class).toLowerCase()] || 10));
+    const parts = [
+        ".dst",
+        `力量:${parseInt(dnd.str, 10) || 0}`,
+        `体质:${parseInt(dnd.con, 10) || 0}`,
+        `敏捷:${parseInt(dnd.dex, 10) || 0}`,
+        `智力:${parseInt(dnd.int, 10) || 0}`,
+        `感知:${parseInt(dnd.wis, 10) || 0}`,
+        `魅力:${parseInt(dnd.cha, 10) || 0}`,
+        `hp:${parseInt(dnd.hp, 10) || 0}`,
+        `hpmax:${parseInt(dnd.hp, 10) || 0}`,
+        `熟练:${pb}`,
+        `ac:${parseInt(dnd.ac, 10) || calculateDndArmorClass(character)}`,
+        `dc:${dc}`
+    ];
+    DND_SKILL_DEFINITIONS.forEach(skill => {
+        parts.push(getDndSkillExportToken(character, skill.name));
+    });
+    return parts.join(" ");
+}
+
+function detectDndImportText(text) {
+    return /\.dst\b/i.test(text) || /(?:^|\s)hp(?:max)?\s*[:=]/i.test(text) || /(?:^|\s)ac\s*[:=]/i.test(text) || /熟练\s*[:=]/.test(text);
+}
+
+function inferLevelFromProficiencyBonus(proficiencyBonus) {
+    const pb = parseInt(proficiencyBonus, 10) || 2;
+    if (pb <= 2) return 1;
+    if (pb === 3) return 5;
+    if (pb === 4) return 9;
+    if (pb === 5) return 13;
+    return 17;
+}
+
+function readImportNumber(text, fieldName) {
+    const escaped = fieldName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const regex = new RegExp(`${escaped}(?:\\*0\\.5|\\*)?\\s*[:=]\\s*(-?\\d+)`, "i");
+    const match = text.match(regex);
+    return match ? parseInt(match[1], 10) : null;
+}
+
+function readCompactImportNumber(text, labels) {
+    const sortedLabels = [...labels].sort((a, b) => b.length - a.length);
+    for (const label of sortedLabels) {
+        const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        const labeledRegex = new RegExp(`${escaped}\\s*[:=]\\s*(-?\\d+)`, "i");
+        const labeledMatch = text.match(labeledRegex);
+        if (labeledMatch) return parseInt(labeledMatch[1], 10);
+
+        const compactRegex = new RegExp(`${escaped}(-?\\d+)`, "i");
+        const compactMatch = text.match(compactRegex);
+        if (compactMatch) return parseInt(compactMatch[1], 10);
+    }
+    return null;
+}
+
+function readImportSkillState(text, skillName) {
+    const escaped = skillName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const regex = new RegExp(`${escaped}(\\*0\\.5|\\*)?\\s*[:=]\\s*(-?\\d+)(?:\\[[^\\]]*\\])?`, "i");
+    const match = text.match(regex);
+    if (!match) return null;
+    if (match[1] === "*0.5") return 0.5;
+    if (match[1] === "*") return 1;
+    return 0;
+}
+
+function importCocText(text) {
+    const attrMap = {
+        "力量": "str", "敏捷": "dex", "体质": "con", "体型": "siz",
+        "外貌": "app", "智力": "int", "意志": "pow", "教育": "edu"
+    };
+    const isCompactSt = /\.st\b/i.test(text);
+
+    for (const segment of COC_EXPORT_SEGMENTS) {
+        const value = isCompactSt
+            ? readCompactImportNumber(text, segment.labels)
+            : readCompactImportNumber(text, [segment.labels[0]]);
+        if (value !== null && selectedChar.cocStats) {
+            selectedChar.cocStats[segment.key] = value;
+        }
+    }
+
+    if (!selectedChar.skills) selectedChar.skills = [];
+    selectedChar.cocStats.luck = selectedChar.cocStats.luck || 0;
+
+    if (isCompactSt) {
+        const compactStatusMap = {
+            san: ["san", "san值", "理智", "理智值"],
+            luck: ["幸运", "运气"],
+            mp: ["mp", "魔法"],
+            hp: ["hp", "体力"]
+        };
+        Object.entries(compactStatusMap).forEach(([key, labels]) => {
+            const value = readCompactImportNumber(text, labels);
+            if (value !== null) {
+                if (key === "luck") selectedChar.cocStats.luck = value;
+                else selectedChar.cocStats[key] = String(value);
+            }
+        });
+
+        Object.entries(COC_SKILL_ALIAS_MAP).forEach(([canonicalName, aliases]) => {
+            const value = readCompactImportNumber(text, aliases);
+            if (value === null) return;
+            const existingSkill = selectedChar.skills.find(skill => skill.name === canonicalName);
+            if (existingSkill) existingSkill.value = value;
+            else selectedChar.skills.push({ name: canonicalName, value });
+        });
+    } else {
+        const sanMatch = text.match(/理智:\s*([\d\/]+)/);
+        if (sanMatch && selectedChar.cocStats) selectedChar.cocStats.san = sanMatch[1];
+
+        const hpMatch = text.match(/生命:\s*([\d\/]+)/);
+        if (hpMatch && selectedChar.cocStats) selectedChar.cocStats.hp = hpMatch[1];
+
+        const mpMatch = text.match(/魔法:\s*([\d\/]+)/);
+        if (mpMatch && selectedChar.cocStats) selectedChar.cocStats.mp = mpMatch[1];
+
+        const luckMatch = text.match(/幸运:\s*(\d+)|运气:\s*(\d+)/);
+        if (luckMatch) {
+            selectedChar.cocStats.luck = parseInt(luckMatch[1] || luckMatch[2], 10) || 0;
+        }
+
+        const skillsText = text.replace(/<.+?>的个人属性为:[\s\S]+?护甲:\d+/m, "").trim();
+        const skillMatches = skillsText.matchAll(/([\u4e00-\u9fa5]+(?::[\u4e00-\u9fa5]+)?):\s*(\d+)/g);
+
+        for (const match of skillMatches) {
+            const skillName = match[1].trim();
+            const skillValue = parseInt(match[2], 10);
+            if (attrMap[skillName] || ["幸运", "DB", "体格", "移动力", "理智", "生命", "魔法", "护甲"].includes(skillName)) {
+                continue;
+            }
+            const existingSkill = selectedChar.skills.find(skill => skill.name === skillName);
+            if (existingSkill) existingSkill.value = skillValue;
+            else selectedChar.skills.push({ name: skillName, value: skillValue });
+        }
+    }
+
+    selectedChar.system = "CoC";
+}
+
+function importDndText(text) {
+    selectedChar.dndSkills = createDefaultDndSkills();
+    ensureDndMeta(selectedChar);
+    selectedChar.system = "DND";
+
+    const attrMap = {
+        "力量": "str",
+        "敏捷": "dex",
+        "体质": "con",
+        "智力": "int",
+        "感知": "wis",
+        "魅力": "cha"
+    };
+
+    Object.entries(attrMap).forEach(([cnName, key]) => {
+        const value = readImportNumber(text, cnName);
+        if (value !== null) selectedChar.dndStats[key] = value;
+    });
+
+    const acValue = readImportNumber(text, "ac");
+    if (acValue !== null) selectedChar.dndStats.ac = acValue;
+
+    const dcValue = readImportNumber(text, "dc");
+    if (dcValue !== null) selectedChar.dndStats.spellSaveDC = dcValue;
+
+    const proficiencyValue = readImportNumber(text, "熟练");
+    if (proficiencyValue !== null) {
+        selectedChar.level = inferLevelFromProficiencyBonus(proficiencyValue);
+    }
+
+    const hpMaxValue = readImportNumber(text, "hpmax");
+    if (hpMaxValue !== null) {
+        selectedChar.dndStats.hp = hpMaxValue;
+    } else {
+        const hpSlashMatch = text.match(/hp\s*[:=]\s*(\d+)\s*\/\s*(\d+)(?:\[(\d+)\])?/i);
+        if (hpSlashMatch) {
+            selectedChar.dndStats.hp = parseInt(hpSlashMatch[2], 10) || parseInt(hpSlashMatch[1], 10) || selectedChar.dndStats.hp;
+        } else {
+            const hpValue = readImportNumber(text, "hp");
+            if (hpValue !== null) selectedChar.dndStats.hp = hpValue;
+        }
+    }
+
+    DND_SKILL_DEFINITIONS.forEach(skill => {
+        const skillState = readImportSkillState(text, skill.name);
+        if (skillState !== null) selectedChar.dndSkills[skill.name] = skillState;
+    });
+
+    if (!selectedChar.dndStats.spellcastingAbility || selectedChar.dndStats.spellcastingAbility === "NONE") {
+        selectedChar.dndStats.spellcastingAbility = getSpellcastingAbilityByClass(selectedChar.class);
+    }
+    autoFillDndSpellSlots(selectedChar);
+}
+
+function processTextImport() {
+    if (!selectedChar) return;
+    const text = document.getElementById("importTextInput").value;
+    if (!text.trim()) {
+        alert("请输入内容！");
+        return;
+    }
+
+    try {
+        const nameMatch = text.match(/<(.+?)>的个人属性/);
+        if (nameMatch) {
+            selectedChar.name = nameMatch[1];
+        }
+        if (detectDndImportText(text)) {
+            importDndText(text);
+        } else {
+            importCocText(text);
+        }
+
+        save();
+        renderCharSelector();
+        switchCharacter(selectedChar.id);
+        closeTextImportModal();
+        alert("导入成功！");
+
+    } catch (e) {
+        console.error(e);
+        alert("解析失败，请检查文本格式是否正确。");
+    }
+}
+
+window.onload = windowOnLoadInit;
+</script>
+</body>
+</html>

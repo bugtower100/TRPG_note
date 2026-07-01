@@ -67,6 +67,7 @@ const LandingPage: React.FC = () => {
     handleUpdateJoinPassword,
     ensurePublicCampaignAccess,
     handleRemoveMember,
+    handleUpdateMemberRole,
     getMemberSummary,
   } = useLandingCampaigns({ user, campaignList });
 
@@ -269,7 +270,7 @@ const LandingPage: React.FC = () => {
              <GuideHelpButton guideId="landing" />
             <button 
                 onClick={() => setImportAssistantOpen(true)}
-                className="flex gap-2 items-center px-4 py-2 text-gray-700 bg-white rounded border border-gray-300 shadow-sm hover:bg-gray-50"
+                className="flex gap-2 items-center px-4 py-2 rounded border border-theme theme-card theme-text-secondary shadow-sm hover:bg-primary-light"
                 title="导入模组或备份包"
             >
                 <Upload size={18} />
@@ -277,7 +278,7 @@ const LandingPage: React.FC = () => {
             </button>
             <button
                 onClick={() => setExportDialogTarget({ type: 'all' })}
-                className="flex gap-2 items-center px-4 py-2 text-gray-700 bg-white rounded border border-gray-300 shadow-sm hover:bg-gray-50"
+                className="flex gap-2 items-center px-4 py-2 rounded border border-theme theme-card theme-text-secondary shadow-sm hover:bg-primary-light"
                 title="导出当前账号下的所有模组备份包"
             >
                 <Download size={18} />
@@ -285,7 +286,7 @@ const LandingPage: React.FC = () => {
             </button>
             <button 
                 onClick={logout}
-                className="ml-2 font-medium text-red-500 hover:text-red-700"
+                className="ml-2 font-medium theme-text-secondary hover:text-primary"
             >
                 退出登录
             </button>
@@ -306,7 +307,7 @@ const LandingPage: React.FC = () => {
                         setPasswordMenuOpen((prev) => !prev);
                         setPasswordStatus('');
                     }}
-                    className="px-3 py-1 text-sm border rounded bg-white text-gray-600 border-gray-300 hover:bg-gray-50 inline-flex items-center gap-1"
+                    className="px-3 py-1 text-sm border rounded theme-card theme-text-secondary border-theme hover:bg-primary-light inline-flex items-center gap-1"
                 >
                     账号
                     <ChevronDown size={16} className={`transition-transform ${passwordMenuOpen ? 'rotate-180' : ''}`} />
@@ -358,10 +359,10 @@ const LandingPage: React.FC = () => {
                     className={`px-3 py-1 text-sm border rounded ${
                         currentTheme === t.id 
                             ? 'bg-primary text-white border-primary' 
-                            : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
+                            : 'theme-card theme-text-secondary border-theme hover:bg-primary-light'
                     }`}
                 >
-                    {t.id === 'default' ? '默认' : t.id === 'scroll' ? '羊皮纸' : t.id === 'archive' ? '未来' : t.id === 'nature' ? '薄巧' : '自定义'}
+                    {t.id === 'default' ? '默认' : t.label}
                 </button>
             ))}
             {customThemes.length > 0 && (
@@ -374,7 +375,7 @@ const LandingPage: React.FC = () => {
                           setTheme('custom');
                         }
                     }}
-                    className="px-3 py-1 text-sm border rounded bg-white text-gray-600 border-gray-300 hover:bg-gray-50 max-w-[180px]"
+                    className="px-3 py-1 text-sm border rounded theme-card theme-text-secondary border-theme hover:bg-primary-light max-w-[180px]"
                     title="切换已上传的自定义主题"
                 >
                     <option value="">选择自定义主题</option>
@@ -395,7 +396,7 @@ const LandingPage: React.FC = () => {
                className="rounded-lg border-2 border-dashed border-theme p-5 flex flex-col items-center justify-center text-center hover:border-primary bg-theme-card transition-colors cursor-pointer min-h-[180px]"
                onClick={() => setIsCreating(true)}
           >
-            <div className="flex justify-center items-center mb-4 w-12 h-12 bg-blue-100 rounded-full text-primary">
+            <div className="flex justify-center items-center mb-4 w-12 h-12 rounded-full bg-primary-light text-primary">
               <Plus size={24} />
             </div>
             <h3 className="text-lg font-medium">创建新模组</h3>
@@ -426,6 +427,8 @@ const LandingPage: React.FC = () => {
                   onSaveConfig={(campaignId) => void handleSaveCampaignConfig(campaignId)}
                   onUpdateJoinPassword={(campaignId) => void handleUpdateJoinPassword(campaignId)}
                   onRemoveMember={(campaignId, memberUserId) => void handleRemoveMember(campaignId, memberUserId)}
+                  onUpdateMemberRole={(campaignId, memberUserId, role) => void handleUpdateMemberRole(campaignId, memberUserId, role)}
+                  currentUserId={user?.id || ''}
                   onEnter={(nextCampaign) => void handleEnterCampaign(nextCampaign)}
                   onOpenExport={(campaignId) => setExportDialogTarget({ type: 'campaign', campaignId })}
                   onDelete={(campaignId) => {
@@ -461,27 +464,27 @@ const LandingPage: React.FC = () => {
         {/* Create Modal */}
         {isCreating && (
           <div className="flex fixed inset-0 z-50 justify-center items-center p-4 bg-black/50">
-            <div className="p-6 w-full max-w-md bg-white rounded-lg shadow-xl">
-              <h2 className="mb-4 text-xl font-bold text-gray-800">创建新模组</h2>
+            <div className="p-6 w-full max-w-md rounded-lg shadow-xl theme-card border border-theme">
+              <h2 className="mb-4 text-xl font-bold text-theme-primary">创建新模组</h2>
               <form onSubmit={handleCreate} className="space-y-4">
                 <div>
-                  <label className="block mb-1 text-sm font-medium text-gray-700">模组名称</label>
+                  <label className="block mb-1 text-sm font-medium text-theme-primary">模组名称</label>
                   <input
                     type="text"
                     value={newCampaignName}
                     onChange={(e) => setNewCampaignName(e.target.value)}
-                    className="px-3 py-2 w-full rounded border border-gray-300 outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                    className="px-3 py-2 w-full rounded border border-theme bg-transparent outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
                     placeholder="例如：奈亚拉托提普的面具、龙金之劫"
                     autoFocus
                     required
                   />
                 </div>
                 <div>
-                  <label className="block mb-1 text-sm font-medium text-gray-700">简介</label>
+                  <label className="block mb-1 text-sm font-medium text-theme-primary">简介</label>
                   <textarea
                     value={newCampaignDesc}
                     onChange={(e) => setNewCampaignDesc(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-primary focus:border-transparent outline-none min-h-[100px]"
+                    className="w-full px-3 py-2 border border-theme rounded bg-transparent focus:ring-2 focus:ring-primary focus:border-transparent outline-none min-h-[100px]"
                     placeholder="简要描述这个模组的背景..."
                   />
                 </div>
@@ -489,7 +492,7 @@ const LandingPage: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => setIsCreating(false)}
-                    className="px-4 py-2 text-gray-600 rounded hover:bg-gray-100"
+                    className="px-4 py-2 rounded theme-text-secondary hover:bg-primary-light"
                   >
                     取消
                   </button>

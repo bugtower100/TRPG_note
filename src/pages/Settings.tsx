@@ -80,8 +80,8 @@ const Settings: React.FC = () => {
                     onClick={() => setTheme(t.id)}
                     className={`flex flex-col items-center p-4 border rounded-lg transition-all ${
                         theme === t.id 
-                            ? 'border-primary bg-blue-50 text-primary' 
-                            : 'border-theme hover:bg-gray-50'
+                            ? 'border-primary bg-primary-light text-primary shadow-sm' 
+                            : 'border-theme hover:bg-primary-light'
                     }`}
                 >
                     <div className="mb-2">{t.icon}</div>
@@ -205,7 +205,7 @@ const Settings: React.FC = () => {
               <button
                 onClick={() => setExportDialogOpen(true)}
                 disabled={!currentCampaignId}
-                className="px-4 py-2 bg-theme-card border border-theme rounded hover:bg-gray-50 disabled:opacity-50 flex items-center gap-2"
+                className="px-4 py-2 bg-theme-card border border-theme rounded hover:bg-primary-light disabled:opacity-50 flex items-center gap-2"
               >
                 <Archive size={16} />
                 导出当前模组

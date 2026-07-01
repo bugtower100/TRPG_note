@@ -10,5 +10,9 @@ export const queryKeys = {
     sessionTasks: (campaignId: string, userId?: string) =>
       ['campaigns', campaignId, 'session-tasks', userId ?? 'anonymous'] as const,
     bundle: (campaignId: string, userId?: string) => ['campaigns', campaignId, 'bundle', userId ?? 'anonymous'] as const,
+    characterSheets: (campaignId: string, userId?: string) =>
+      ['campaigns', campaignId, 'character-sheets', userId ?? 'anonymous'] as const,
+    characterSheetDetail: (campaignId: string, sheetId: string, userId?: string) =>
+      ['campaigns', campaignId, 'character-sheets', sheetId, userId ?? 'anonymous'] as const,
   },
 };

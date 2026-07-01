@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
-import { CampaignConfig, CampaignSummary, PublicCampaignSummary, UserProfile } from '../../../types';
+import { CampaignConfig, CampaignMemberRole, CampaignSummary, PublicCampaignSummary, UserProfile } from '../../../types';
 import { queryKeys } from '../../../query/queryKeys';
 import { teamNotesService } from '../../../services/teamNotesService';
 import { campaignAccessService } from '../../../services/campaignAccessService';
@@ -189,6 +189,19 @@ export const useLandingCampaigns = ({ user, campaignList }: UseLandingCampaignsP
     }
   };
 
+  const handleUpdateMemberRole = async (campaignId: string, memberUserId: string, role: CampaignMemberRole) => {
+    if (!user) return;
+    const actionText = role === 'ASSISTANT_GM' ? '设为副GM' : '改回 PL';
+    if (!window.confirm(`确定要将这名成员${actionText}吗？`)) return;
+    try {
+      const next = await teamNotesService.updateMemberRole(campaignId, memberUserId, role, user);
+      syncConfigCache(campaignId, next);
+      await refreshPublicCampaignsCache();
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : '成员角色更新失败');
+    }
+  };
+
   const getMemberSummary = (config?: CampaignConfig) => {
     const members = config?.members || [];
     const now = Date.now();
@@ -210,6 +223,7 @@ export const useLandingCampaigns = ({ user, campaignList }: UseLandingCampaignsP
     handleUpdateJoinPassword,
     ensurePublicCampaignAccess,
     handleRemoveMember,
+    handleUpdateMemberRole,
     getMemberSummary,
   };
 };

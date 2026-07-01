@@ -138,6 +138,76 @@ type humaGetSessionTasksOutput struct {
 	Body SessionTaskBoardDoc
 }
 
+type humaListCharacterSheetsInput struct {
+	UserID           string `header:"X-TRPG-User-Id" doc:"当前用户 ID"`
+	Username         string `header:"X-TRPG-Username" doc:"当前用户名"`
+	CampaignPassword string `header:"X-TRPG-Campaign-Password" doc:"公开模组进入密码，只有需要时才传"`
+	CampaignID       string `path:"campaignId" doc:"模组 ID"`
+}
+
+type humaListCharacterSheetsOutput struct {
+	Body []CharacterSheetSummary
+}
+
+type humaCreateCharacterSheetInput struct {
+	UserID           string `header:"X-TRPG-User-Id" doc:"当前用户 ID"`
+	Username         string `header:"X-TRPG-Username" doc:"当前用户名"`
+	CampaignPassword string `header:"X-TRPG-Campaign-Password" doc:"公开模组进入密码，只有需要时才传"`
+	CampaignID       string `path:"campaignId" doc:"模组 ID"`
+	Body             CharacterSheetCreateRequest
+}
+
+type humaCreateCharacterSheetOutput struct {
+	Body CharacterSheetDocument
+}
+
+type humaPreviewCharacterSheetImportInput struct {
+	UserID           string `header:"X-TRPG-User-Id" doc:"当前用户 ID"`
+	Username         string `header:"X-TRPG-Username" doc:"当前用户名"`
+	CampaignPassword string `header:"X-TRPG-Campaign-Password" doc:"公开模组进入密码，只有需要时才传"`
+	CampaignID       string `path:"campaignId" doc:"模组 ID"`
+	Body             CharacterSheetImportPreviewRequest
+}
+
+type humaPreviewCharacterSheetImportOutput struct {
+	Body CharacterSheetImportPreview
+}
+
+type humaGetCharacterSheetInput struct {
+	UserID           string `header:"X-TRPG-User-Id" doc:"当前用户 ID"`
+	Username         string `header:"X-TRPG-Username" doc:"当前用户名"`
+	CampaignPassword string `header:"X-TRPG-Campaign-Password" doc:"公开模组进入密码，只有需要时才传"`
+	CampaignID       string `path:"campaignId" doc:"模组 ID"`
+	SheetID          string `path:"sheetId" doc:"角色卡 ID"`
+}
+
+type humaGetCharacterSheetOutput struct {
+	Body CharacterSheetDocument
+}
+
+type humaUpdateCharacterSheetInput struct {
+	UserID           string `header:"X-TRPG-User-Id" doc:"当前用户 ID"`
+	Username         string `header:"X-TRPG-Username" doc:"当前用户名"`
+	CampaignPassword string `header:"X-TRPG-Campaign-Password" doc:"公开模组进入密码，只有需要时才传"`
+	CampaignID       string `path:"campaignId" doc:"模组 ID"`
+	SheetID          string `path:"sheetId" doc:"角色卡 ID"`
+	Body             CharacterSheetUpdateRequest
+}
+
+type humaUpdateCharacterSheetOutput struct {
+	Body CharacterSheetDocument
+}
+
+type humaDeleteCharacterSheetInput struct {
+	UserID           string `header:"X-TRPG-User-Id" doc:"当前用户 ID"`
+	Username         string `header:"X-TRPG-Username" doc:"当前用户名"`
+	CampaignPassword string `header:"X-TRPG-Campaign-Password" doc:"公开模组进入密码，只有需要时才传"`
+	CampaignID       string `path:"campaignId" doc:"模组 ID"`
+	SheetID          string `path:"sheetId" doc:"角色卡 ID"`
+}
+
+type humaDeleteCharacterSheetOutput struct{}
+
 func buildPhase1OpenAPISpec() ([]byte, error) {
 	docRouter := gin.New()
 	config := huma.DefaultConfig("TRPG Module Notes API", appVersion)
@@ -324,5 +394,77 @@ func registerPhase1OpenAPIOperations(api huma.API) {
 		Errors:      []int{400, 403, 500},
 	}, func(context.Context, *humaGetSessionTasksInput) (*humaGetSessionTasksOutput, error) {
 		return &humaGetSessionTasksOutput{}, nil
+	})
+
+	huma.Register(api, huma.Operation{
+		OperationID: "listCharacterSheets",
+		Method:      http.MethodGet,
+		Path:        "/api/campaigns/{campaignId}/character-sheets",
+		Summary:     "获取角色卡列表",
+		Description: "按当前用户权限返回模组内可见的角色卡摘要列表。",
+		Tags:        []string{"campaigns-collaboration"},
+		Errors:      []int{400, 403, 500},
+	}, func(context.Context, *humaListCharacterSheetsInput) (*humaListCharacterSheetsOutput, error) {
+		return &humaListCharacterSheetsOutput{}, nil
+	})
+
+	huma.Register(api, huma.Operation{
+		OperationID: "createCharacterSheet",
+		Method:      http.MethodPost,
+		Path:        "/api/campaigns/{campaignId}/character-sheets",
+		Summary:     "创建角色卡",
+		Description: "创建一张新的角色卡文档，首版支持 CoC7 与 DND5e。",
+		Tags:        []string{"campaigns-collaboration"},
+		Errors:      []int{400, 403, 500},
+	}, func(context.Context, *humaCreateCharacterSheetInput) (*humaCreateCharacterSheetOutput, error) {
+		return &humaCreateCharacterSheetOutput{}, nil
+	})
+
+	huma.Register(api, huma.Operation{
+		OperationID: "previewCharacterSheetImport",
+		Method:      http.MethodPost,
+		Path:        "/api/campaigns/{campaignId}/character-sheets/import-text/preview",
+		Summary:     "预览角色卡文本导入",
+		Description: "解析文本中的角色卡数值与字段，返回识别结果与规范化草稿，不直接落库。",
+		Tags:        []string{"campaigns-collaboration"},
+		Errors:      []int{400, 403, 500},
+	}, func(context.Context, *humaPreviewCharacterSheetImportInput) (*humaPreviewCharacterSheetImportOutput, error) {
+		return &humaPreviewCharacterSheetImportOutput{}, nil
+	})
+
+	huma.Register(api, huma.Operation{
+		OperationID: "getCharacterSheet",
+		Method:      http.MethodGet,
+		Path:        "/api/campaigns/{campaignId}/character-sheets/{sheetId}",
+		Summary:     "获取角色卡详情",
+		Description: "返回一张角色卡的完整内容。",
+		Tags:        []string{"campaigns-collaboration"},
+		Errors:      []int{400, 403, 404, 500},
+	}, func(context.Context, *humaGetCharacterSheetInput) (*humaGetCharacterSheetOutput, error) {
+		return &humaGetCharacterSheetOutput{}, nil
+	})
+
+	huma.Register(api, huma.Operation{
+		OperationID: "updateCharacterSheet",
+		Method:      http.MethodPut,
+		Path:        "/api/campaigns/{campaignId}/character-sheets/{sheetId}",
+		Summary:     "更新角色卡",
+		Description: "使用 expectedVersion 执行角色卡更新，冲突时返回 409。",
+		Tags:        []string{"campaigns-collaboration"},
+		Errors:      []int{400, 403, 404, 409, 500},
+	}, func(context.Context, *humaUpdateCharacterSheetInput) (*humaUpdateCharacterSheetOutput, error) {
+		return &humaUpdateCharacterSheetOutput{}, nil
+	})
+
+	huma.Register(api, huma.Operation{
+		OperationID: "deleteCharacterSheet",
+		Method:      http.MethodDelete,
+		Path:        "/api/campaigns/{campaignId}/character-sheets/{sheetId}",
+		Summary:     "删除角色卡",
+		Description: "删除一张角色卡文档。",
+		Tags:        []string{"campaigns-collaboration"},
+		Errors:      []int{400, 403, 404, 500},
+	}, func(context.Context, *humaDeleteCharacterSheetInput) (*humaDeleteCharacterSheetOutput, error) {
+		return &humaDeleteCharacterSheetOutput{}, nil
 	})
 }

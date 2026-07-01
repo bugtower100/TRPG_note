@@ -6,12 +6,15 @@ import { useNavigate } from 'react-router-dom';
 import { Clue } from '../../types';
 import { useReceivedShares } from '../../hooks/useReceivedShares';
 import ClueBoard from '../ClueBoard';
+import { useCampaignMemberRole } from '../../hooks/useCampaignMemberRole';
 
 const ClueList: React.FC = () => {
   const { campaignData, setCampaignData, reorderEntities } = useCampaignData();
   const navigate = useNavigate();
   const sharedEntries = useReceivedShares('clues');
   const [activeTab, setActiveTab] = useState<'list' | 'board'>('list');
+  const { canManageCampaignContent } = useCampaignMemberRole();
+  const visibleClues = canManageCampaignContent ? campaignData.clues : [];
 
   const handleAdd = () => {
     const newClue = dataService.createEntity<Clue>({
@@ -55,15 +58,21 @@ const ClueList: React.FC = () => {
       {activeTab === 'list' ? (
         <EntityListLayout
           title="线索列表"
-          entities={campaignData.clues}
+          entities={visibleClues}
           entityType="clues"
-          onAdd={handleAdd}
-          onReorder={(orderedIds) => reorderEntities('clues', orderedIds)}
+          onAdd={canManageCampaignContent ? handleAdd : undefined}
+          onReorder={canManageCampaignContent ? ((orderedIds) => reorderEntities('clues', orderedIds)) : undefined}
           sharedEntries={sharedEntries}
         />
       ) : (
         <div data-tour="clue-board">
-          <ClueBoard />
+          {canManageCampaignContent ? (
+            <ClueBoard />
+          ) : (
+            <div className="text-center py-12 theme-text-secondary bg-theme-card rounded-lg border border-dashed border-theme">
+              线索板仅对 GM / 副GM 开放，PL 请通过分享内容查看可见线索。
+            </div>
+          )}
         </div>
       )}
     </div>

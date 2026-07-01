@@ -255,7 +255,7 @@ export interface UserProfile {
 }
 
 export type CampaignVisibility = 'public' | 'private';
-export type CampaignMemberRole = 'GM' | 'PL';
+export type CampaignMemberRole = 'GM' | 'ASSISTANT_GM' | 'PL';
 export type SharedPermission = 'read' | 'edit';
 
 export interface CampaignSummary {

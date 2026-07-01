@@ -5,11 +5,14 @@ import { dataService } from '../../services/dataService';
 import { useNavigate } from 'react-router-dom';
 import { Location } from '../../types';
 import { useReceivedShares } from '../../hooks/useReceivedShares';
+import { useCampaignMemberRole } from '../../hooks/useCampaignMemberRole';
 
 const LocationList: React.FC = () => {
   const { campaignData, setCampaignData, reorderEntities } = useCampaignData();
   const navigate = useNavigate();
   const sharedEntries = useReceivedShares('locations');
+  const { canManageCampaignContent } = useCampaignMemberRole();
+  const visibleLocations = canManageCampaignContent ? campaignData.locations : [];
 
   const handleAdd = () => {
     const newLocation = dataService.createEntity<Location>({
@@ -31,10 +34,10 @@ const LocationList: React.FC = () => {
   return (
     <EntityListLayout
       title="地点列表"
-      entities={campaignData.locations}
+      entities={visibleLocations}
       entityType="locations"
-      onAdd={handleAdd}
-      onReorder={(orderedIds) => reorderEntities('locations', orderedIds)}
+      onAdd={canManageCampaignContent ? handleAdd : undefined}
+      onReorder={canManageCampaignContent ? ((orderedIds) => reorderEntities('locations', orderedIds)) : undefined}
       sharedEntries={sharedEntries}
     />
   );

@@ -6,6 +6,7 @@ import { Timeline, TimelineEvent } from '../../types';
 import RichTextEditor from '../../components/common/RichTextEditor';
 import RichTextDisplay from '../../components/common/RichTextDisplay';
 import { markdownToPreviewText } from '../../components/common/richTextReference';
+import { useCampaignMemberRole } from '../../hooks/useCampaignMemberRole';
 
 const BOARD_MIN_HEIGHT = 900;
 const BOARD_PADDING_TOP = 120;
@@ -42,6 +43,7 @@ const TimelineWorkbench: React.FC = () => {
   const { campaignData, updateEntity } = useCampaignData();
   const navigate = useNavigate();
   const location = useLocation();
+  const { canManageCampaignContent } = useCampaignMemberRole();
   const boardRef = useRef<HTMLDivElement>(null);
   const suppressClickRef = useRef(false);
   const focusTimelineId = (location.state as { focusTimelineId?: string } | null)?.focusTimelineId;
@@ -54,6 +56,14 @@ const TimelineWorkbench: React.FC = () => {
   const [dragNode, setDragNode] = useState<DragNodeState | null>(null);
 
   const timelines = campaignData.timelines;
+
+  if (!canManageCampaignContent) {
+    return (
+      <div className="text-center py-12 theme-text-secondary bg-theme-card rounded-lg border border-dashed border-theme">
+        时间线工作版仅对 GM / 副GM 开放。
+      </div>
+    );
+  }
 
   const visibleTimelines = useMemo(
     () => [...timelines]

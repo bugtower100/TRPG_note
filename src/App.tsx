@@ -1,5 +1,5 @@
 import { lazy, Suspense } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useParams } from 'react-router-dom';
 import { CampaignProvider, useCampaignSession } from './context/CampaignContext';
 import { GuideProvider } from './components/common/InteractiveGuide';
 import Layout from './components/Layout';
@@ -28,6 +28,12 @@ const TeamNotes = lazy(() => import('./pages/TeamNotes'));
 const SharedContent = lazy(() => import('./pages/SharedContent'));
 const SharedEntityDetailRoute = lazy(() => import('./pages/SharedEntityDetailRoute'));
 const SessionTaskBoard = lazy(() => import('./pages/SessionTaskBoard'));
+const CharacterSheets = lazy(() => import('./pages/CharacterSheets'));
+
+function LegacyCharacterSheetRedirect() {
+  const { id } = useParams<{ id: string }>();
+  return <Navigate to={id ? `/characters/sheets/${id}` : '/characters/sheets'} replace />;
+}
 
 const routeFallback = (
   <div className="flex min-h-[40vh] items-center justify-center text-sm theme-text-secondary">
@@ -80,6 +86,10 @@ function AppContent() {
               <Route path="timelines/shared/:shareId" element={<SharedEntityDetailRoute entityType="timelines" />} />
               <Route path="relation-graphs" element={<RelationGraphs />} />
               <Route path="team-notes" element={<TeamNotes />} />
+              <Route path="characters/sheets" element={<CharacterSheets />} />
+              <Route path="characters/sheets/:id" element={<CharacterSheets />} />
+              <Route path="character-sheets" element={<LegacyCharacterSheetRedirect />} />
+              <Route path="character-sheets/:id" element={<LegacyCharacterSheetRedirect />} />
               <Route path="shared-content" element={<SharedContent />} />
               <Route path="versions" element={<Navigate to="/settings" replace />} />
               <Route path="settings" element={<Settings />} />

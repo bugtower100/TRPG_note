@@ -5,11 +5,14 @@ import { dataService } from '../../services/dataService';
 import { useNavigate } from 'react-router-dom';
 import { Character } from '../../types';
 import { useReceivedShares } from '../../hooks/useReceivedShares';
+import { useCampaignMemberRole } from '../../hooks/useCampaignMemberRole';
 
 const CharacterList: React.FC = () => {
   const { campaignData, setCampaignData, reorderEntities } = useCampaignData();
   const navigate = useNavigate();
   const sharedEntries = useReceivedShares('characters');
+  const { canManageCampaignContent } = useCampaignMemberRole();
+  const visibleCharacters = canManageCampaignContent ? campaignData.characters : [];
 
   const handleAdd = () => {
     const newCharacter = dataService.createEntity<Character>({
@@ -34,10 +37,10 @@ const CharacterList: React.FC = () => {
   return (
     <EntityListLayout
       title="角色列表"
-      entities={campaignData.characters}
+      entities={visibleCharacters}
       entityType="characters"
-      onAdd={handleAdd}
-      onReorder={(orderedIds) => reorderEntities('characters', orderedIds)}
+      onAdd={canManageCampaignContent ? handleAdd : undefined}
+      onReorder={canManageCampaignContent ? ((orderedIds) => reorderEntities('characters', orderedIds)) : undefined}
       sharedEntries={sharedEntries}
     />
   );

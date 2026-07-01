@@ -4,6 +4,7 @@ import { useCampaignData, useCampaignSession } from '../../context/CampaignConte
 import EntityDetailHeader from '../../features/entities/components/EntityDetailHeader';
 import SectionedEntityContent from '../../features/entities/components/SectionedEntityContent';
 import { useSectionedEntityDetail } from '../../features/entities/hooks/useSectionedEntityDetail';
+import { useCampaignMemberRole } from '../../hooks/useCampaignMemberRole';
 
 interface MonsterDetailProps {
   entityId?: string;
@@ -15,6 +16,7 @@ const MonsterDetail: React.FC<MonsterDetailProps> = ({ entityId }) => {
   const navigate = useNavigate();
   const { campaignData, updateEntity, deleteEntity } = useCampaignData();
   const { saveCampaign } = useCampaignSession();
+  const { canManageCampaignContent } = useCampaignMemberRole();
   const sectionDefs = [
     { key: 'basic', title: '基本信息' },
     { key: 'combat', title: '数据与掉落' },
@@ -37,7 +39,7 @@ const MonsterDetail: React.FC<MonsterDetailProps> = ({ entityId }) => {
     toggleAllSections,
   } = useSectionedEntityDetail({
     id,
-    items: campaignData.monsters,
+    items: canManageCampaignContent ? campaignData.monsters : [],
     navigate,
     listPath: '/monsters',
     initialCollapsed: { basic: true, combat: true },
