@@ -250,6 +250,7 @@ jobs:
             ## ${{ steps.version.outputs.name }} 更新内容
             - 为GM管理增加了副GM选项，副GM和GM除去不可删除模组外功能一致；
             - 增加了角色卡管理页面，同时可以快速配置角色关联和角色跳转
+            - fix：修复了后端导出问题
           files: |
             TRPG模组笔记-${{ steps.version.outputs.app_version }}-windows-amd64.zip
             TRPG模组笔记-${{ steps.version.outputs.app_version }}-windows-arm64.zip

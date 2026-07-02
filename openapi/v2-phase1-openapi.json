@@ -1358,7 +1358,7 @@
   "info": {
     "description": "Phase 1 V2 migration and campaign bundle contract. Runtime business logic remains on Gin handlers; Huma is introduced here to generate OpenAPI incrementally.",
     "title": "TRPG Module Notes API",
-    "version": "v1.5.4"
+    "version": "v1.5.5"
   },
   "openapi": "3.1.0",
   "paths": {
