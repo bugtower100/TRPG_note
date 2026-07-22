@@ -1,4 +1,5 @@
 import { CampaignData, UserProfile, BaseEntity, Character, Location, Organization, Event, Clue, Timeline, Monster, RelationGraph, ClueRevealStatus, ClueRevealLogItem, SessionTask, SessionTaskStatus } from '../types';
+import { normalizeTimelinePriority } from '../utils/timelinePriority';
 import { v4 as uuidv4 } from 'uuid';
 
 const STORAGE_KEYS = {
@@ -254,6 +255,7 @@ class DataService {
       timelineEvents: safeArray<any>(t?.timelineEvents, []).map((event) => ({
         id: typeof event?.id === 'string' && event.id ? event.id : uuidv4(),
         title: timelineEventFallbackTitle(event),
+        priority: normalizeTimelinePriority(event?.priority),
         time: typeof event?.time === 'string' ? event.time : '',
         content: typeof event?.content === 'string' ? event.content : '',
         relations: safeArray<any>(event?.relations, []),

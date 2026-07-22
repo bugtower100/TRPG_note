@@ -73,6 +73,7 @@ export interface Clue extends BaseEntity {
 export interface TimelineEvent {
   id: string;
   title?: string;
+  priority: number;
   time: string;
   content: string;
   relations: Relation[];

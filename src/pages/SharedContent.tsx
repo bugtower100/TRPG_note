@@ -8,6 +8,7 @@ import RichTextDisplay from '../components/common/RichTextDisplay';
 import ConflictResolveDialog from '../components/common/ConflictResolveDialog';
 import { queryKeys } from '../query/queryKeys';
 import { CustomSubItem, GraphEntityType, SharedEntityRecord, TimelineEvent } from '../types';
+import { normalizeTimelinePriority, TIMELINE_PRIORITY_MAX } from '../utils/timelinePriority';
 import { sharingService } from '../services/sharingService';
 import { VersionConflictError } from '../services/conflictError';
 import { useNavigate } from 'react-router-dom';
@@ -136,6 +137,7 @@ const SharedContent: React.FC<SharedContentProps> = ({ embedded = false, shareId
     setDraftDetails(share.snapshot.details || '');
     setDraftTimelineEvents((share.snapshot.timelineEvents || []).map((event) => ({
       id: String(event.id || `timeline_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`),
+      priority: normalizeTimelinePriority(event.priority),
       time: String(event.time || ''),
       content: String(event.content || ''),
       relations: Array.isArray(event.relations) ? event.relations : [],
@@ -445,6 +447,16 @@ const SharedContent: React.FC<SharedContentProps> = ({ embedded = false, shareId
                               className="flex-1 px-3 py-2 rounded border border-theme bg-transparent"
                               placeholder="时间节点"
                             />
+                            <select
+                              value={normalizeTimelinePriority(event.priority)}
+                              onChange={(e) => setDraftTimelineEvents((prev) => prev.map((item, itemIndex) => itemIndex === index ? { ...item, priority: Number(e.target.value) } : item))}
+                              className="px-3 py-2 rounded border border-theme bg-theme-card"
+                              aria-label="事件优先级"
+                            >
+                              {Array.from({ length: TIMELINE_PRIORITY_MAX + 1 }, (_, priority) => (
+                                <option key={priority} value={priority}>优先级 {priority}</option>
+                              ))}
+                            </select>
                             <button
                               type="button"
                               onClick={() => setDraftTimelineEvents((prev) => prev.filter((_, itemIndex) => itemIndex !== index))}
@@ -499,6 +511,7 @@ const SharedContent: React.FC<SharedContentProps> = ({ embedded = false, shareId
                           >
                             {collapsedKeys[`timeline:${event.id || index}`] ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
                             <div className="font-medium">{event.time || `事件 ${index + 1}`}</div>
+                            <span className="text-xs theme-text-secondary">优先级 {normalizeTimelinePriority(event.priority)}</span>
                           </button>
                           {!collapsedKeys[`timeline:${event.id || index}`] && (
                             <div className="mt-3 space-y-2">
@@ -518,6 +531,7 @@ const SharedContent: React.FC<SharedContentProps> = ({ embedded = false, shareId
                       ...prev,
                       {
                         id: `timeline_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+                        priority: 0,
                         time: '',
                         content: '',
                         relations: [],

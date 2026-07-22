@@ -7,6 +7,11 @@ import RichTextEditor from '../../components/common/RichTextEditor';
 import RichTextDisplay from '../../components/common/RichTextDisplay';
 import { markdownToPreviewText } from '../../components/common/richTextReference';
 import { useCampaignMemberRole } from '../../hooks/useCampaignMemberRole';
+import {
+  getTimelineEventPriority,
+  normalizeTimelinePriority,
+  TIMELINE_PRIORITY_MAX,
+} from '../../utils/timelinePriority';
 
 const BOARD_MIN_HEIGHT = 900;
 const BOARD_PADDING_TOP = 120;
@@ -39,11 +44,10 @@ const getEventTitle = (event: TimelineEvent) => {
   return event.time?.trim() || '未命名节点';
 };
 
-const TimelineWorkbench: React.FC = () => {
+const TimelineWorkbenchContent: React.FC = () => {
   const { campaignData, updateEntity } = useCampaignData();
   const navigate = useNavigate();
   const location = useLocation();
-  const { canManageCampaignContent } = useCampaignMemberRole();
   const boardRef = useRef<HTMLDivElement>(null);
   const suppressClickRef = useRef(false);
   const focusTimelineId = (location.state as { focusTimelineId?: string } | null)?.focusTimelineId;
@@ -54,16 +58,9 @@ const TimelineWorkbench: React.FC = () => {
   const [eventDraft, setEventDraft] = useState<TimelineEvent | null>(null);
   const [addTimelineId, setAddTimelineId] = useState('');
   const [dragNode, setDragNode] = useState<DragNodeState | null>(null);
+  const [priorityRange, setPriorityRange] = useState<{ min: number; max: number } | null>(null);
 
   const timelines = campaignData.timelines;
-
-  if (!canManageCampaignContent) {
-    return (
-      <div className="text-center py-12 theme-text-secondary bg-theme-card rounded-lg border border-dashed border-theme">
-        时间线工作版仅对 GM / 副GM 开放。
-      </div>
-    );
-  }
 
   const visibleTimelines = useMemo(
     () => [...timelines]
@@ -196,19 +193,29 @@ const TimelineWorkbench: React.FC = () => {
     if (!timeline.timelineEvents.some((item) => item.id === selectedNode.eventId)) {
       setSelectedNode(null);
       setIsEditingEvent(false);
+      return;
     }
-  }, [selectedNode, timelines]);
+    const event = timeline.timelineEvents.find((item) => item.id === selectedNode.eventId);
+    if (event && priorityRange !== null) {
+      const priority = getTimelineEventPriority(event);
+      if (priority >= priorityRange.min && priority <= priorityRange.max) return;
+      setSelectedNode(null);
+      setIsEditingEvent(false);
+    }
+  }, [priorityRange, selectedNode, timelines]);
 
   const boardHeight = useMemo(() => {
     const maxY = visibleTimelines.reduce((currentMax, timeline) => {
       const timelineMax = timeline.timelineEvents.reduce((eventMax, event, index) => {
+        const priority = getTimelineEventPriority(event);
+        if (priorityRange !== null && (priority < priorityRange.min || priority > priorityRange.max)) return eventMax;
         const fallbackY = BOARD_PADDING_TOP + index * DEFAULT_EVENT_STEP;
         return Math.max(eventMax, event.workbenchY ?? fallbackY);
       }, 0);
       return Math.max(currentMax, timelineMax);
     }, 0);
     return Math.max(BOARD_MIN_HEIGHT, maxY + BOARD_PADDING_BOTTOM);
-  }, [visibleTimelines]);
+  }, [priorityRange, visibleTimelines]);
 
   const boardWidth = Math.max(960, visibleTimelines.length * (LANE_WIDTH + LANE_GAP) + 160);
 
@@ -247,6 +254,7 @@ const TimelineWorkbench: React.FC = () => {
       ...selectedEvent,
       ...eventDraft,
       title: (eventDraft.title || '').trim() || getEventTitle(eventDraft),
+      priority: normalizeTimelinePriority(eventDraft.priority),
       time: eventDraft.time || '',
       content: eventDraft.content || '',
     };
@@ -274,6 +282,41 @@ const TimelineWorkbench: React.FC = () => {
           <p className="text-sm theme-text-secondary">把多条时间线放到同一张画布里，对齐节点位置来比较不同线索的发展。</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <label className="flex items-center gap-2 text-sm theme-text-secondary">
+            显示优先级
+            <select
+              value={priorityRange?.min ?? 'all'}
+              onChange={(event) => {
+                if (event.target.value === 'all') {
+                  setPriorityRange(null);
+                  return;
+                }
+                const min = Number(event.target.value);
+                setPriorityRange((current) => ({ min, max: Math.max(min, current?.max ?? min) }));
+              }}
+              className="px-3 py-2 border border-theme rounded-md bg-theme-card text-sm"
+            >
+              <option value="all">全部</option>
+              {Array.from({ length: TIMELINE_PRIORITY_MAX + 1 }, (_, priority) => (
+                <option key={priority} value={priority}>从 {priority}</option>
+              ))}
+            </select>
+            {priorityRange && (
+              <select
+                value={priorityRange.max}
+                onChange={(event) => {
+                  const max = Number(event.target.value);
+                  setPriorityRange((current) => ({ min: Math.min(current?.min ?? max, max), max }));
+                }}
+                className="px-3 py-2 border border-theme rounded-md bg-theme-card text-sm"
+                aria-label="优先级范围结束值"
+              >
+                {Array.from({ length: TIMELINE_PRIORITY_MAX + 1 }, (_, priority) => (
+                  <option key={priority} value={priority}>到 {priority}</option>
+                ))}
+              </select>
+            )}
+          </label>
           <button
             type="button"
             onClick={() => navigate('/timelines')}
@@ -380,6 +423,8 @@ const TimelineWorkbench: React.FC = () => {
                     />
 
                     {timeline.timelineEvents.map((event, index) => {
+                      const priority = getTimelineEventPriority(event);
+                      if (priorityRange !== null && (priority < priorityRange.min || priority > priorityRange.max)) return null;
                       const fallbackY = BOARD_PADDING_TOP + index * DEFAULT_EVENT_STEP;
                       const currentY = dragNode?.timelineId === timeline.id && dragNode.eventId === event.id
                         ? dragNode.currentY
@@ -411,7 +456,7 @@ const TimelineWorkbench: React.FC = () => {
                           className="absolute group"
                           style={{
                             top: `${currentY}px`,
-                            left: '50%',
+                            left: `calc(50% + ${priorityRange === null ? priority * 6 : 0}px)`,
                             transform: 'translate(-50%, -50%)',
                             width: `${LANE_WIDTH}px`,
                           }}
@@ -426,6 +471,7 @@ const TimelineWorkbench: React.FC = () => {
                               <div className="text-[11px] font-mono text-primary truncate">
                                 {event.time?.trim() || '未标注时间'}
                               </div>
+                              <div className="text-[10px] theme-text-secondary">优先级 {priority}</div>
                               <div className="mt-0.5 text-sm font-semibold truncate" title={getEventTitle(event)}>
                                 {getEventTitle(event)}
                               </div>
@@ -474,6 +520,18 @@ const TimelineWorkbench: React.FC = () => {
                   placeholder="时间"
                 />
               </div>
+              <label className="flex items-center gap-2 text-sm theme-text-secondary">
+                优先级
+                <select
+                  value={normalizeTimelinePriority(eventDraft.priority)}
+                  onChange={(event) => setEventDraft((prev) => (prev ? { ...prev, priority: Number(event.target.value) } : prev))}
+                  className="px-3 py-2 rounded border border-theme bg-theme-card"
+                >
+                  {Array.from({ length: TIMELINE_PRIORITY_MAX + 1 }, (_, priority) => (
+                    <option key={priority} value={priority}>{priority}{priority === 0 ? '（最高）' : ''}</option>
+                  ))}
+                </select>
+              </label>
               <RichTextEditor
                 value={eventDraft.content || ''}
                 onChange={(value) => setEventDraft((prev) => (prev ? { ...prev, content: value } : prev))}
@@ -528,6 +586,20 @@ const TimelineWorkbench: React.FC = () => {
       )}
     </div>
   );
+};
+
+const TimelineWorkbench: React.FC = () => {
+  const { canManageCampaignContent } = useCampaignMemberRole();
+
+  if (!canManageCampaignContent) {
+    return (
+      <div className="text-center py-12 theme-text-secondary bg-theme-card rounded-lg border border-dashed border-theme">
+        时间线工作版仅对 GM / 副GM 开放。
+      </div>
+    );
+  }
+
+  return <TimelineWorkbenchContent />;
 };
 
 export default TimelineWorkbench;

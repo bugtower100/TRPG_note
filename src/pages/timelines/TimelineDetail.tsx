@@ -8,11 +8,16 @@ import RichTextEditor from '../../components/common/RichTextEditor';
 import RichTextDisplay from '../../components/common/RichTextDisplay';
 import CustomSubItemsEditor from '../../components/common/CustomSubItemsEditor';
 import CollapsibleSection from '../../components/common/CollapsibleSection';
-import EntityShareActions, { ShareSectionAction, ShareSubItemAction } from '../../components/common/EntityShareActions';
+import { ShareSectionAction, ShareSubItemAction } from '../../components/common/EntityShareActions';
 import { markdownToPreviewText } from '../../components/common/richTextReference';
 import EntityDetailHeader from '../../features/entities/components/EntityDetailHeader';
 import { useSectionedEntityDetail } from '../../features/entities/hooks/useSectionedEntityDetail';
 import { useCampaignMemberRole } from '../../hooks/useCampaignMemberRole';
+import {
+  getTimelineEventPriority,
+  normalizeTimelinePriority,
+  TIMELINE_PRIORITY_MAX,
+} from '../../utils/timelinePriority';
 
 interface TimelineDetailProps {
   entityId?: string;
@@ -62,6 +67,7 @@ const TimelineDetail: React.FC<TimelineDetailProps> = ({ entityId, embedded = fa
   const [draggingEventId, setDraggingEventId] = useState<string | null>(null);
   const [dropTarget, setDropTarget] = useState<{ id: string; position: 'before' | 'after' } | null>(null);
   const [hasInitializedSelection, setHasInitializedSelection] = useState(false);
+  const [priorityRange, setPriorityRange] = useState<{ min: number; max: number } | null>(null);
 
   useEffect(() => {
     const handlePointerDown = (event: MouseEvent) => {
@@ -96,6 +102,7 @@ const TimelineDetail: React.FC<TimelineDetailProps> = ({ entityId, embedded = fa
   const createNewEvent = (): TimelineEvent => ({
     id: uuidv4(),
     title: `新节点 ${timeline.timelineEvents.length + 1}`,
+    priority: 0,
     time: '',
     content: '',
     relations: [],
@@ -174,6 +181,15 @@ const TimelineDetail: React.FC<TimelineDetailProps> = ({ entityId, embedded = fa
     () => timeline?.timelineEvents.find((event) => event.id === selectedEventId) || null,
     [timeline, selectedEventId]
   );
+  const filteredTimelineEvents = useMemo(
+    () => (timeline?.timelineEvents || []).filter((event) => (
+      priorityRange === null || (
+        getTimelineEventPriority(event) >= priorityRange.min
+        && getTimelineEventPriority(event) <= priorityRange.max
+      )
+    )),
+    [priorityRange, timeline]
+  );
 
   useEffect(() => {
     if (!timeline) return;
@@ -193,6 +209,13 @@ const TimelineDetail: React.FC<TimelineDetailProps> = ({ entityId, embedded = fa
       setSelectedEventId(null);
     }
   }, [timeline, selectedEventId, hasInitializedSelection]);
+
+  useEffect(() => {
+    if (selectedEventId && !filteredTimelineEvents.some((event) => event.id === selectedEventId)) {
+      setSelectedEventId(null);
+      setIsEditingEvent(false);
+    }
+  }, [filteredTimelineEvents, selectedEventId]);
 
   useEffect(() => {
     if (!timeline) return;
@@ -218,6 +241,7 @@ const TimelineDetail: React.FC<TimelineDetailProps> = ({ entityId, embedded = fa
       ...selectedEvent,
       ...eventDraft,
       title: (eventDraft.title || '').trim() || getEventTitle(eventDraft),
+      priority: normalizeTimelinePriority(eventDraft.priority),
       time: eventDraft.time || '',
       content: eventDraft.content || '',
     };
@@ -326,21 +350,61 @@ const TimelineDetail: React.FC<TimelineDetailProps> = ({ entityId, embedded = fa
               点击添加节点，单击节点展开备注，也可以直接拖拽节点调整顺序。蓝线会提示插入位置。
             </p>
           </div>
-          <button
-            onClick={addEvent}
-            className="px-3 py-1 bg-primary text-white rounded hover:bg-primary-dark text-sm"
-          >
-            + 添加节点
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            <label className="flex items-center gap-2 text-sm theme-text-secondary">
+              显示优先级
+              <select
+                value={priorityRange?.min ?? 'all'}
+                onChange={(event) => {
+                  if (event.target.value === 'all') {
+                    setPriorityRange(null);
+                    return;
+                  }
+                  const min = Number(event.target.value);
+                  setPriorityRange((current) => ({ min, max: Math.max(min, current?.max ?? min) }));
+                }}
+                className="px-2 py-1 rounded border border-theme bg-theme-card"
+              >
+                <option value="all">全部</option>
+                {Array.from({ length: TIMELINE_PRIORITY_MAX + 1 }, (_, priority) => (
+                  <option key={priority} value={priority}>从 {priority}</option>
+                ))}
+              </select>
+              {priorityRange && (
+                <select
+                  value={priorityRange.max}
+                  onChange={(event) => {
+                    const max = Number(event.target.value);
+                    setPriorityRange((current) => ({ min: Math.min(current?.min ?? max, max), max }));
+                  }}
+                  className="px-2 py-1 rounded border border-theme bg-theme-card"
+                  aria-label="优先级范围结束值"
+                >
+                  {Array.from({ length: TIMELINE_PRIORITY_MAX + 1 }, (_, priority) => (
+                    <option key={priority} value={priority}>到 {priority}</option>
+                  ))}
+                </select>
+              )}
+            </label>
+            <button
+              onClick={addEvent}
+              className="px-3 py-1 bg-primary text-white rounded hover:bg-primary-dark text-sm"
+            >
+              + 添加节点
+            </button>
+          </div>
         </div>
 
-        {timeline.timelineEvents.length === 0 ? (
-          <p className="text-center text-gray-400 py-10">暂无事件节点，点击右上角开始添加节点。</p>
+        {filteredTimelineEvents.length === 0 ? (
+          <p className="text-center text-gray-400 py-10">
+            {timeline.timelineEvents.length === 0 ? '暂无事件节点，点击右上角开始添加节点。' : '当前优先级范围内没有事件节点。'}
+          </p>
         ) : (
           <div className="relative pl-8 before:absolute before:left-3 before:top-2 before:bottom-2 before:w-0.5 before:bg-theme">
             <div className="space-y-2">
-              {timeline.timelineEvents.map((event) => {
+              {filteredTimelineEvents.map((event) => {
                 const selected = selectedEventId === event.id;
+                const priority = getTimelineEventPriority(event);
                 const isDropBefore = dropTarget?.id === event.id && dropTarget.position === 'before' && draggingEventId !== event.id;
                 const isDropAfter = dropTarget?.id === event.id && dropTarget.position === 'after' && draggingEventId !== event.id;
                 return (
@@ -384,11 +448,12 @@ const TimelineDetail: React.FC<TimelineDetailProps> = ({ entityId, embedded = fa
                         setSelectedEventId(event.id);
                         setIsEditingEvent(false);
                       }}
-                      className={`ml-5 w-[220px] max-w-full rounded-lg border px-3 py-2 text-left transition-colors ${
+                      className={`w-[220px] max-w-full rounded-lg border px-3 py-2 text-left transition-[colors,margin] ${
                         selected
                           ? 'border-primary bg-primary/10 ring-2 ring-primary/20'
                           : 'border-theme hover:bg-primary-light/30'
                       } ${draggingEventId === event.id ? 'opacity-45' : ''}`}
+                      style={{ marginLeft: `${20 + (priorityRange === null ? priority * 12 : 0)}px` }}
                       title={getEventTitle(event)}
                     >
                       <div className="flex items-start gap-2">
@@ -403,6 +468,7 @@ const TimelineDetail: React.FC<TimelineDetailProps> = ({ entityId, embedded = fa
                           <div className="text-[11px] font-mono text-primary truncate">
                             {event.time?.trim() || '未标注时间'}
                           </div>
+                          <div className="text-[10px] theme-text-secondary">优先级 {priority}</div>
                           <div className="mt-1 text-sm font-semibold truncate">
                             {getEventTitle(event)}
                           </div>
@@ -473,6 +539,18 @@ const TimelineDetail: React.FC<TimelineDetailProps> = ({ entityId, embedded = fa
                   placeholder="时间"
                 />
               </div>
+              <label className="flex items-center gap-2 text-sm theme-text-secondary">
+                优先级
+                <select
+                  value={normalizeTimelinePriority(eventDraft.priority)}
+                  onChange={(event) => setEventDraft((prev) => (prev ? { ...prev, priority: Number(event.target.value) } : prev))}
+                  className="px-3 py-2 rounded border border-theme bg-theme-card"
+                >
+                  {Array.from({ length: TIMELINE_PRIORITY_MAX + 1 }, (_, priority) => (
+                    <option key={priority} value={priority}>{priority}{priority === 0 ? '（最高）' : ''}</option>
+                  ))}
+                </select>
+              </label>
               <RichTextEditor
                 value={eventDraft.content || ''}
                 onChange={(value) => setEventDraft((prev) => (prev ? { ...prev, content: value } : prev))}

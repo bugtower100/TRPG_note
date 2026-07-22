@@ -30,7 +30,7 @@ const ReleaseNotesContent: React.FC<ReleaseNotesContentProps> = ({ content, clas
 
   return (
     <div
-      className={`release-notes-content prose prose-sm max-w-none theme-text-primary prose-headings:mb-2 prose-headings:mt-4 prose-p:my-2 prose-ul:my-2 prose-ol:my-2 prose-li:my-0.5 prose-pre:overflow-auto prose-code:break-all prose-a:text-primary prose-a:underline ${className}`}
+      className={`rich-text-content release-notes-content theme-text-primary ${className}`}
       dangerouslySetInnerHTML={{ __html: renderedHtml }}
     />
   );

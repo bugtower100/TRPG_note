@@ -220,10 +220,102 @@
     list-style: lower-alpha;
   }
 
+  .rich-text-content {
+    max-width: 100%;
+    color: var(--text-primary);
+    font-family: var(--font-family);
+    font-size: 0.925rem;
+    line-height: 1.7;
+    overflow-wrap: anywhere;
+  }
+
+  .rich-text-content > :first-child {
+    margin-top: 0;
+  }
+
+  .rich-text-content > :last-child {
+    margin-bottom: 0;
+  }
+
+  .rich-text-content p,
+  .rich-text-content ul,
+  .rich-text-content ol,
+  .rich-text-content blockquote,
+  .rich-text-content pre,
+  .rich-text-content table,
+  .rich-text-content hr {
+    margin: 0 0 0.75rem;
+  }
+
+  .rich-text-content h1,
+  .rich-text-content h2,
+  .rich-text-content h3,
+  .rich-text-content h4,
+  .rich-text-content h5,
+  .rich-text-content h6 {
+    margin: 1.15rem 0 0.55rem;
+    color: var(--text-primary);
+    font-weight: 700;
+    line-height: 1.3;
+  }
+
+  .rich-text-content h1 {
+    padding-bottom: 0.3rem;
+    border-bottom: 1px solid var(--border-color);
+    font-size: 1.75rem;
+  }
+
+  .rich-text-content h2 {
+    padding-bottom: 0.25rem;
+    border-bottom: 1px solid var(--border-color);
+    font-size: 1.45rem;
+  }
+
+  .rich-text-content h3 {
+    font-size: 1.25rem;
+  }
+
+  .rich-text-content h4 {
+    font-size: 1.1rem;
+  }
+
+  .rich-text-content h5,
+  .rich-text-content h6 {
+    font-size: 1rem;
+  }
+
+  .rich-text-content strong {
+    font-weight: 700;
+  }
+
+  .rich-text-content em {
+    font-style: italic;
+  }
+
+  .rich-text-content del {
+    text-decoration: line-through;
+  }
+
+  .rich-text-content u {
+    text-decoration: underline;
+    text-decoration-thickness: 1.5px;
+    text-underline-offset: 0.16em;
+  }
+
+  .rich-text-content a:not(.entity-link):not(.section-link) {
+    color: var(--primary-color);
+    text-decoration: underline;
+    text-decoration-style: dotted;
+    text-underline-offset: 0.16em;
+  }
+
+  .rich-text-content a:not(.entity-link):not(.section-link):hover {
+    text-decoration-style: solid;
+  }
+
   .rich-text-content ul,
   .rich-text-content ol {
     padding-left: 1.5rem;
-    margin: 0 0 0.75rem;
   }
 
   .rich-text-content ul {
@@ -236,11 +328,98 @@
 
   .rich-text-content li {
     display: list-item;
+    margin: 0.15rem 0;
   }
 
-  .rich-text-content u {
-    text-decoration-thickness: 1.5px;
-    text-underline-offset: 0.16em;
+  .rich-text-content li > ul,
+  .rich-text-content li > ol {
+    margin-top: 0.15rem;
+    margin-bottom: 0.15rem;
+  }
+
+  .rich-text-content ul ul {
+    list-style: circle;
+  }
+
+  .rich-text-content ul ul ul {
+    list-style: square;
+  }
+
+  .rich-text-content ol ol {
+    list-style: lower-alpha;
+  }
+
+  .rich-text-content .task-list-item {
+    list-style: none;
+  }
+
+  .rich-text-content .task-list-item input[type='checkbox'] {
+    margin-right: 0.45rem;
+    accent-color: var(--primary-color);
+  }
+
+  .rich-text-content blockquote {
+    border-left: 3px solid var(--primary-color);
+    padding: 0.35rem 0 0.35rem 0.85rem;
+    color: var(--text-secondary);
+    background-color: color-mix(in srgb, var(--bg-card) 82%, var(--primary-light) 18%);
+  }
+
+  .rich-text-content blockquote > :last-child {
+    margin-bottom: 0;
+  }
+
+  .rich-text-content code {
+    border-radius: 0.25rem;
+    padding: 0.1rem 0.3rem;
+    background-color: color-mix(in srgb, var(--bg-card) 70%, var(--primary-light) 30%);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    font-size: 0.875em;
+  }
+
+  .rich-text-content pre {
+    max-width: 100%;
+    overflow-x: auto;
+    border: 1px solid var(--border-color);
+    border-radius: 0.5rem;
+    padding: 0.8rem 0.9rem;
+    background-color: color-mix(in srgb, var(--bg-card) 76%, #000 24%);
+    color: var(--text-primary);
+    white-space: pre;
+  }
+
+  .rich-text-content pre code {
+    padding: 0;
+    background: transparent;
+    color: inherit;
+    font-size: 0.85rem;
+  }
+
+  .rich-text-content table {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    overflow-x: auto;
+    border-collapse: collapse;
+  }
+
+  .rich-text-content th,
+  .rich-text-content td {
+    min-width: 7rem;
+    border: 1px solid var(--border-color);
+    padding: 0.45rem 0.6rem;
+    text-align: left;
+    vertical-align: top;
+  }
+
+  .rich-text-content th {
+    background-color: color-mix(in srgb, var(--bg-card) 72%, var(--primary-light) 28%);
+    font-weight: 700;
+  }
+
+  .rich-text-content hr {
+    border: 0;
+    border-top: 1px solid var(--border-color);
   }
 
   .rich-text-content .rich-text-image,

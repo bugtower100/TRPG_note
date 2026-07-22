@@ -151,7 +151,7 @@ const RichTextDisplay: React.FC<RichTextDisplayProps> = ({ content, className = 
     <>
       <div 
         ref={containerRef} 
-        className={`rich-text-content prose prose-sm max-w-none theme-text-primary prose-a:underline prose-a:decoration-dotted prose-ul:list-disc prose-ol:list-decimal prose-li:my-0 ${className}`}
+        className={`rich-text-content theme-text-primary ${className}`}
         style={{ minHeight: '1em' }}
         dangerouslySetInnerHTML={{ __html: renderedHtml }}
       />
