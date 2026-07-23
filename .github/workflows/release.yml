@@ -248,9 +248,9 @@ jobs:
           make_latest: true
           body: |
             ## ${{ steps.version.outputs.name }} 更新内容
-            - 为关系图界面增加了新建人物和节点功能；
-            - 为时间线添加优先级分级功能；
-            - fix:对md文本适配进一步调整，修复了编辑和预览格式不统一的问题
+            - 主要：新增了节点思维导图功能模块；
+            - 为团队笔记添加了顺序锁；
+            - 为关系图页面增加了怪物新建和重复提醒；
           files: |
             TRPG模组笔记-${{ steps.version.outputs.app_version }}-windows-amd64.zip
             TRPG模组笔记-${{ steps.version.outputs.app_version }}-windows-arm64.zip

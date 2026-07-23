@@ -13,7 +13,8 @@ type CollectionKey =
   | 'clues'
   | 'timelines'
   | 'sessionTasks'
-  | 'relationGraphs';
+  | 'relationGraphs'
+  | 'mindMaps';
 
 type MappingTarget = CollectionKey | 'skip';
 type MergeMode = 'append' | 'replace';
@@ -37,6 +38,7 @@ const collectionOrder: CollectionKey[] = [
   'timelines',
   'sessionTasks',
   'relationGraphs',
+  'mindMaps',
 ];
 
 const collectionLabel: Record<CollectionKey, string> = {
@@ -49,6 +51,7 @@ const collectionLabel: Record<CollectionKey, string> = {
   timelines: '时间线',
   sessionTasks: '任务看板',
   relationGraphs: '关系图',
+  mindMaps: '思维导图',
 };
 
 const createDefaultMapping = (): Record<CollectionKey, MappingTarget> =>
@@ -454,6 +457,7 @@ const ImportAssistant: React.FC<ImportAssistantProps> = ({ allowLegacyJsonImport
                       <div className="border border-theme rounded px-2 py-2">时间线 {item.collectionCounts.timelines || 0}</div>
                       <div className="border border-theme rounded px-2 py-2">任务 {item.taskCount || 0}</div>
                       <div className="border border-theme rounded px-2 py-2">关系图 {item.collectionCounts.relationGraphs || 0}</div>
+                      <div className="border border-theme rounded px-2 py-2">思维导图 {item.collectionCounts.mindMaps || 0}</div>
                       <div className="border border-theme rounded px-2 py-2">团队笔记 {item.teamNoteCount}</div>
                       <div className="border border-theme rounded px-2 py-2">图片资源 {item.assetCount}</div>
                     </div>

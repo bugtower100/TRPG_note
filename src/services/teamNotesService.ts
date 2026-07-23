@@ -154,6 +154,33 @@ class TeamNotesService {
     return this.parseResponse<TeamNoteDocument>(response);
   }
 
+  async setTeamNoteOrderLock(
+    campaignId: string,
+    noteId: string,
+    user: UserProfile | null,
+    locked: boolean
+  ): Promise<TeamNoteDocument> {
+    const response = await fetch(`/api/campaigns/${campaignId}/team-notes/${noteId}/order-lock`, {
+      method: 'PUT',
+      headers: buildCollaborationHeaders(user, campaignId),
+      body: JSON.stringify({ locked }),
+    });
+    return this.parseResponse<TeamNoteDocument>(response);
+  }
+
+  async reorderTeamNotes(
+    campaignId: string,
+    user: UserProfile | null,
+    orderedIds: string[]
+  ): Promise<TeamNoteDocument[]> {
+    const response = await fetch(`/api/campaigns/${campaignId}/team-notes/order`, {
+      method: 'PUT',
+      headers: buildCollaborationHeaders(user, campaignId),
+      body: JSON.stringify({ orderedIds }),
+    });
+    return this.parseResponse<TeamNoteDocument[]>(response);
+  }
+
   async startLease(campaignId: string, noteId: string, user: UserProfile | null, role: CampaignMemberRole): Promise<TeamNoteDocument> {
     const response = await fetch(`/api/campaigns/${campaignId}/team-notes/${noteId}/lease/start`, {
       method: 'POST',

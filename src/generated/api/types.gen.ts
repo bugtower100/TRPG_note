@@ -203,6 +203,39 @@ export type MigrationStatusResponse = {
     targetSchemaVersion: number;
 };
 
+export type MindMapHistoryDocument = {
+    /**
+     * A URL to the JSON Schema for this object.
+     */
+    readonly $schema?: string;
+    campaignId: string;
+    histories: {
+        [key: string]: MindMapHistoryState;
+    };
+    updatedAt: number;
+    version: number;
+};
+
+export type MindMapHistoryState = {
+    future: Array<{
+        [key: string]: unknown;
+    }> | null;
+    past: Array<{
+        [key: string]: unknown;
+    }> | null;
+};
+
+export type MindMapHistoryUpdateRequest = {
+    /**
+     * A URL to the JSON Schema for this object.
+     */
+    readonly $schema?: string;
+    expectedVersion: number;
+    histories: {
+        [key: string]: MindMapHistoryState;
+    };
+};
+
 export type PublicCampaignSummary = {
     description: string;
     hasJoinPassword?: boolean;
@@ -307,6 +340,8 @@ export type TeamNoteDoc = {
     createdBy: string;
     createdByName: string;
     id: string;
+    sortLocked: boolean;
+    sortOrder: number;
     title: string;
     updatedAt: number;
     updatedBy: string;
@@ -339,6 +374,9 @@ export type V2CampaignBundle = {
     meta: {
         [key: string]: unknown;
     };
+    mindMaps: Array<{
+        [key: string]: unknown;
+    }> | null;
     monsters: Array<{
         [key: string]: unknown;
     }> | null;
@@ -524,6 +562,22 @@ export type MigrationStatusResponseWritable = {
     requiresMigration: boolean;
     state: string;
     targetSchemaVersion: number;
+};
+
+export type MindMapHistoryDocumentWritable = {
+    campaignId: string;
+    histories: {
+        [key: string]: MindMapHistoryState;
+    };
+    updatedAt: number;
+    version: number;
+};
+
+export type MindMapHistoryUpdateRequestWritable = {
+    expectedVersion: number;
+    histories: {
+        [key: string]: MindMapHistoryState;
+    };
 };
 
 export type SessionTaskBoardDocWritable = {
@@ -1561,3 +1615,119 @@ export type UpdateV2CampaignBundleResponses = {
 };
 
 export type UpdateV2CampaignBundleResponse = UpdateV2CampaignBundleResponses[keyof UpdateV2CampaignBundleResponses];
+
+export type GetMindMapHistoryData = {
+    body?: never;
+    headers?: {
+        /**
+         * 当前用户 ID
+         */
+        'X-TRPG-User-Id'?: string;
+        /**
+         * 当前用户名
+         */
+        'X-TRPG-Username'?: string;
+        /**
+         * 公开模组进入密码，只有需要时才传
+         */
+        'X-TRPG-Campaign-Password'?: string;
+    };
+    path: {
+        /**
+         * 模组 ID
+         */
+        campaignId: string;
+    };
+    query?: never;
+    url: '/api/v2/campaigns/{campaignId}/mind-map-history';
+};
+
+export type GetMindMapHistoryErrors = {
+    /**
+     * Bad Request
+     */
+    400: ErrorModel;
+    /**
+     * Forbidden
+     */
+    403: ErrorModel;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorModel;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorModel;
+};
+
+export type GetMindMapHistoryError = GetMindMapHistoryErrors[keyof GetMindMapHistoryErrors];
+
+export type GetMindMapHistoryResponses = {
+    /**
+     * OK
+     */
+    200: MindMapHistoryDocument;
+};
+
+export type GetMindMapHistoryResponse = GetMindMapHistoryResponses[keyof GetMindMapHistoryResponses];
+
+export type UpdateMindMapHistoryData = {
+    body: MindMapHistoryUpdateRequestWritable;
+    headers?: {
+        /**
+         * 当前用户 ID
+         */
+        'X-TRPG-User-Id'?: string;
+        /**
+         * 当前用户名
+         */
+        'X-TRPG-Username'?: string;
+        /**
+         * 公开模组进入密码，只有需要时才传
+         */
+        'X-TRPG-Campaign-Password'?: string;
+    };
+    path: {
+        /**
+         * 模组 ID
+         */
+        campaignId: string;
+    };
+    query?: never;
+    url: '/api/v2/campaigns/{campaignId}/mind-map-history';
+};
+
+export type UpdateMindMapHistoryErrors = {
+    /**
+     * Bad Request
+     */
+    400: ErrorModel;
+    /**
+     * Forbidden
+     */
+    403: ErrorModel;
+    /**
+     * Conflict
+     */
+    409: ErrorModel;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorModel;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorModel;
+};
+
+export type UpdateMindMapHistoryError = UpdateMindMapHistoryErrors[keyof UpdateMindMapHistoryErrors];
+
+export type UpdateMindMapHistoryResponses = {
+    /**
+     * OK
+     */
+    200: MindMapHistoryDocument;
+};
+
+export type UpdateMindMapHistoryResponse = UpdateMindMapHistoryResponses[keyof UpdateMindMapHistoryResponses];

@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertCircle, FilePlus2, History, Lock, Trash2, Unlock } from 'lucide-react';
+import { AlertCircle, FilePlus2, GripVertical, History, Lock, Trash2, Unlock } from 'lucide-react';
 import RichTextEditor from '../components/common/RichTextEditor';
 import RichTextDisplay from '../components/common/RichTextDisplay';
 import ConfirmDialog from '../components/common/ConfirmDialog';
@@ -12,6 +12,13 @@ import { teamNotesService } from '../services/teamNotesService';
 import { VersionConflictError } from '../services/conflictError';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { getCampaignRoleLabel } from '../utils/campaignRoles';
+
+const mergeSavedNote = (notes: TeamNoteDocument[], saved: TeamNoteDocument) => {
+  if (saved.sortLocked) {
+    return notes.map((item) => item.id === saved.id ? saved : item);
+  }
+  return [saved, ...notes.filter((item) => item.id !== saved.id)];
+};
 
 const TeamNotes: React.FC = () => {
   const { currentCampaignId, user } = useCampaignSession();
@@ -29,6 +36,10 @@ const TeamNotes: React.FC = () => {
   const [deletingNote, setDeletingNote] = useState<TeamNoteDocument | null>(null);
   const [leaseStartedAt, setLeaseStartedAt] = useState<number | null>(null);
   const [conflictNote, setConflictNote] = useState<TeamNoteDocument | null>(null);
+  const [draggingNoteId, setDraggingNoteId] = useState<string | null>(null);
+  const [dropTarget, setDropTarget] = useState<{ id: string; position: 'before' | 'after' } | null>(null);
+  const [lockingNoteId, setLockingNoteId] = useState<string | null>(null);
+  const [isReordering, setIsReordering] = useState(false);
   const saveTimerRef = useRef<number | null>(null);
   const cleanupStateRef = useRef<{
     campaignId: string | null;
@@ -52,9 +63,12 @@ const TeamNotes: React.FC = () => {
   const configQueryKey = currentCampaignId
     ? queryKeys.campaigns.config(currentCampaignId, user?.id)
     : ['campaigns', 'config', 'disabled'] as const;
-  const notesQueryKey = currentCampaignId
-    ? queryKeys.campaigns.teamNotes(currentCampaignId, user?.id)
-    : ['campaigns', 'team-notes', 'disabled'] as const;
+  const notesQueryKey = useMemo(
+    () => currentCampaignId
+      ? queryKeys.campaigns.teamNotes(currentCampaignId, user?.id)
+      : ['campaigns', 'team-notes', 'disabled'] as const,
+    [currentCampaignId, user?.id]
+  );
   const configQuery = useQuery({
     queryKey: configQueryKey,
     queryFn: async () => {
@@ -145,9 +159,9 @@ const TeamNotes: React.FC = () => {
         expectedVersion: selectedNote.version,
         leaseStartedAt,
       }).then((saved) => {
-        setNotes((prev) => prev.map((item) => item.id === saved.id ? saved : item));
+        setNotes((prev) => mergeSavedNote(prev, saved));
         queryClient.setQueryData<TeamNoteDocument[]>(notesQueryKey, (prev = []) =>
-          prev.map((item) => item.id === saved.id ? saved : item)
+          mergeSavedNote(prev, saved)
         );
         setStatusText(`已自动保存：${new Date(saved.updatedAt).toLocaleTimeString()}`);
       }).catch((error) => {
@@ -163,7 +177,7 @@ const TeamNotes: React.FC = () => {
         saveTimerRef.current = null;
       }
     };
-  }, [currentCampaignId, draftContent, draftTitle, editing, leaseStartedAt, selectedNote, user]);
+  }, [currentCampaignId, draftContent, draftTitle, editing, leaseStartedAt, notesQueryKey, queryClient, selectedNote, user]);
 
   useEffect(() => {
     cleanupStateRef.current = {
@@ -231,9 +245,9 @@ const TeamNotes: React.FC = () => {
       expectedVersion: selectedNote.version,
       leaseStartedAt,
     });
-    setNotes((prev) => prev.map((item) => item.id === saved.id ? saved : item));
+    setNotes((prev) => mergeSavedNote(prev, saved));
     queryClient.setQueryData<TeamNoteDocument[]>(notesQueryKey, (prev = []) =>
-      prev.map((item) => item.id === saved.id ? saved : item)
+      mergeSavedNote(prev, saved)
     );
     setStatusText(`已保存：${new Date(saved.updatedAt).toLocaleTimeString()}`);
     return saved;
@@ -310,9 +324,9 @@ const TeamNotes: React.FC = () => {
 
   const handleUseRemoteConflict = () => {
     if (!conflictNote) return;
-    setNotes((prev) => prev.map((item) => item.id === conflictNote.id ? conflictNote : item));
+    setNotes((prev) => mergeSavedNote(prev, conflictNote));
     queryClient.setQueryData<TeamNoteDocument[]>(notesQueryKey, (prev = []) =>
-      prev.map((item) => item.id === conflictNote.id ? conflictNote : item)
+      mergeSavedNote(prev, conflictNote)
     );
     if (selectedId === conflictNote.id) {
       setDraftTitle(conflictNote.title);
@@ -331,9 +345,9 @@ const TeamNotes: React.FC = () => {
         expectedVersion: conflictNote.version,
         leaseStartedAt,
       });
-      setNotes((prev) => prev.map((item) => item.id === saved.id ? saved : item));
+      setNotes((prev) => mergeSavedNote(prev, saved));
       queryClient.setQueryData<TeamNoteDocument[]>(notesQueryKey, (prev = []) =>
-        prev.map((item) => item.id === saved.id ? saved : item)
+        mergeSavedNote(prev, saved)
       );
       setConflictNote(null);
       setStatusText(`已覆盖保存：${new Date(saved.updatedAt).toLocaleTimeString()}`);
@@ -350,6 +364,67 @@ const TeamNotes: React.FC = () => {
     : selectedNote?.activeLease?.userId === user?.id
       ? '你正在编辑'
       : '';
+
+  const handleToggleOrderLock = async (note: TeamNoteDocument) => {
+    if (!currentCampaignId || !user || lockingNoteId) return;
+    setLockingNoteId(note.id);
+    try {
+      const saved = await teamNotesService.setTeamNoteOrderLock(currentCampaignId, note.id, user, !note.sortLocked);
+      setNotes((prev) => prev.map((item) => item.id === saved.id ? saved : item));
+      queryClient.setQueryData<TeamNoteDocument[]>(notesQueryKey, (prev = []) =>
+        prev.map((item) => item.id === saved.id ? saved : item)
+      );
+      setStatusText(saved.sortLocked ? '已锁定笔记顺序' : '已解除笔记顺序锁定');
+    } catch (error) {
+      setStatusText(error instanceof Error ? error.message : '更新顺序锁失败');
+    } finally {
+      setLockingNoteId(null);
+    }
+  };
+
+  const clearNoteDragState = () => {
+    setDraggingNoteId(null);
+    setDropTarget(null);
+  };
+
+  const handleDropNote = async (targetId: string) => {
+    if (!currentCampaignId || !user || !draggingNoteId || !dropTarget || isReordering) {
+      clearNoteDragState();
+      return;
+    }
+    const previousNotes = notes;
+    const nextNotes = [...notes];
+    const sourceIndex = nextNotes.findIndex((note) => note.id === draggingNoteId);
+    if (sourceIndex < 0 || draggingNoteId === targetId) {
+      clearNoteDragState();
+      return;
+    }
+    const [draggedNote] = nextNotes.splice(sourceIndex, 1);
+    const targetIndex = nextNotes.findIndex((note) => note.id === targetId);
+    if (targetIndex < 0) {
+      clearNoteDragState();
+      return;
+    }
+    const insertIndex = dropTarget.position === 'after' ? targetIndex + 1 : targetIndex;
+    nextNotes.splice(insertIndex, 0, draggedNote);
+    clearNoteDragState();
+    setNotes(nextNotes);
+    queryClient.setQueryData<TeamNoteDocument[]>(notesQueryKey, nextNotes);
+    setIsReordering(true);
+    try {
+      const saved = await teamNotesService.reorderTeamNotes(currentCampaignId, user, nextNotes.map((note) => note.id));
+      setNotes(saved);
+      queryClient.setQueryData<TeamNoteDocument[]>(notesQueryKey, saved);
+      setStatusText('笔记顺序已保存');
+    } catch (error) {
+      setNotes(previousNotes);
+      queryClient.setQueryData<TeamNoteDocument[]>(notesQueryKey, previousNotes);
+      setStatusText(error instanceof Error ? error.message : '保存笔记顺序失败');
+      void notesQuery.refetch();
+    } finally {
+      setIsReordering(false);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -383,20 +458,64 @@ const TeamNotes: React.FC = () => {
           <div className="space-y-2 max-h-[60vh] overflow-y-auto">
             {notes.map((note) => {
               const activeElsewhere = note.activeLease && note.activeLease.userId !== user?.id;
+              const isDropBefore = dropTarget?.id === note.id && dropTarget.position === 'before' && draggingNoteId !== note.id;
+              const isDropAfter = dropTarget?.id === note.id && dropTarget.position === 'after' && draggingNoteId !== note.id;
               return (
-                <button
+                <div
                   key={note.id}
-                  type="button"
-                  onClick={() => void handleSelectNote(note.id)}
-                  className={`w-full text-left p-3 rounded border transition-colors ${
+                  onDragOver={(event) => {
+                    if (!draggingNoteId || draggingNoteId === note.id) return;
+                    event.preventDefault();
+                    const rect = event.currentTarget.getBoundingClientRect();
+                    setDropTarget({ id: note.id, position: event.clientY < rect.top + rect.height / 2 ? 'before' : 'after' });
+                  }}
+                  onDrop={(event) => {
+                    event.preventDefault();
+                    void handleDropNote(note.id);
+                  }}
+                  className={`relative flex items-center gap-1 rounded border transition-colors ${
                     selectedId === note.id ? 'border-primary bg-primary-light' : 'border-theme hover:bg-primary-light/50'
-                  }`}
+                  } ${draggingNoteId === note.id ? 'opacity-50' : ''}`}
                 >
-                  <div className="font-medium truncate">{note.title}</div>
-                  <div className="text-xs theme-text-secondary mt-1 truncate">
-                    {activeElsewhere ? `${note.activeLease?.username} 正在编辑...` : `版本 ${note.version}`}
-                  </div>
-                </button>
+                  {isDropBefore && <div className="absolute -top-1 left-0 right-0 h-0.5 bg-primary rounded" />}
+                  <span
+                    draggable={!isReordering}
+                    onDragStart={(event) => {
+                      event.dataTransfer.effectAllowed = 'move';
+                      event.dataTransfer.setData('text/plain', note.id);
+                      setDraggingNoteId(note.id);
+                      setDropTarget(null);
+                    }}
+                    onDragEnd={clearNoteDragState}
+                    className="pl-2 text-gray-400 cursor-grab active:cursor-grabbing"
+                    title="拖拽调整顺序"
+                  >
+                    <GripVertical size={16} />
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => void handleSelectNote(note.id)}
+                    className="min-w-0 flex-1 p-3 text-left"
+                  >
+                    <div className="font-medium truncate">{note.title}</div>
+                    <div className="text-xs theme-text-secondary mt-1 truncate">
+                      {activeElsewhere ? `${note.activeLease?.username} 正在编辑...` : `版本 ${note.version}`}
+                    </div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void handleToggleOrderLock(note)}
+                    disabled={lockingNoteId === note.id}
+                    aria-pressed={note.sortLocked}
+                    className={`mr-2 p-1.5 rounded border disabled:opacity-50 ${
+                      note.sortLocked ? 'border-primary text-primary bg-primary/10' : 'border-theme theme-text-secondary hover:text-primary'
+                    }`}
+                    title={note.sortLocked ? '解除顺序锁定' : '锁定当前顺序'}
+                  >
+                    {note.sortLocked ? <Lock size={14} /> : <Unlock size={14} />}
+                  </button>
+                  {isDropAfter && <div className="absolute -bottom-1 left-0 right-0 h-0.5 bg-primary rounded" />}
+                </div>
               );
             })}
             {notes.length === 0 && <div className="text-sm theme-text-secondary p-2">还没有团队笔记</div>}

@@ -2,7 +2,7 @@
 
 import type { Client, Options as Options2, TDataShape } from './client';
 import { client } from './client.gen';
-import type { CreateCharacterSheetData, CreateCharacterSheetErrors, CreateCharacterSheetResponses, CreateV2CampaignData, CreateV2CampaignErrors, CreateV2CampaignResponses, DeleteCharacterSheetData, DeleteCharacterSheetErrors, DeleteCharacterSheetResponses, DeleteV2CampaignData, DeleteV2CampaignErrors, DeleteV2CampaignResponses, GetCampaignConfigData, GetCampaignConfigErrors, GetCampaignConfigResponses, GetCharacterSheetData, GetCharacterSheetErrors, GetCharacterSheetResponses, GetMigrationStatusData, GetMigrationStatusErrors, GetMigrationStatusResponses, GetSessionTasksData, GetSessionTasksErrors, GetSessionTasksResponses, GetV2CampaignBundleData, GetV2CampaignBundleErrors, GetV2CampaignBundleResponses, ListCampaignSharesData, ListCampaignSharesErrors, ListCampaignSharesResponses, ListCampaignVersionsData, ListCampaignVersionsErrors, ListCampaignVersionsResponses, ListCharacterSheetsData, ListCharacterSheetsErrors, ListCharacterSheetsResponses, ListPublicCampaignsData, ListPublicCampaignsErrors, ListPublicCampaignsResponses, ListTeamNotesData, ListTeamNotesErrors, ListTeamNotesResponses, ListV2CampaignsData, ListV2CampaignsErrors, ListV2CampaignsResponses, PreviewCharacterSheetImportData, PreviewCharacterSheetImportErrors, PreviewCharacterSheetImportResponses, StartMigrationData, StartMigrationErrors, StartMigrationResponses, UpdateCharacterSheetData, UpdateCharacterSheetErrors, UpdateCharacterSheetResponses, UpdateV2CampaignBundleData, UpdateV2CampaignBundleErrors, UpdateV2CampaignBundleResponses } from './types.gen';
+import type { CreateCharacterSheetData, CreateCharacterSheetErrors, CreateCharacterSheetResponses, CreateV2CampaignData, CreateV2CampaignErrors, CreateV2CampaignResponses, DeleteCharacterSheetData, DeleteCharacterSheetErrors, DeleteCharacterSheetResponses, DeleteV2CampaignData, DeleteV2CampaignErrors, DeleteV2CampaignResponses, GetCampaignConfigData, GetCampaignConfigErrors, GetCampaignConfigResponses, GetCharacterSheetData, GetCharacterSheetErrors, GetCharacterSheetResponses, GetMigrationStatusData, GetMigrationStatusErrors, GetMigrationStatusResponses, GetMindMapHistoryData, GetMindMapHistoryErrors, GetMindMapHistoryResponses, GetSessionTasksData, GetSessionTasksErrors, GetSessionTasksResponses, GetV2CampaignBundleData, GetV2CampaignBundleErrors, GetV2CampaignBundleResponses, ListCampaignSharesData, ListCampaignSharesErrors, ListCampaignSharesResponses, ListCampaignVersionsData, ListCampaignVersionsErrors, ListCampaignVersionsResponses, ListCharacterSheetsData, ListCharacterSheetsErrors, ListCharacterSheetsResponses, ListPublicCampaignsData, ListPublicCampaignsErrors, ListPublicCampaignsResponses, ListTeamNotesData, ListTeamNotesErrors, ListTeamNotesResponses, ListV2CampaignsData, ListV2CampaignsErrors, ListV2CampaignsResponses, PreviewCharacterSheetImportData, PreviewCharacterSheetImportErrors, PreviewCharacterSheetImportResponses, StartMigrationData, StartMigrationErrors, StartMigrationResponses, UpdateCharacterSheetData, UpdateCharacterSheetErrors, UpdateCharacterSheetResponses, UpdateMindMapHistoryData, UpdateMindMapHistoryErrors, UpdateMindMapHistoryResponses, UpdateV2CampaignBundleData, UpdateV2CampaignBundleErrors, UpdateV2CampaignBundleResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -179,6 +179,27 @@ export const getV2CampaignBundle = <ThrowOnError extends boolean = false>(option
  */
 export const updateV2CampaignBundle = <ThrowOnError extends boolean = false>(options: Options<UpdateV2CampaignBundleData, ThrowOnError>) => (options.client ?? client).put<UpdateV2CampaignBundleResponses, UpdateV2CampaignBundleErrors, ThrowOnError>({
     url: '/api/v2/campaigns/{campaignId}/bundle',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * 获取思维导图撤销历史
+ *
+ * 仅 GM 和副 GM 可读取。历史独立于普通模组 bundle 与导出文件。
+ */
+export const getMindMapHistory = <ThrowOnError extends boolean = false>(options: Options<GetMindMapHistoryData, ThrowOnError>) => (options.client ?? client).get<GetMindMapHistoryResponses, GetMindMapHistoryErrors, ThrowOnError>({ url: '/api/v2/campaigns/{campaignId}/mind-map-history', ...options });
+
+/**
+ * 更新思维导图撤销历史
+ *
+ * 仅 GM 和副 GM 可更新，使用独立版本号进行乐观锁保存。
+ */
+export const updateMindMapHistory = <ThrowOnError extends boolean = false>(options: Options<UpdateMindMapHistoryData, ThrowOnError>) => (options.client ?? client).put<UpdateMindMapHistoryResponses, UpdateMindMapHistoryErrors, ThrowOnError>({
+    url: '/api/v2/campaigns/{campaignId}/mind-map-history',
     ...options,
     headers: {
         'Content-Type': 'application/json',

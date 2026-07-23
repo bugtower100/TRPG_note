@@ -88,6 +88,8 @@ type TeamNoteDoc struct {
 	CreatedAt     int64          `json:"createdAt"`
 	UpdatedAt     int64          `json:"updatedAt"`
 	Version       int            `json:"version"`
+	SortOrder     int64          `json:"sortOrder"`
+	SortLocked    bool           `json:"sortLocked"`
 	ActiveLease   *TeamNoteLease `json:"activeLease,omitempty"`
 }
 
@@ -606,6 +608,24 @@ func leaseExpired(lease *TeamNoteLease) bool {
 		return false
 	}
 	return *lease.ExpiresAt <= time.Now().UnixMilli()
+}
+
+func normalizeTeamNoteSortOrder(note TeamNoteDoc) int64 {
+	if note.SortOrder > 0 {
+		return note.SortOrder
+	}
+	return note.UpdatedAt * 1000
+}
+
+func sortTeamNotes(notes []TeamNoteDoc) {
+	sort.SliceStable(notes, func(i, j int) bool {
+		left := normalizeTeamNoteSortOrder(notes[i])
+		right := normalizeTeamNoteSortOrder(notes[j])
+		if left != right {
+			return left > right
+		}
+		return notes[i].UpdatedAt > notes[j].UpdatedAt
+	})
 }
 
 func normalizeTaskStatus(status string) string {
@@ -1982,9 +2002,10 @@ func main() {
 			if leaseExpired(note.ActiveLease) {
 				note.ActiveLease = nil
 			}
+			note.SortOrder = normalizeTeamNoteSortOrder(note)
 			notes = append(notes, note)
 		}
-		sort.Slice(notes, func(i, j int) bool { return notes[i].UpdatedAt > notes[j].UpdatedAt })
+		sortTeamNotes(notes)
 		c.JSON(200, notes)
 	})
 
@@ -2019,6 +2040,7 @@ func main() {
 			CreatedAt:     now,
 			UpdatedAt:     now,
 			Version:       1,
+			SortOrder:     now * 1000,
 		}
 		if note.Title == "" {
 			note.Title = "新的团队笔记"
@@ -2039,6 +2061,96 @@ func main() {
 			CreatedAt:        now,
 			Snapshot:         toGenericMap(note),
 		}); err != nil {
+			c.JSON(500, gin.H{"error": "database_error"})
+			return
+		}
+		c.JSON(200, note)
+	})
+
+	campaignAPI.PUT("/:campaignId/team-notes/order", func(c *gin.Context) {
+		campaignID := strings.TrimSpace(c.Param("campaignId"))
+		userID, username := requestUser(c)
+		if campaignID == "" || userID == "" || username == "" {
+			c.JSON(400, gin.H{"error": "missing_identity"})
+			return
+		}
+		if _, accessOK := loadCampaignConfigForRequest(c, db, campaignID, userID, username); !accessOK {
+			return
+		}
+		var body struct {
+			OrderedIDs []string `json:"orderedIds"`
+		}
+		if err := c.ShouldBindJSON(&body); err != nil || len(body.OrderedIDs) == 0 {
+			c.JSON(400, gin.H{"error": "invalid_payload"})
+			return
+		}
+		seen := make(map[string]bool, len(body.OrderedIDs))
+		notes := make([]TeamNoteDoc, 0, len(body.OrderedIDs))
+		baseOrder := time.Now().UnixMilli() * 1000
+		for index, noteID := range body.OrderedIDs {
+			noteID = strings.TrimSpace(noteID)
+			if noteID == "" || seen[noteID] {
+				c.JSON(400, gin.H{"error": "invalid_payload"})
+				return
+			}
+			seen[noteID] = true
+			var note TeamNoteDoc
+			ok, _, err := kvLoadJSON(db, teamNoteKey(campaignID, noteID), &note)
+			if err != nil {
+				c.JSON(500, gin.H{"error": "database_error"})
+				return
+			}
+			if !ok {
+				c.JSON(409, gin.H{"error": "note_list_changed"})
+				return
+			}
+			note.SortOrder = baseOrder + int64(len(body.OrderedIDs)-index)
+			if leaseExpired(note.ActiveLease) {
+				note.ActiveLease = nil
+			}
+			notes = append(notes, note)
+		}
+		for _, note := range notes {
+			if _, err := kvSaveJSON(db, teamNoteKey(campaignID, note.ID), note); err != nil {
+				c.JSON(500, gin.H{"error": "database_error"})
+				return
+			}
+		}
+		sortTeamNotes(notes)
+		c.JSON(200, notes)
+	})
+
+	campaignAPI.PUT("/:campaignId/team-notes/:noteId/order-lock", func(c *gin.Context) {
+		campaignID := strings.TrimSpace(c.Param("campaignId"))
+		noteID := strings.TrimSpace(c.Param("noteId"))
+		userID, username := requestUser(c)
+		if campaignID == "" || noteID == "" || userID == "" || username == "" {
+			c.JSON(400, gin.H{"error": "missing_identity"})
+			return
+		}
+		if _, accessOK := loadCampaignConfigForRequest(c, db, campaignID, userID, username); !accessOK {
+			return
+		}
+		var body struct {
+			Locked *bool `json:"locked"`
+		}
+		if err := c.ShouldBindJSON(&body); err != nil || body.Locked == nil {
+			c.JSON(400, gin.H{"error": "invalid_payload"})
+			return
+		}
+		var note TeamNoteDoc
+		ok, _, err := kvLoadJSON(db, teamNoteKey(campaignID, noteID), &note)
+		if err != nil {
+			c.JSON(500, gin.H{"error": "database_error"})
+			return
+		}
+		if !ok {
+			c.JSON(404, gin.H{"error": "not_found"})
+			return
+		}
+		note.SortOrder = normalizeTeamNoteSortOrder(note)
+		note.SortLocked = *body.Locked
+		if _, err := kvSaveJSON(db, teamNoteKey(campaignID, noteID), note); err != nil {
 			c.JSON(500, gin.H{"error": "database_error"})
 			return
 		}
@@ -2104,6 +2216,11 @@ func main() {
 		note.UpdatedByName = username
 		note.UpdatedAt = now
 		note.Version++
+		if !note.SortLocked {
+			note.SortOrder = now * 1000
+		} else {
+			note.SortOrder = normalizeTeamNoteSortOrder(note)
+		}
 		if role == "PL" {
 			expiresAt := now + int64(10*time.Minute/time.Millisecond)
 			note.ActiveLease = &TeamNoteLease{UserID: userID, Username: username, Role: role, StartedAt: now, ExpiresAt: &expiresAt}
@@ -2697,6 +2814,65 @@ func main() {
 			bundle = redactV2CampaignBundleForPL(bundle)
 		}
 		c.JSON(200, bundle)
+	})
+
+	v2CampaignAPI.GET("/:campaignId/mind-map-history", func(c *gin.Context) {
+		campaignID := strings.TrimSpace(c.Param("campaignId"))
+		userID, username := requestUser(c)
+		if campaignID == "" || userID == "" || username == "" {
+			c.JSON(400, gin.H{"error": "missing_identity"})
+			return
+		}
+		cfg, accessOK := loadCampaignConfigForRequest(c, db, campaignID, userID, username)
+		if !accessOK {
+			return
+		}
+		if !isCampaignManagerRole(memberRole(cfg, userID)) {
+			c.JSON(403, gin.H{"error": "forbidden"})
+			return
+		}
+		history, err := loadMindMapHistoryDocument(db, campaignID)
+		if err != nil {
+			c.JSON(500, gin.H{"error": "database_error"})
+			return
+		}
+		c.JSON(200, history)
+	})
+
+	v2CampaignAPI.PUT("/:campaignId/mind-map-history", func(c *gin.Context) {
+		campaignID := strings.TrimSpace(c.Param("campaignId"))
+		userID, username := requestUser(c)
+		if campaignID == "" || userID == "" || username == "" {
+			c.JSON(400, gin.H{"error": "missing_identity"})
+			return
+		}
+		cfg, accessOK := loadCampaignConfigForRequest(c, db, campaignID, userID, username)
+		if !accessOK {
+			return
+		}
+		if !isCampaignManagerRole(memberRole(cfg, userID)) {
+			c.JSON(403, gin.H{"error": "forbidden"})
+			return
+		}
+		var request MindMapHistoryUpdateRequest
+		if err := c.ShouldBindJSON(&request); err != nil {
+			c.JSON(400, gin.H{"error": "invalid_body"})
+			return
+		}
+		history, err := updateMindMapHistoryDocument(db, campaignID, request)
+		if err != nil {
+			var conflictErr *MindMapHistoryConflictError
+			if errors.As(err, &conflictErr) {
+				c.JSON(409, gin.H{
+					"error":   "conflict",
+					"history": conflictErr.Current,
+				})
+				return
+			}
+			c.JSON(500, gin.H{"error": "database_error"})
+			return
+		}
+		c.JSON(200, history)
 	})
 
 	v2CampaignAPI.GET("", func(c *gin.Context) {

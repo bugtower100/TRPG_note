@@ -24,6 +24,7 @@ const MonsterDetail = lazy(() => import('./pages/monsters/MonsterDetail'));
 const LocationDetail = lazy(() => import('./pages/locations/LocationDetail'));
 const OrganizationDetail = lazy(() => import('./pages/organizations/OrganizationDetail'));
 const RelationGraphs = lazy(() => import('./pages/RelationGraphs'));
+const MindMaps = lazy(() => import('./pages/MindMaps'));
 const TeamNotes = lazy(() => import('./pages/TeamNotes'));
 const SharedContent = lazy(() => import('./pages/SharedContent'));
 const SharedEntityDetailRoute = lazy(() => import('./pages/SharedEntityDetailRoute'));
@@ -85,6 +86,7 @@ function AppContent() {
               <Route path="timelines/:id" element={<TimelineList />} />
               <Route path="timelines/shared/:shareId" element={<SharedEntityDetailRoute entityType="timelines" />} />
               <Route path="relation-graphs" element={<RelationGraphs />} />
+              <Route path="mind-maps" element={<MindMaps />} />
               <Route path="team-notes" element={<TeamNotes />} />
               <Route path="characters/sheets" element={<CharacterSheets />} />
               <Route path="characters/sheets/:id" element={<CharacterSheets />} />

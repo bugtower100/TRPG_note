@@ -190,6 +190,58 @@ export interface RelationGraph {
   updatedAt: number;
 }
 
+export type MindMapLayoutDirection = 'LR' | 'TB';
+export const MIND_MAP_MAX_ENTITY_REFS = 20;
+
+export interface MindMapEntityReference {
+  entityType: GraphEntityType;
+  entityId: string;
+}
+
+export interface MindMapNodePosition {
+  x: number;
+  y: number;
+}
+
+export interface MindMapNode {
+  id: string;
+  parentId: string | null;
+  title: string;
+  content: string;
+  siblingOrder: number;
+  collapsed: boolean;
+  color?: string;
+  position?: MindMapNodePosition;
+  incomingEdgeLabel?: string;
+  entityRefs: MindMapEntityReference[];
+  /** V1 compatibility bridge. New data is written to entityRefs. */
+  entityRef?: MindMapEntityReference;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface MindMapDocument {
+  id: string;
+  name: string;
+  rootNodeId: string;
+  nodes: MindMapNode[];
+  layoutDirection: MindMapLayoutDirection;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface MindMapHistoryState {
+  past: MindMapDocument[];
+  future: MindMapDocument[];
+}
+
+export interface MindMapHistoryDocument {
+  campaignId: string;
+  histories: Record<string, MindMapHistoryState>;
+  updatedAt: number;
+  version: number;
+}
+
 export type SessionTaskStatus = 'todo' | 'in_progress' | 'done';
 
 export interface SessionTask {
@@ -234,6 +286,7 @@ export interface CampaignData {
   monsters: Monster[];
   sessionTasks: SessionTask[];
   relationGraphs?: RelationGraph[];
+  mindMaps?: MindMapDocument[];
 }
 
 export interface Monster extends BaseEntity {
@@ -324,6 +377,8 @@ export interface TeamNoteDocument {
   createdAt: number;
   updatedAt: number;
   version: number;
+  sortOrder: number;
+  sortLocked: boolean;
   activeLease?: TeamNoteLease | null;
 }
 

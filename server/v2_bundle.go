@@ -20,6 +20,7 @@ type V2CampaignBundle struct {
 	Monsters       []map[string]any `json:"monsters"`
 	SessionTasks   []map[string]any `json:"sessionTasks"`
 	RelationGraphs []map[string]any `json:"relationGraphs"`
+	MindMaps       []map[string]any `json:"mindMaps"`
 }
 
 type V2CampaignBundleResponse struct {
@@ -53,6 +54,7 @@ var v2DocumentTypeOrder = []string{
 	"monsters",
 	"session_tasks",
 	"relation_graphs",
+	"mind_maps",
 }
 
 func defaultV2Bundle(campaignID string) V2CampaignBundle {
@@ -76,6 +78,7 @@ func defaultV2Bundle(campaignID string) V2CampaignBundle {
 		Monsters:       []map[string]any{},
 		SessionTasks:   []map[string]any{},
 		RelationGraphs: []map[string]any{},
+		MindMaps:       []map[string]any{},
 	}
 }
 
@@ -105,6 +108,9 @@ func toMapSlice(value any) []map[string]any {
 	}
 	var result []map[string]any
 	if err := json.Unmarshal(bytes, &result); err != nil {
+		return []map[string]any{}
+	}
+	if result == nil {
 		return []map[string]any{}
 	}
 	return result
@@ -169,6 +175,11 @@ func loadV2CampaignBundle(db *gorm.DB, campaignID string) (V2CampaignBundleRespo
 	} else if doc != nil {
 		version = maxInt(version, doc.Version)
 	}
+	if doc, err := loadDocumentJSON(db, campaignID, "mind_maps", &bundle.MindMaps); err != nil {
+		return V2CampaignBundleResponse{}, err
+	} else if doc != nil {
+		version = maxInt(version, doc.Version)
+	}
 
 	return V2CampaignBundleResponse{
 		CampaignID: campaignID,
@@ -188,6 +199,7 @@ func redactV2CampaignBundleForPL(response V2CampaignBundleResponse) V2CampaignBu
 	response.Bundle.Monsters = []map[string]any{}
 	response.Bundle.SessionTasks = []map[string]any{}
 	response.Bundle.RelationGraphs = []map[string]any{}
+	response.Bundle.MindMaps = []map[string]any{}
 	return response
 }
 
@@ -266,6 +278,9 @@ func saveV2CampaignBundle(db *gorm.DB, campaignID string, request V2CampaignBund
 			return err
 		}
 		if err := saveV2CampaignDocument(tx, campaignID, "relation_graphs", request.Bundle.RelationGraphs, nextVersion); err != nil {
+			return err
+		}
+		if err := saveV2CampaignDocument(tx, campaignID, "mind_maps", request.Bundle.MindMaps, nextVersion); err != nil {
 			return err
 		}
 		return nil

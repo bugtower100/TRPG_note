@@ -2,7 +2,12 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useCampaignData, useCampaignTabs } from '../context/CampaignContext';
 import { dataService } from '../services/dataService';
 import { relationGraphService } from '../services/relationGraphService';
-import { Character, RelationGraphEdge, RelationGraphNode } from '../types';
+import type {
+  Character,
+  Monster,
+  RelationGraphEdge,
+  RelationGraphNode,
+} from '../types';
 import {
   RESOURCE_ROOT_PATH,
   resourceService,
@@ -30,6 +35,16 @@ type GraphEntity = {
   isShared?: boolean;
 };
 
+type NewGraphEntityType = 'characters' | 'monsters';
+
+const graphEntityTypeLabel = (entityType: NewGraphEntityType) => (
+  entityType === 'characters' ? '人物' : '怪物'
+);
+
+const normalizeEntityNameForComparison = (name: string) => (
+  name.trim().toLocaleLowerCase()
+);
+
 const RelationGraphs: React.FC = () => {
   const { campaignData, setCampaignData } = useCampaignData();
   const { openInTab } = useCampaignTabs();
@@ -43,7 +58,8 @@ const RelationGraphs: React.FC = () => {
   const [edgeEditorId, setEdgeEditorId] = useState<string | null>(null);
   const [dragNode, setDragNode] = useState<{ id: string; dx: number; dy: number } | null>(null);
   const [entityTypeFilter, setEntityTypeFilter] = useState<'characters' | 'monsters'>('characters');
-  const [newCharacterName, setNewCharacterName] = useState('');
+  const [newEntityType, setNewEntityType] = useState<NewGraphEntityType>('characters');
+  const [newEntityName, setNewEntityName] = useState('');
   const [scale, setScale] = useState(1);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
@@ -332,41 +348,67 @@ const RelationGraphs: React.FC = () => {
     persistGraph({ ...activeGraph, nodes: [...activeGraph.nodes, node] });
   };
 
-  const createCharacterAndAddNode = (event: React.FormEvent<HTMLFormElement>) => {
+  const createEntityAndAddNode = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const name = newCharacterName.trim();
+    const name = newEntityName.trim();
     if (!name || !activeGraph || !boardRef.current) return;
 
-    const character = dataService.createEntity<Character>({
-      name,
-      details: '',
-      relatedImages: [],
-      identity: '',
-      appearance: '',
-      desireOrGoal: '',
-      attributes: '',
-      relations: [],
-    });
+    const existingEntities = newEntityType === 'characters'
+      ? campaignData.characters
+      : campaignData.monsters;
+    const normalizedName = normalizeEntityNameForComparison(name);
+    if (
+      existingEntities.some(
+        (entity) => normalizeEntityNameForComparison(entity.name) === normalizedName
+      )
+    ) {
+      window.alert(`已存在同名${graphEntityTypeLabel(newEntityType)}“${name}”，未重复新建。`);
+      return;
+    }
+
+    const entity = newEntityType === 'characters'
+      ? dataService.createEntity<Character>({
+          name,
+          details: '',
+          relatedImages: [],
+          identity: '',
+          appearance: '',
+          desireOrGoal: '',
+          attributes: '',
+          relations: [],
+        })
+      : dataService.createEntity<Monster>({
+          name,
+          details: '',
+          relatedImages: [],
+          type: '',
+          stats: '',
+          abilities: '',
+          drops: '',
+          relations: [],
+        });
     const widthWorld = boardRef.current.clientWidth / scale;
     const heightWorld = boardRef.current.clientHeight / scale;
     const node = relationGraphService.makeNode(
-      character.id,
-      'characters',
-      character.name,
+      entity.id,
+      newEntityType,
+      entity.name,
       widthWorld / 2 + Math.random() * 24 - 12,
       heightWorld / 2 + Math.random() * 24 - 12
     );
     const nextGraph = { ...activeGraph, nodes: [...activeGraph.nodes, node] };
 
-    setCampaignData((previous) => relationGraphService.update({
-      ...previous,
-      characters: [...previous.characters, character],
-    }, nextGraph));
-    setEntityTypeFilter('characters');
-    setEntityIdToAdd(character.id);
+    setCampaignData((previous) => relationGraphService.update(
+      newEntityType === 'characters'
+        ? { ...previous, characters: [...previous.characters, entity as Character] }
+        : { ...previous, monsters: [...previous.monsters, entity as Monster] },
+      nextGraph
+    ));
+    setEntityTypeFilter(newEntityType);
+    setEntityIdToAdd(entity.id);
     setSelectedNodeIds([node.id]);
     setSelectedEdgeId(null);
-    setNewCharacterName('');
+    setNewEntityName('');
   };
 
   const removeSelectedNodes = () => {
@@ -509,21 +551,30 @@ const RelationGraphs: React.FC = () => {
 
       <div className="p-3 rounded-lg border border-theme theme-card shrink-0">
         <div className="text-sm font-medium mb-2">节点添加（仅人物/怪物）</div>
-        <form onSubmit={createCharacterAndAddNode} className="flex flex-col sm:flex-row gap-2 mb-2">
+        <form onSubmit={createEntityAndAddNode} className="flex flex-col sm:flex-row gap-2 mb-2">
+          <select
+            value={newEntityType}
+            onChange={(event) => setNewEntityType(event.target.value as NewGraphEntityType)}
+            aria-label="新建实体类型"
+            className="px-3 py-2 rounded border border-theme bg-theme-card"
+          >
+            <option value="characters">人物</option>
+            <option value="monsters">怪物</option>
+          </select>
           <input
             type="text"
-            value={newCharacterName}
-            onChange={(event) => setNewCharacterName(event.target.value)}
-            placeholder="输入新人物名字"
-            aria-label="新人物名字"
+            value={newEntityName}
+            onChange={(event) => setNewEntityName(event.target.value)}
+            placeholder={`输入新${graphEntityTypeLabel(newEntityType)}名称`}
+            aria-label={`新${graphEntityTypeLabel(newEntityType)}名称`}
             className="min-w-0 flex-1 px-3 py-2 rounded border border-theme bg-theme-card"
           />
           <button
             type="submit"
-            disabled={!newCharacterName.trim() || !activeGraph}
+            disabled={!newEntityName.trim() || !activeGraph}
             className="px-3 py-2 rounded bg-primary text-white hover:bg-primary-dark disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            新建人物并加入
+            新建{graphEntityTypeLabel(newEntityType)}并加入
           </button>
         </form>
         <div className="grid grid-cols-1 md:grid-cols-4 gap-2">

@@ -1,0 +1,244 @@
+.mind-map-flow {
+  background: color-mix(in srgb, var(--bg-card) 88%, var(--bg-page) 12%);
+}
+
+.mind-map-node-card {
+  position: relative;
+  display: flex;
+  width: 220px;
+  height: 96px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  overflow: hidden;
+  border: 2px solid var(--border-color);
+  border-radius: 14px;
+  background: var(--bg-card);
+  color: var(--text-primary);
+  box-shadow: 0 8px 22px rgb(15 23 42 / 10%);
+}
+
+.mind-map-node-card-root {
+  border-width: 3px;
+  background: color-mix(in srgb, var(--bg-card) 82%, var(--primary-light) 18%);
+  box-shadow: 0 10px 28px color-mix(in srgb, var(--primary-color) 20%, transparent);
+}
+
+.mind-map-node-card-selected {
+  box-shadow:
+    0 0 0 4px color-mix(in srgb, var(--primary-color) 24%, transparent),
+    0 10px 28px rgb(15 23 42 / 16%);
+}
+
+.mind-map-node-title {
+  display: -webkit-box;
+  max-height: 3.75rem;
+  overflow: hidden;
+  padding: 0 16px;
+  font-size: 0.925rem;
+  font-weight: 650;
+  line-height: 1.25rem;
+  overflow-wrap: anywhere;
+  text-align: center;
+  white-space: pre-wrap;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.mind-map-keyword-link {
+  display: inline;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--primary-color);
+  cursor: pointer;
+  font: inherit;
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-underline-offset: 2px;
+}
+
+.mind-map-keyword-link:hover {
+  color: var(--primary-dark);
+  text-decoration-style: solid;
+}
+
+.mind-map-node-reference {
+  position: absolute;
+  left: 7px;
+  bottom: 6px;
+  display: inline-flex;
+  max-width: 86px;
+  align-items: center;
+  gap: 3px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--primary-light);
+  color: var(--primary-color);
+  font-size: 0.625rem;
+  line-height: 1;
+  padding: 4px 6px;
+}
+
+.mind-map-node-reference span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mind-map-node-reference:hover:not(:disabled) {
+  filter: brightness(0.96);
+}
+
+.mind-map-node-reference:disabled {
+  cursor: not-allowed;
+  color: #b91c1c;
+  opacity: 0.8;
+}
+
+.mind-map-node-kind {
+  color: var(--text-secondary);
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+}
+
+.mind-map-node-collapsed-count {
+  position: absolute;
+  right: 8px;
+  bottom: 6px;
+  border-radius: 999px;
+  background: var(--primary-light);
+  color: var(--primary-color);
+  font-size: 0.625rem;
+  font-weight: 600;
+  line-height: 1;
+  padding: 4px 7px;
+}
+
+.mind-map-node-toolbar {
+  display: flex;
+  gap: 3px;
+  padding: 4px;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  background: var(--bg-card);
+  box-shadow: 0 8px 22px rgb(15 23 42 / 16%);
+}
+
+.mind-map-toolbar-button {
+  display: inline-flex;
+  width: 30px;
+  height: 30px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 7px;
+  color: var(--text-primary);
+}
+
+.mind-map-toolbar-button:hover:not(:disabled) {
+  background: var(--primary-light);
+  color: var(--primary-color);
+}
+
+.mind-map-toolbar-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.35;
+}
+
+.mind-map-toolbar-button-danger {
+  color: #dc2626;
+}
+
+.mind-map-toolbar-button-danger:hover:not(:disabled) {
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+.mind-map-node-handle {
+  width: 8px !important;
+  height: 8px !important;
+  border: 2px solid var(--bg-card) !important;
+  background: var(--primary-color) !important;
+}
+
+.mind-map-flow .react-flow__controls {
+  overflow: hidden;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  box-shadow: 0 5px 16px rgb(15 23 42 / 10%);
+}
+
+.mind-map-flow .react-flow__controls-button {
+  border-color: var(--border-color);
+  background: var(--bg-card);
+  color: var(--text-primary);
+  fill: currentColor;
+}
+
+.mind-map-flow .react-flow__controls-button:hover {
+  background: var(--primary-light);
+}
+
+.mind-map-flow .react-flow__minimap {
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  background: var(--bg-card);
+}
+
+@media (max-width: 767px) {
+  .mind-map-document-actions {
+    display: grid;
+    width: 100%;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .mind-map-document-actions select {
+    width: 100%;
+    min-width: 0;
+    grid-column: 1 / -1;
+  }
+
+  .mind-map-document-actions button {
+    justify-content: center;
+  }
+
+  .mind-map-main-toolbar {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: thin;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .mind-map-main-toolbar > * {
+    flex: 0 0 auto;
+  }
+
+  .mind-map-main-toolbar .mind-map-fit-button {
+    margin-left: 0;
+  }
+
+  .mind-map-canvas-shell {
+    min-height: max(58vh, 420px);
+  }
+
+  .mind-map-details-panel {
+    max-height: 88dvh;
+    padding-bottom: calc(1rem + env(safe-area-inset-bottom));
+  }
+
+  .mind-map-node-toolbar {
+    gap: 4px;
+  }
+
+  .mind-map-toolbar-button {
+    width: 36px;
+    height: 36px;
+  }
+
+  .mind-map-minimap {
+    display: none;
+  }
+}

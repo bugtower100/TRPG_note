@@ -2,9 +2,10 @@ import React from 'react';
 import { NavLink } from 'react-router-dom';
 import { useCampaignData, useCampaignSession } from '../context/CampaignContext';
 import { APP_VERSION } from '../constants/appVersion';
+import { useCampaignMemberRole } from '../hooks/useCampaignMemberRole';
 import { 
   LayoutDashboard, Users, MapPin, Building, Calendar, 
-  Search, Clock, Settings, LogOut, Skull, Home, Share2, NotebookPen, Kanban, ScrollText
+  Search, Clock, Settings, LogOut, Skull, Home, Share2, NotebookPen, Kanban, ScrollText, BrainCircuit
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -15,6 +16,7 @@ interface SidebarProps {
 const Sidebar: React.FC<SidebarProps> = ({ className = '', onNavigate }) => {
   const { campaignData } = useCampaignData();
   const { logout, exitCampaign } = useCampaignSession();
+  const { canManageCampaignContent } = useCampaignMemberRole();
 
   const navGroups = [
     {
@@ -30,6 +32,12 @@ const Sidebar: React.FC<SidebarProps> = ({ className = '', onNavigate }) => {
         },
         { to: '/monsters', icon: <Skull size={20} />, label: '怪物' },
         { to: '/relation-graphs', icon: <Share2 size={20} />, label: '关系图' },
+        {
+          to: '/mind-maps',
+          icon: <BrainCircuit size={20} />,
+          label: '思维导图',
+          managerOnly: true,
+        },
         { to: '/team-notes', icon: <NotebookPen size={20} />, label: '团队笔记' },
         { to: '/locations', icon: <MapPin size={20} />, label: '地点' },
         { to: '/organizations', icon: <Building size={20} />, label: '组织' },
@@ -51,10 +59,12 @@ const Sidebar: React.FC<SidebarProps> = ({ className = '', onNavigate }) => {
         <p className="text-xs theme-text-secondary mt-1">TRPG 备团工具 {APP_VERSION}</p>
       </div>
       
-      <nav className="flex-1 p-3 space-y-1 overflow-hidden" data-tour="sidebar-nav">
+      <nav className="flex-1 p-3 space-y-1 overflow-y-auto" data-tour="sidebar-nav">
         {navGroups.map((group, groupIndex) => (
           <div key={groupIndex} className="space-y-1">
-            {group.items.map((item) => (
+            {group.items
+              .filter((item) => !item.managerOnly || canManageCampaignContent)
+              .map((item) => (
               <div key={item.to} className="space-y-1">
                 <NavLink
                   to={item.to}
@@ -99,7 +109,7 @@ const Sidebar: React.FC<SidebarProps> = ({ className = '', onNavigate }) => {
                   </NavLink>
                 ))}
               </div>
-            ))}
+              ))}
           </div>
         ))}
       </nav>

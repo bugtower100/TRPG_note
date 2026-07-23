@@ -46,6 +46,17 @@ export interface RichKeywordData {
   allKeywords: string[];
 }
 
+export type RichKeywordSource = Pick<
+  CampaignData,
+  | 'characters'
+  | 'monsters'
+  | 'locations'
+  | 'organizations'
+  | 'events'
+  | 'clues'
+  | 'timelines'
+>;
+
 export interface TooltipTargetPayload {
   entityType: string;
   entityId: string;
@@ -238,7 +249,7 @@ export const resolveTooltipTarget = (
   return null;
 };
 
-export const buildRichKeywordData = (campaignData: CampaignData): RichKeywordData => {
+export const buildRichKeywordData = (campaignData: RichKeywordSource): RichKeywordData => {
   const entityMap = new Map<string, EntityReferenceEntry>();
   const sectionTitleMap = new Map<string, SectionReferenceEntry[]>();
   const subItemTitleMap = new Map<string, SubItemReferenceEntry[]>();
@@ -474,6 +485,7 @@ interface TooltipContentProps {
   campaignData: CampaignData;
   keywordData: RichKeywordData;
   mode?: 'tooltip' | 'sheet';
+  hint?: string;
   onOpenTarget?: (target: {
     entityType: string;
     entityId: string;
@@ -488,6 +500,7 @@ export const RichTextTooltipContent: React.FC<TooltipContentProps> = ({
   campaignData,
   keywordData,
   mode = 'tooltip',
+  hint,
   onOpenTarget,
 }) => {
   const interactive = mode === 'sheet' && typeof onOpenTarget === 'function';
@@ -529,7 +542,9 @@ export const RichTextTooltipContent: React.FC<TooltipContentProps> = ({
             </div>
           ))}
         </div>
-        <div className="mt-1 text-xs theme-text-secondary opacity-70">{interactive ? '点击打开并定位到该区块' : '双击在右侧打开并定位到该区块'}</div>
+        <div className="mt-1 text-xs theme-text-secondary opacity-70">
+          {interactive ? '点击打开并定位到该区块' : (hint || '双击在右侧打开并定位到该区块')}
+        </div>
       </div>
     );
   }
@@ -550,7 +565,9 @@ export const RichTextTooltipContent: React.FC<TooltipContentProps> = ({
             </div>
           ))}
         </div>
-        <div className="mt-1 text-xs theme-text-secondary opacity-70">双击在右侧打开并定位到该子项目</div>
+        <div className="mt-1 text-xs theme-text-secondary opacity-70">
+          {hint || '双击在右侧打开并定位到该子项目'}
+        </div>
       </div>
     );
   }
@@ -582,7 +599,7 @@ export const RichTextTooltipContent: React.FC<TooltipContentProps> = ({
             在右侧打开
           </button>
         ) : (
-          '双击在右侧打开'
+          hint || '双击在右侧打开'
         )}
       </div>
     </div>

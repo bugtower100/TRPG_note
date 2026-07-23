@@ -194,26 +194,22 @@ func buildLegacyCampaignDataFromV2(bundle V2CampaignBundle) map[string]any {
 		"monsters":       bundle.Monsters,
 		"sessionTasks":   bundle.SessionTasks,
 		"relationGraphs": bundle.RelationGraphs,
+		"mindMaps":       bundle.MindMaps,
 	}
 }
 
 func loadCampaignPayloadForBackup(db *gorm.DB, userID, campaignID string) (any, error) {
-	raw, err := loadUserCampaignPayload(db, userID, campaignID)
-	if err == nil {
-		return raw, nil
-	}
-	if err != gorm.ErrRecordNotFound {
+	if _, err := loadAccessibleV2Campaign(db, userID, campaignID); err == nil {
+		bundle, loadErr := loadV2CampaignBundle(db, campaignID)
+		if loadErr != nil {
+			return nil, loadErr
+		}
+		return buildLegacyCampaignDataFromV2(bundle.Bundle), nil
+	} else if err != gorm.ErrRecordNotFound {
 		return nil, err
 	}
 
-	if _, err := loadAccessibleV2Campaign(db, userID, campaignID); err != nil {
-		return nil, err
-	}
-	bundle, err := loadV2CampaignBundle(db, campaignID)
-	if err != nil {
-		return nil, err
-	}
-	return buildLegacyCampaignDataFromV2(bundle.Bundle), nil
+	return loadUserCampaignPayload(db, userID, campaignID)
 }
 
 func loadCampaignConfigOptional(db *gorm.DB, campaignID string) (*CampaignConfigDoc, error) {
@@ -598,6 +594,7 @@ func buildImportedV2Bundle(campaignID string, raw any) (V2CampaignBundle, error)
 		Monsters:       toMapSlice(root["monsters"]),
 		SessionTasks:   toMapSlice(root["sessionTasks"]),
 		RelationGraphs: toMapSlice(root["relationGraphs"]),
+		MindMaps:       toMapSlice(root["mindMaps"]),
 	}, nil
 }
 
@@ -851,12 +848,11 @@ func extractCampaignMeta(raw any) (string, string) {
 }
 
 func extractCollectionCounts(raw any) map[string]int {
-	keys := []string{"characters", "monsters", "locations", "organizations", "events", "clues", "timelines", "sessionTasks", "relationGraphs"}
+	keys := []string{"characters", "monsters", "locations", "organizations", "events", "clues", "timelines", "sessionTasks", "relationGraphs", "mindMaps"}
 	root, _ := raw.(map[string]any)
 	counts := make(map[string]int, len(keys))
 	for _, key := range keys {
-		list, _ := root[key].([]any)
-		counts[key] = len(list)
+		counts[key] = len(toMapSlice(root[key]))
 	}
 	return counts
 }

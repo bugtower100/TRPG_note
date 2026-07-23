@@ -73,6 +73,29 @@ type humaUpdateBundleOutput struct {
 	Body V2CampaignBundleResponse
 }
 
+type humaGetMindMapHistoryInput struct {
+	UserID           string `header:"X-TRPG-User-Id" doc:"当前用户 ID"`
+	Username         string `header:"X-TRPG-Username" doc:"当前用户名"`
+	CampaignPassword string `header:"X-TRPG-Campaign-Password" doc:"公开模组进入密码，只有需要时才传"`
+	CampaignID       string `path:"campaignId" doc:"模组 ID"`
+}
+
+type humaGetMindMapHistoryOutput struct {
+	Body MindMapHistoryDocument
+}
+
+type humaUpdateMindMapHistoryInput struct {
+	UserID           string `header:"X-TRPG-User-Id" doc:"当前用户 ID"`
+	Username         string `header:"X-TRPG-Username" doc:"当前用户名"`
+	CampaignPassword string `header:"X-TRPG-Campaign-Password" doc:"公开模组进入密码，只有需要时才传"`
+	CampaignID       string `path:"campaignId" doc:"模组 ID"`
+	Body             MindMapHistoryUpdateRequest
+}
+
+type humaUpdateMindMapHistoryOutput struct {
+	Body MindMapHistoryDocument
+}
+
 type humaGetCampaignConfigInput struct {
 	UserID           string `header:"X-TRPG-User-Id" doc:"当前用户 ID"`
 	Username         string `header:"X-TRPG-Username" doc:"当前用户名"`
@@ -322,6 +345,30 @@ func registerPhase1OpenAPIOperations(api huma.API) {
 		Errors:      []int{400, 403, 409, 500},
 	}, func(context.Context, *humaUpdateBundleInput) (*humaUpdateBundleOutput, error) {
 		return &humaUpdateBundleOutput{}, nil
+	})
+
+	huma.Register(api, huma.Operation{
+		OperationID: "getMindMapHistory",
+		Method:      http.MethodGet,
+		Path:        "/api/v2/campaigns/{campaignId}/mind-map-history",
+		Summary:     "获取思维导图撤销历史",
+		Description: "仅 GM 和副 GM 可读取。历史独立于普通模组 bundle 与导出文件。",
+		Tags:        []string{"campaigns-v2"},
+		Errors:      []int{400, 403, 500},
+	}, func(context.Context, *humaGetMindMapHistoryInput) (*humaGetMindMapHistoryOutput, error) {
+		return &humaGetMindMapHistoryOutput{}, nil
+	})
+
+	huma.Register(api, huma.Operation{
+		OperationID: "updateMindMapHistory",
+		Method:      http.MethodPut,
+		Path:        "/api/v2/campaigns/{campaignId}/mind-map-history",
+		Summary:     "更新思维导图撤销历史",
+		Description: "仅 GM 和副 GM 可更新，使用独立版本号进行乐观锁保存。",
+		Tags:        []string{"campaigns-v2"},
+		Errors:      []int{400, 403, 409, 500},
+	}, func(context.Context, *humaUpdateMindMapHistoryInput) (*humaUpdateMindMapHistoryOutput, error) {
+		return &humaUpdateMindMapHistoryOutput{}, nil
 	})
 
 	huma.Register(api, huma.Operation{

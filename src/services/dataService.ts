@@ -1,4 +1,4 @@
-import { CampaignData, UserProfile, BaseEntity, Character, Location, Organization, Event, Clue, Timeline, Monster, RelationGraph, ClueRevealStatus, ClueRevealLogItem, SessionTask, SessionTaskStatus } from '../types';
+import { CampaignData, UserProfile, BaseEntity, Character, Location, Organization, Event, Clue, Timeline, Monster, RelationGraph, MindMapDocument, GraphEntityType, ClueRevealStatus, ClueRevealLogItem, SessionTask, SessionTaskStatus, MIND_MAP_MAX_ENTITY_REFS } from '../types';
 import { normalizeTimelinePriority } from '../utils/timelinePriority';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -6,6 +6,16 @@ const STORAGE_KEYS = {
   USERS: 'trpg_users',
   CURRENT_USER: 'trpg_current_user',
 } as const;
+
+const MIND_MAP_ENTITY_TYPES = new Set<GraphEntityType>([
+  'characters',
+  'monsters',
+  'locations',
+  'organizations',
+  'events',
+  'clues',
+  'timelines',
+]);
 
 export const DEFAULT_CAMPAIGN_DATA: CampaignData = {
   meta: {
@@ -25,6 +35,7 @@ export const DEFAULT_CAMPAIGN_DATA: CampaignData = {
   monsters: [],
   sessionTasks: [],
   relationGraphs: [],
+  mindMaps: [],
 };
 
 const timelineEventFallbackTitle = (raw: any): string => {
@@ -314,6 +325,83 @@ class DataService {
       updatedAt: typeof g?.updatedAt === 'number' ? g.updatedAt : Date.now(),
     }));
 
+    const mindMaps: MindMapDocument[] = safeArray<any>(raw?.mindMaps, []).map((mindMap) => {
+      const nodes = safeArray<any>(mindMap?.nodes, []).map((node, index) => {
+        const rawEntityRefs = Array.isArray(node?.entityRefs)
+          ? node.entityRefs
+          : (node?.entityRef ? [node.entityRef] : []);
+        const seenEntityRefs = new Set<string>();
+        const entityRefs = rawEntityRefs.flatMap((rawRef: any) => {
+          const entityType = rawRef?.entityType;
+          const entityId = typeof rawRef?.entityId === 'string' ? rawRef.entityId.trim() : '';
+          const key = `${entityType}:${entityId}`;
+          if (
+            !MIND_MAP_ENTITY_TYPES.has(entityType as GraphEntityType)
+            || !entityId
+            || seenEntityRefs.has(key)
+          ) {
+            return [];
+          }
+          seenEntityRefs.add(key);
+          return [{ entityType: entityType as GraphEntityType, entityId }];
+        }).slice(0, MIND_MAP_MAX_ENTITY_REFS);
+        const position =
+          Number.isFinite(node?.position?.x) && Number.isFinite(node?.position?.y)
+            ? { x: node.position.x, y: node.position.y }
+            : undefined;
+
+        return {
+          id: typeof node?.id === 'string' && node.id ? node.id : uuidv4(),
+          parentId:
+            typeof node?.parentId === 'string' && node.parentId
+              ? node.parentId
+              : null,
+          title:
+            typeof node?.title === 'string' && node.title.trim()
+              ? node.title
+              : '未命名节点',
+          content: typeof node?.content === 'string' ? node.content : '',
+          siblingOrder:
+            typeof node?.siblingOrder === 'number' && Number.isFinite(node.siblingOrder)
+              ? node.siblingOrder
+              : index,
+          collapsed: Boolean(node?.collapsed),
+          color:
+            typeof node?.color === 'string' && node.color.trim()
+              ? node.color
+              : undefined,
+          position,
+          incomingEdgeLabel:
+            typeof node?.incomingEdgeLabel === 'string' && node.incomingEdgeLabel.trim()
+              ? node.incomingEdgeLabel.trim().slice(0, 120)
+              : undefined,
+          entityRefs,
+          entityRef: entityRefs[0],
+          createdAt: typeof node?.createdAt === 'number' ? node.createdAt : Date.now(),
+          updatedAt: typeof node?.updatedAt === 'number' ? node.updatedAt : Date.now(),
+        };
+      });
+      const requestedRootNodeId =
+        typeof mindMap?.rootNodeId === 'string' ? mindMap.rootNodeId : '';
+      const rootNodeId =
+        nodes.some((node) => node.id === requestedRootNodeId)
+          ? requestedRootNodeId
+          : (nodes.find((node) => node.parentId === null)?.id || nodes[0]?.id || '');
+
+      return {
+        id: typeof mindMap?.id === 'string' && mindMap.id ? mindMap.id : uuidv4(),
+        name:
+          typeof mindMap?.name === 'string' && mindMap.name.trim()
+            ? mindMap.name.trim()
+            : '新思维导图',
+        rootNodeId,
+        nodes,
+        layoutDirection: mindMap?.layoutDirection === 'TB' ? 'TB' : 'LR',
+        createdAt: typeof mindMap?.createdAt === 'number' ? mindMap.createdAt : Date.now(),
+        updatedAt: typeof mindMap?.updatedAt === 'number' ? mindMap.updatedAt : Date.now(),
+      };
+    });
+
     const notes = typeof raw?.notes === 'string' ? raw.notes : (typeof raw?.memoContent === 'string' ? raw.memoContent : '');
 
     return {
@@ -335,6 +423,7 @@ class DataService {
       monsters,
       sessionTasks,
       relationGraphs,
+      mindMaps,
     };
   }
 
