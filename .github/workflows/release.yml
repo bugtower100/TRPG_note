@@ -248,9 +248,9 @@ jobs:
           make_latest: true
           body: |
             ## ${{ steps.version.outputs.name }} 更新内容
-            - 主要：新增了节点思维导图功能模块；
-            - 为团队笔记添加了顺序锁；
-            - 为关系图页面增加了怪物新建和重复提醒；
+            - 匹配了没有st的简化卡；
+            - 建立模组后在主页更改模组名功能；
+            - fix：修复团队笔记连接超时问题
           files: |
             TRPG模组笔记-${{ steps.version.outputs.app_version }}-windows-amd64.zip
             TRPG模组笔记-${{ steps.version.outputs.app_version }}-windows-arm64.zip

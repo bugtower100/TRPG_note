@@ -24,6 +24,7 @@ const LandingPage: React.FC = () => {
     isCampaignSaving,
     sessionError,
     clearSessionError,
+    reloadCampaignList,
   } = useCampaignSession();
   const {
     theme: currentTheme,
@@ -69,7 +70,8 @@ const LandingPage: React.FC = () => {
     handleRemoveMember,
     handleUpdateMemberRole,
     getMemberSummary,
-  } = useLandingCampaigns({ user, campaignList });
+    handleRenameCampaign,
+  } = useLandingCampaigns({ user, campaignList, reloadCampaignList });
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -428,6 +430,7 @@ const LandingPage: React.FC = () => {
                   onUpdateJoinPassword={(campaignId) => void handleUpdateJoinPassword(campaignId)}
                   onRemoveMember={(campaignId, memberUserId) => void handleRemoveMember(campaignId, memberUserId)}
                   onUpdateMemberRole={(campaignId, memberUserId, role) => void handleUpdateMemberRole(campaignId, memberUserId, role)}
+                  onRename={handleRenameCampaign}
                   currentUserId={user?.id || ''}
                   onEnter={(nextCampaign) => void handleEnterCampaign(nextCampaign)}
                   onOpenExport={(campaignId) => setExportDialogTarget({ type: 'campaign', campaignId })}

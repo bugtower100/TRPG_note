@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"math"
 	"net/http"
 	"regexp"
 	"strconv"
@@ -239,7 +240,6 @@ func mergeMap(base map[string]any, override map[string]any) map[string]any {
 }
 
 func detectCharacterSheetImportSystem(text, systemHint string) (string, float64) {
-	lowerText := strings.ToLower(text)
 	switch normalizeCharacterSheetSystem(strings.TrimSpace(systemHint)) {
 	case characterSheetSystemDnd5e:
 		if strings.EqualFold(strings.TrimSpace(systemHint), characterSheetSystemDnd5e) {
@@ -253,12 +253,69 @@ func detectCharacterSheetImportSystem(text, systemHint string) (string, float64)
 	if regexp.MustCompile(`(?i)\.dst\b`).MatchString(text) {
 		return characterSheetSystemDnd5e, 0.98
 	}
-	for _, alias := range []string{"hpmax", "ac", "熟练", "hp"} {
-		if strings.Contains(lowerText, strings.ToLower(alias)) {
-			return characterSheetSystemDnd5e, 0.82
+	if regexp.MustCompile(`(?i)\.st\b`).MatchString(text) {
+		return characterSheetSystemCoC7, 0.98
+	}
+
+	cocScore := countNumericImportFields(text, [][]string{
+		{"pow", "意志"},
+		{"app", "外貌"},
+		{"edu", "教育", "教养"},
+		{"siz", "体型"},
+		{"san", "san值", "理智", "理智值"},
+		{"幸运", "运气"},
+		{"mp", "魔法", "魔法值"},
+	}) * 2
+	cocScore += countNumericImportFields(text, [][]string{
+		{"会计"}, {"人类学"}, {"估价"}, {"考古学"}, {"取悦", "魅惑"},
+		{"攀爬"}, {"计算机", "计算机使用", "电脑"}, {"信用", "信誉", "信用评级"},
+		{"克苏鲁", "克苏鲁神话", "cm"}, {"乔装"}, {"闪避"}, {"汽车驾驶"},
+		{"电气维修"}, {"电子学"}, {"话术"}, {"斗殴"}, {"手枪"}, {"急救"},
+		{"恐吓"}, {"图书馆", "图书馆使用"}, {"聆听"}, {"开锁", "撬锁"},
+		{"机械维修"}, {"医学"}, {"博物学"}, {"领航"}, {"神秘学"},
+		{"说服"}, {"精神分析"}, {"心理学"}, {"骑术"}, {"妙手"}, {"侦查"},
+		{"潜行"}, {"游泳"}, {"投掷"}, {"追踪"},
+	})
+
+	dndScore := countNumericImportFields(text, [][]string{
+		{"wis", "感知"},
+		{"cha", "魅力"},
+		{"ac", "护甲等级"},
+		{"hpmax"},
+		{"熟练", "熟练加值", "proficiency"},
+		{"等级", "level", "lv"},
+		{"法术豁免dc", "豁免dc", "spell save dc"},
+		{"法术攻击", "spell attack"},
+	}) * 2
+	dndScore += countNumericImportFields(text, [][]string{
+		{"运动"}, {"体操"}, {"巧手"}, {"隐匿"}, {"调查"}, {"奥秘"},
+		{"自然"}, {"宗教"}, {"察觉"}, {"洞悉"}, {"驯兽"}, {"医药"},
+		{"求生"}, {"游说"}, {"欺瞒"}, {"威吓"}, {"表演"},
+	})
+	for _, marker := range []string{"种族", "race", "阵营", "alignment", "subclass"} {
+		if strings.Contains(strings.ToLower(text), strings.ToLower(marker)) {
+			dndScore += 2
 		}
 	}
-	return characterSheetSystemCoC7, 0.82
+
+	if dndScore > cocScore {
+		return characterSheetSystemDnd5e, importDetectionConfidence(dndScore - cocScore)
+	}
+	return characterSheetSystemCoC7, importDetectionConfidence(cocScore - dndScore)
+}
+
+func countNumericImportFields(text string, fieldGroups [][]string) int {
+	count := 0
+	for _, aliases := range fieldGroups {
+		if _, ok := findSignedIntValue(text, aliases...); ok {
+			count++
+		}
+	}
+	return count
+}
+
+func importDetectionConfidence(scoreDifference int) float64 {
+	return minFloat(0.96, 0.72+float64(scoreDifference)*0.04)
 }
 
 func minFloat(a, b float64) float64 {
@@ -339,7 +396,10 @@ func getStringFromAny(value any) string {
 }
 
 func fillCoCImportPreview(text string, preview *CharacterSheetImportPreview) {
-	isCompactSt := regexp.MustCompile(`(?i)\.st\b`).MatchString(text)
+	compactPairs := findCompactLabelValuePairs(text)
+	isCompactSt := regexp.MustCompile(`(?i)\.st\b`).MatchString(text) ||
+		countNumericImportFields(text, cocCompactSkillFieldGroups()) > 0 ||
+		len(compactPairs) >= 2
 	preview.Name = firstNonEmpty(
 		findBracketedName(text),
 		findLineValue(text, "姓名", "名称", "角色名", "调查员", "name"),
@@ -393,28 +453,33 @@ func fillCoCImportPreview(text string, preview *CharacterSheetImportPreview) {
 				upsertCoCSkill(&skills, canonical, value)
 			}
 		}
-	} else {
-		normalSkillMatches := regexp.MustCompile(`(?m)([\p{Han}A-Za-z]+(?::[\p{Han}A-Za-z]+)?)\s*[:：]\s*(\d+)`).FindAllStringSubmatch(text, -1)
-		reserved := map[string]bool{
-			"力量": true, "敏捷": true, "体质": true, "体型": true, "外貌": true, "智力": true, "意志": true, "教育": true,
-			"幸运": true, "运气": true, "DB": true, "db": true, "体格": true, "移动力": true, "移动率": true,
-			"理智": true, "理智值": true, "生命": true, "体力": true, "魔法": true, "护甲": true,
-			"姓名": true, "名称": true, "角色名": true, "调查员": true, "职业": true,
+		for _, pair := range compactPairs {
+			if isReservedCoCCompactLabel(pair.Name) {
+				continue
+			}
+			upsertCoCSkill(&skills, pair.Name, pair.Value)
 		}
-		for _, match := range normalSkillMatches {
-			if len(match) < 3 {
-				continue
-			}
-			skillName := strings.TrimSpace(match[1])
-			if reserved[skillName] {
-				continue
-			}
-			skillValue, err := strconv.Atoi(match[2])
-			if err != nil {
-				continue
-			}
-			upsertCoCSkill(&skills, skillName, skillValue)
+	}
+	normalSkillMatches := regexp.MustCompile(`(?m)([\p{Han}A-Za-z]+(?::[\p{Han}A-Za-z]+)?)\s*[:：]\s*(\d+)`).FindAllStringSubmatch(text, -1)
+	reserved := map[string]bool{
+		"力量": true, "敏捷": true, "体质": true, "体型": true, "外貌": true, "智力": true, "意志": true, "教育": true,
+		"幸运": true, "运气": true, "DB": true, "db": true, "体格": true, "移动力": true, "移动率": true,
+		"理智": true, "理智值": true, "生命": true, "体力": true, "魔法": true, "护甲": true,
+		"姓名": true, "名称": true, "角色名": true, "调查员": true, "职业": true,
+	}
+	for _, match := range normalSkillMatches {
+		if len(match) < 3 {
+			continue
 		}
+		skillName := strings.TrimSpace(match[1])
+		if reserved[skillName] {
+			continue
+		}
+		skillValue, err := strconv.Atoi(match[2])
+		if err != nil {
+			continue
+		}
+		upsertCoCSkill(&skills, skillName, skillValue)
 	}
 
 	preview.Payload.CoC7 = map[string]any{
@@ -520,7 +585,13 @@ func fillDndImportPreview(text string, preview *CharacterSheetImportPreview) {
 
 	dndSkills := buildDefaultDndSkills()
 	for _, skill := range dndSkillDefinitions {
-		if value, ok := readImportSkillState(text, skill.Name); ok {
+		if value, ok := readDndImportSkillState(
+			text,
+			skill.Name,
+			skill.Ability,
+			stats,
+			getIntFromAny(payload["proficiencyBonus"], 2),
+		); ok {
 			dndSkills[skill.Name] = value
 		}
 	}
@@ -640,8 +711,107 @@ func readImportSkillState(text, skillName string) (float64, bool) {
 	case "*":
 		return 1, true
 	default:
+		return 0, false
+	}
+}
+
+func readDndImportSkillState(
+	text string,
+	skillName string,
+	ability string,
+	stats map[string]int,
+	proficiencyBonus int,
+) (float64, bool) {
+	if state, ok := readImportSkillState(text, skillName); ok {
+		return state, true
+	}
+	total, ok := findSignedIntValue(text, skillName)
+	if !ok {
+		return 0, false
+	}
+	abilityScore, hasAbility := stats[ability]
+	if !hasAbility {
 		return 0, true
 	}
+	abilityModifier := int(math.Floor(float64(abilityScore-10) / 2))
+	switch total - abilityModifier {
+	case proficiencyBonus:
+		return 1, true
+	case int(math.Floor(float64(proficiencyBonus) / 2)):
+		return 0.5, true
+	default:
+		return 0, true
+	}
+}
+
+func getIntFromAny(value any, fallback int) int {
+	switch typed := value.(type) {
+	case int:
+		return typed
+	case int64:
+		return int(typed)
+	case float64:
+		return int(typed)
+	default:
+		return fallback
+	}
+}
+
+func cocCompactSkillFieldGroups() [][]string {
+	groups := make([][]string, 0, len(cocSkillAliasMap))
+	for _, aliases := range cocSkillAliasMap {
+		groups = append(groups, aliases)
+	}
+	return groups
+}
+
+type compactLabelValuePair struct {
+	Name  string
+	Value int
+}
+
+func findCompactLabelValuePairs(text string) []compactLabelValuePair {
+	matches := regexp.MustCompile(`(?i)([\p{Han}A-Za-z]+(?::[\p{Han}A-Za-z]+)?)\s*([+-]?\d{1,3})`).
+		FindAllStringSubmatch(text, -1)
+	result := make([]compactLabelValuePair, 0, len(matches))
+	for _, match := range matches {
+		if len(match) < 3 {
+			continue
+		}
+		value, err := strconv.Atoi(match[2])
+		if err != nil {
+			continue
+		}
+		result = append(result, compactLabelValuePair{
+			Name:  strings.TrimSpace(match[1]),
+			Value: value,
+		})
+	}
+	return result
+}
+
+func isReservedCoCCompactLabel(label string) bool {
+	reservedGroups := make([][]string, 0, len(cocExportSegments)+len(cocExportStatusSegments)+4)
+	for _, segment := range cocExportSegments {
+		reservedGroups = append(reservedGroups, segment.Labels)
+	}
+	for _, segment := range cocExportStatusSegments {
+		reservedGroups = append(reservedGroups, segment.Labels)
+	}
+	reservedGroups = append(reservedGroups,
+		[]string{"mov", "移动率", "移动力"},
+		[]string{"db", "伤害加值"},
+		[]string{"build", "体格"},
+		[]string{"护甲", "年龄"},
+	)
+	for _, aliases := range reservedGroups {
+		for _, alias := range aliases {
+			if strings.EqualFold(strings.TrimSpace(label), strings.TrimSpace(alias)) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func findBracketedName(text string) string {

@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useCampaignData } from '../context/CampaignContext';
+import { useCampaignData, useCampaignSession } from '../context/CampaignContext';
 import { useGuide } from '../components/common/InteractiveGuide';
 import { useReceivedShares } from '../hooks/useReceivedShares';
 import { useNavigate } from 'react-router-dom';
 import { useCampaignMemberRole } from '../hooks/useCampaignMemberRole';
+import CampaignNameEditor from '../components/common/CampaignNameEditor';
+import { teamNotesService } from '../services/teamNotesService';
 
 type SearchEntry = {
   id: string;
@@ -16,6 +18,7 @@ type SearchEntry = {
 
 const Dashboard: React.FC = () => {
   const { campaignData, setCampaignData } = useCampaignData();
+  const { currentCampaignId, user, reloadCampaignList, reloadCurrentCampaign } = useCampaignSession();
   const navigate = useNavigate();
   const { startGuide } = useGuide();
   const [notes, setNotes] = useState(campaignData.notes || '');
@@ -151,11 +154,31 @@ const Dashboard: React.FC = () => {
     });
   };
 
+  const handleRenameCampaign = async (name: string) => {
+    if (!currentCampaignId || !user) {
+      throw new Error('当前模组或用户信息缺失，请重新进入模组后再试。');
+    }
+    await teamNotesService.updateConfig(currentCampaignId, user, {
+      name,
+      lastModified: Date.now(),
+    });
+    await Promise.all([
+      reloadCurrentCampaign(),
+      reloadCampaignList(),
+    ]);
+  };
+
   return (
     <div className="space-y-6">
       <div data-tour="dashboard-header" className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold text-gray-800">
-            {campaignData.meta.projectName} <span className="text-gray-400 text-sm font-normal">概览</span>
+        <h2 className="flex min-w-0 items-center gap-2 text-2xl font-bold text-gray-800">
+          <CampaignNameEditor
+            name={campaignData.meta.projectName}
+            canEdit={canManageCampaignContent}
+            onSave={handleRenameCampaign}
+            nameClassName="break-words"
+          />
+          <span className="shrink-0 text-gray-400 text-sm font-normal">概览</span>
         </h2>
       </div>
 

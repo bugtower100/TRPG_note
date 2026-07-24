@@ -462,6 +462,49 @@ func saveCampaignConfigDoc(db *gorm.DB, cfg CampaignConfigDoc) error {
 	return removePublicCampaignIndex(db, cfg.CampaignID)
 }
 
+func saveCampaignConfigUpdate(db *gorm.DB, cfg CampaignConfigDoc, metadataChanged bool) error {
+	return db.Transaction(func(tx *gorm.DB) error {
+		if err := saveCampaignConfigDoc(tx, cfg); err != nil {
+			return err
+		}
+		if !metadataChanged {
+			return nil
+		}
+
+		currentBundle, err := loadV2CampaignBundle(tx, cfg.CampaignID)
+		if err != nil {
+			return err
+		}
+		if currentBundle.Bundle.Meta == nil {
+			currentBundle.Bundle.Meta = map[string]any{}
+		}
+		currentBundle.Bundle.Meta["projectName"] = cfg.Name
+		currentBundle.Bundle.Meta["description"] = cfg.Description
+		currentBundle.Bundle.Meta["lastModified"] = cfg.LastModified
+
+		updatedAt := time.Now()
+		if cfg.LastModified > 0 {
+			updatedAt = time.UnixMilli(cfg.LastModified)
+		}
+		if err := tx.Model(&V2Campaign{}).
+			Where("id = ?", cfg.CampaignID).
+			Updates(map[string]any{
+				"name":        cfg.Name,
+				"description": cfg.Description,
+				"updated_at":  updatedAt,
+			}).Error; err != nil {
+			return err
+		}
+		return saveV2CampaignDocument(
+			tx,
+			cfg.CampaignID,
+			"campaign_meta",
+			currentBundle.Bundle.Meta,
+			currentBundle.Version+1,
+		)
+	})
+}
+
 func ensureCampaignConfig(db *gorm.DB, campaignID, userID, username, campaignPassword string) (CampaignConfigDoc, error) {
 	now := time.Now().UnixMilli()
 	key := campaignConfigKey(campaignID)
@@ -608,6 +651,28 @@ func leaseExpired(lease *TeamNoteLease) bool {
 		return false
 	}
 	return *lease.ExpiresAt <= time.Now().UnixMilli()
+}
+
+func renewPLTeamNoteLeaseAfterSave(
+	note *TeamNoteDoc,
+	userID string,
+	username string,
+	now int64,
+) {
+	expiresAt := now + int64(10*time.Minute/time.Millisecond)
+	if note.ActiveLease != nil && note.ActiveLease.UserID == userID {
+		note.ActiveLease.Username = username
+		note.ActiveLease.Role = campaignRolePL
+		note.ActiveLease.ExpiresAt = &expiresAt
+		return
+	}
+	note.ActiveLease = &TeamNoteLease{
+		UserID:    userID,
+		Username:  username,
+		Role:      campaignRolePL,
+		StartedAt: now,
+		ExpiresAt: &expiresAt,
+	}
 }
 
 func normalizeTeamNoteSortOrder(note TeamNoteDoc) int64 {
@@ -1088,8 +1153,14 @@ func main() {
 			c.JSON(400, gin.H{"error": "invalid_payload"})
 			return
 		}
+		metadataChanged := body.Name != nil || body.Description != nil
 		if body.Name != nil {
-			cfg.Name = strings.TrimSpace(*body.Name)
+			normalizedName := strings.TrimSpace(*body.Name)
+			if normalizedName == "" {
+				c.JSON(400, gin.H{"error": "invalid_name"})
+				return
+			}
+			cfg.Name = normalizedName
 		}
 		if body.Description != nil {
 			cfg.Description = strings.TrimSpace(*body.Description)
@@ -1114,7 +1185,7 @@ func main() {
 		if cfg.LastModified == 0 {
 			cfg.LastModified = cfg.UpdatedAt
 		}
-		if err := saveCampaignConfigDoc(db, cfg); err != nil {
+		if err := saveCampaignConfigUpdate(db, cfg, metadataChanged); err != nil {
 			c.JSON(500, gin.H{"error": "database_error"})
 			return
 		}
@@ -2222,8 +2293,7 @@ func main() {
 			note.SortOrder = normalizeTeamNoteSortOrder(note)
 		}
 		if role == "PL" {
-			expiresAt := now + int64(10*time.Minute/time.Millisecond)
-			note.ActiveLease = &TeamNoteLease{UserID: userID, Username: username, Role: role, StartedAt: now, ExpiresAt: &expiresAt}
+			renewPLTeamNoteLeaseAfterSave(&note, userID, username, now)
 		}
 		if _, err := kvSaveJSON(db, teamNoteKey(campaignID, noteID), note); err != nil {
 			c.JSON(500, gin.H{"error": "database_error"})

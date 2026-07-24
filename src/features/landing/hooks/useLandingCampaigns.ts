@@ -8,6 +8,7 @@ import { campaignAccessService } from '../../../services/campaignAccessService';
 interface UseLandingCampaignsParams {
   user: UserProfile | null;
   campaignList: CampaignSummary[];
+  reloadCampaignList: () => Promise<void>;
 }
 
 const buildFallbackConfig = (campaignId: string, ownerUserId: string): CampaignConfig => ({
@@ -20,7 +21,7 @@ const buildFallbackConfig = (campaignId: string, ownerUserId: string): CampaignC
   updatedAt: Date.now(),
 });
 
-export const useLandingCampaigns = ({ user, campaignList }: UseLandingCampaignsParams) => {
+export const useLandingCampaigns = ({ user, campaignList, reloadCampaignList }: UseLandingCampaignsParams) => {
   const queryClient = useQueryClient();
   const [configOverrides, setConfigOverrides] = useState<Record<string, Partial<CampaignConfig>>>({});
   const [savingConfigId, setSavingConfigId] = useState<string | null>(null);
@@ -101,11 +102,7 @@ export const useLandingCampaigns = ({ user, campaignList }: UseLandingCampaignsP
     if (!current) return;
     setSavingConfigId(campaignId);
     try {
-      const currentCampaign = campaignList.find((campaign) => campaign.id === campaignId);
       const next = await teamNotesService.updateConfig(campaignId, user, {
-        name: currentCampaign?.name,
-        description: currentCampaign?.description,
-        lastModified: currentCampaign?.lastModified,
         visibility: current.visibility,
       });
       syncConfigCache(campaignId, next);
@@ -113,6 +110,22 @@ export const useLandingCampaigns = ({ user, campaignList }: UseLandingCampaignsP
     } finally {
       setSavingConfigId(null);
     }
+  };
+
+  const handleRenameCampaign = async (campaignId: string, name: string) => {
+    if (!user) {
+      throw new Error('当前用户信息缺失，请重新登录后再试。');
+    }
+    const lastModified = Date.now();
+    const next = await teamNotesService.updateConfig(campaignId, user, {
+      name,
+      lastModified,
+    });
+    syncConfigCache(campaignId, next);
+    await Promise.all([
+      reloadCampaignList(),
+      refreshPublicCampaignsCache(),
+    ]);
   };
 
   const handleUpdateJoinPassword = async (campaignId: string) => {
@@ -220,6 +233,7 @@ export const useLandingCampaigns = ({ user, campaignList }: UseLandingCampaignsP
     publicCampaigns,
     setCampaignVisibility,
     handleSaveCampaignConfig,
+    handleRenameCampaign,
     handleUpdateJoinPassword,
     ensurePublicCampaignAccess,
     handleRemoveMember,

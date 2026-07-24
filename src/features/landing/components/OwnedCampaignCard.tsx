@@ -2,6 +2,7 @@ import React from 'react';
 import { Trash2, Download } from 'lucide-react';
 import { CampaignConfig, CampaignMember, CampaignMemberRole, CampaignSummary } from '../../../types';
 import { getCampaignRoleLabel, isCampaignManagerRole } from '../../../utils/campaignRoles';
+import CampaignNameEditor from '../../../components/common/CampaignNameEditor';
 
 interface OwnedCampaignCardProps {
   campaign: CampaignSummary;
@@ -15,6 +16,7 @@ interface OwnedCampaignCardProps {
   onUpdateJoinPassword: (campaignId: string) => void;
   onRemoveMember: (campaignId: string, memberUserId: string) => void;
   onUpdateMemberRole: (campaignId: string, memberUserId: string, role: CampaignMemberRole) => void;
+  onRename: (campaignId: string, name: string) => Promise<void>;
   currentUserId: string;
   onEnter: (campaign: CampaignSummary) => void;
   onOpenExport: (campaignId: string) => void;
@@ -33,6 +35,7 @@ const OwnedCampaignCard: React.FC<OwnedCampaignCardProps> = ({
   onUpdateJoinPassword,
   onRemoveMember,
   onUpdateMemberRole,
+  onRename,
   currentUserId,
   onEnter,
   onOpenExport,
@@ -48,7 +51,14 @@ const OwnedCampaignCard: React.FC<OwnedCampaignCardProps> = ({
     <div data-tour="landing-campaign-card" className="flex flex-col p-4 rounded-lg border shadow-sm transition-shadow theme-card border-theme hover:shadow-md">
       <div className="flex-1">
         <div className="flex justify-between items-start mb-1">
-          <h3 className="pr-2 text-lg font-bold break-words">{campaign.name}</h3>
+          <h3 className="min-w-0 pr-2 text-lg font-bold">
+            <CampaignNameEditor
+              name={campaign.name}
+              canEdit={canManageCampaign}
+              onSave={(name) => onRename(campaign.id, name)}
+              nameClassName="break-words"
+            />
+          </h3>
         </div>
         <p className="theme-text-secondary text-sm line-clamp-2 mb-3 min-h-[2.5em]">
           {campaign.description || '暂无描述'}

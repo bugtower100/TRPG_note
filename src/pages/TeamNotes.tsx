@@ -55,6 +55,7 @@ const TeamNotes: React.FC = () => {
     leaseStartedAt: null,
   });
   const selectedNote = useMemo(() => notes.find((note) => note.id === selectedId) || null, [notes, selectedId]);
+  const selectedNoteId = selectedNote?.id ?? null;
   const requestedNoteId = searchParams.get('noteId');
   const memberRole = useMemo(() => {
     if (!config || !user) return 'PL';
@@ -133,9 +134,9 @@ const TeamNotes: React.FC = () => {
   }, [notes, requestedNoteId, searchParams, setSearchParams]);
 
   useEffect(() => {
-    if (!currentCampaignId || !user || !editing || !selectedNote) return;
+    if (!currentCampaignId || !user || !editing || !selectedNoteId) return;
     const timer = window.setInterval(() => {
-      teamNotesService.refreshLease(currentCampaignId, selectedNote.id, user, memberRole, leaseStartedAt).then((next) => {
+      teamNotesService.refreshLease(currentCampaignId, selectedNoteId, user, memberRole, leaseStartedAt).then((next) => {
         setNotes((prev) => prev.map((item) => item.id === next.id ? next : item));
         setLeaseStartedAt(next.activeLease?.startedAt ?? null);
       }).catch(() => {
@@ -145,7 +146,7 @@ const TeamNotes: React.FC = () => {
       });
     }, 60000);
     return () => window.clearInterval(timer);
-  }, [currentCampaignId, editing, leaseStartedAt, memberRole, selectedNote, user]);
+  }, [currentCampaignId, editing, leaseStartedAt, memberRole, selectedNoteId, user]);
 
   useEffect(() => {
     if (!editing || !currentCampaignId || !selectedNote || !user) return;
@@ -163,6 +164,7 @@ const TeamNotes: React.FC = () => {
         queryClient.setQueryData<TeamNoteDocument[]>(notesQueryKey, (prev = []) =>
           mergeSavedNote(prev, saved)
         );
+        setLeaseStartedAt(saved.activeLease?.startedAt ?? null);
         setStatusText(`已自动保存：${new Date(saved.updatedAt).toLocaleTimeString()}`);
       }).catch((error) => {
         if (error instanceof VersionConflictError && error.remote) {
@@ -190,10 +192,27 @@ const TeamNotes: React.FC = () => {
   }, [currentCampaignId, editing, leaseStartedAt, selectedNote?.id, user]);
 
   useEffect(() => {
-    return () => {
-      const { campaignId, noteId, user: currentUser, editing: isEditing, leaseStartedAt: currentLeaseStartedAt } = cleanupStateRef.current;
+    const releaseCurrentLease = () => {
+      const {
+        campaignId,
+        noteId,
+        user: currentUser,
+        editing: isEditing,
+        leaseStartedAt: currentLeaseStartedAt,
+      } = cleanupStateRef.current;
       if (!campaignId || !noteId || !currentUser || !isEditing) return;
-      teamNotesService.endLease(campaignId, noteId, currentUser, currentLeaseStartedAt).catch(() => void 0);
+      teamNotesService.endLease(
+        campaignId,
+        noteId,
+        currentUser,
+        currentLeaseStartedAt,
+        true
+      ).catch(() => void 0);
+    };
+    window.addEventListener('pagehide', releaseCurrentLease);
+    return () => {
+      window.removeEventListener('pagehide', releaseCurrentLease);
+      releaseCurrentLease();
     };
   }, []);
 
@@ -249,6 +268,7 @@ const TeamNotes: React.FC = () => {
     queryClient.setQueryData<TeamNoteDocument[]>(notesQueryKey, (prev = []) =>
       mergeSavedNote(prev, saved)
     );
+    setLeaseStartedAt(saved.activeLease?.startedAt ?? null);
     setStatusText(`已保存：${new Date(saved.updatedAt).toLocaleTimeString()}`);
     return saved;
   };
@@ -257,8 +277,14 @@ const TeamNotes: React.FC = () => {
     if (!currentCampaignId || !selectedNote || !user) return false;
     let shouldExitEdit = false;
     try {
-      await persistCurrentDraft();
-      await teamNotesService.endLease(currentCampaignId, selectedNote.id, user, leaseStartedAt);
+      const saved = await persistCurrentDraft();
+      const currentLeaseStartedAt = saved?.activeLease?.startedAt ?? leaseStartedAt;
+      await teamNotesService.endLease(
+        currentCampaignId,
+        selectedNote.id,
+        user,
+        currentLeaseStartedAt
+      );
       shouldExitEdit = true;
     } catch (error) {
       if (error instanceof VersionConflictError && error.remote) {
@@ -349,6 +375,7 @@ const TeamNotes: React.FC = () => {
       queryClient.setQueryData<TeamNoteDocument[]>(notesQueryKey, (prev = []) =>
         mergeSavedNote(prev, saved)
       );
+      setLeaseStartedAt(saved.activeLease?.startedAt ?? null);
       setConflictNote(null);
       setStatusText(`已覆盖保存：${new Date(saved.updatedAt).toLocaleTimeString()}`);
     } catch (error) {

@@ -108,6 +108,44 @@ func TestPreviewCharacterSheetImportParsesCoCCompactStText(t *testing.T) {
 	}
 }
 
+func TestPreviewCharacterSheetImportParsesCoCCompactTextWithoutStPrefix(t *testing.T) {
+	preview := previewCharacterSheetImport(CharacterSheetImportPreviewRequest{
+		Text: "力量40敏捷70意志60体质80外貌50教育70体型40智力70理智60幸运65魔法12体力12会计35人类学16考古学41闪避50",
+	})
+
+	if preview.System != characterSheetSystemCoC7 {
+		t.Fatalf("expected coc7, got %s", preview.System)
+	}
+	stats := preview.Payload.CoC7["stats"].(map[string]int)
+	if stats["str"] != 40 || stats["pow"] != 60 || stats["edu"] != 70 {
+		t.Fatalf("unexpected coc compact stats without prefix: %#v", stats)
+	}
+	skills := preview.Payload.CoC7["skills"].([]map[string]any)
+	if len(skills) < 4 {
+		t.Fatalf("expected compact coc skills without prefix, got %#v", skills)
+	}
+}
+
+func TestPreviewCharacterSheetImportParsesCustomCompactSkillsWithoutStPrefix(t *testing.T) {
+	preview := previewCharacterSheetImport(CharacterSheetImportPreviewRequest{
+		Text: "技能11二号技能13",
+	})
+
+	if preview.System != characterSheetSystemCoC7 {
+		t.Fatalf("expected ambiguous compact custom skills to use coc7 default, got %s", preview.System)
+	}
+	skills := preview.Payload.CoC7["skills"].([]map[string]any)
+	if len(skills) != 2 {
+		t.Fatalf("expected 2 custom compact skills, got %#v", skills)
+	}
+	if skills[0]["name"] != "技能" || skills[0]["value"] != 11 {
+		t.Fatalf("unexpected first custom skill: %#v", skills[0])
+	}
+	if skills[1]["name"] != "二号技能" || skills[1]["value"] != 13 {
+		t.Fatalf("unexpected second custom skill: %#v", skills[1])
+	}
+}
+
 func TestPreviewCharacterSheetImportParsesDndEnglishAbbreviationText(t *testing.T) {
 	preview := previewCharacterSheetImport(CharacterSheetImportPreviewRequest{
 		Text: "Name Laila Race Human Class Cleric Level 3 STR 16 DEX 14 CON 12 INT 10 WIS 15 CHA 8 AC 16 HP 22/22 Proficiency +2",
@@ -179,6 +217,24 @@ func TestPreviewCharacterSheetImportParsesDndSkillStatesWithoutClassAndHalfMarke
 		if warning == "未识别到职业字段。" {
 			t.Fatalf("unexpected class warning: %#v", preview.Warnings)
 		}
+	}
+}
+
+func TestPreviewCharacterSheetImportParsesDndCompactTextWithoutDstPrefix(t *testing.T) {
+	preview := previewCharacterSheetImport(CharacterSheetImportPreviewRequest{
+		Text: "力量16敏捷14体质12智力10感知15魅力8护甲等级16生命值22熟练加值2运动5历史2察觉4",
+	})
+
+	if preview.System != characterSheetSystemDnd5e {
+		t.Fatalf("expected dnd5e, got %s", preview.System)
+	}
+	stats := preview.Payload.Dnd5e["stats"].(map[string]int)
+	if stats["str"] != 16 || stats["wis"] != 15 || stats["cha"] != 8 {
+		t.Fatalf("unexpected dnd compact stats without prefix: %#v", stats)
+	}
+	skills := preview.Payload.Dnd5e["skills"].(map[string]any)
+	if skills["运动"] != 1.0 || skills["历史"] != 1.0 || skills["察觉"] != 1.0 {
+		t.Fatalf("unexpected inferred dnd skill states without prefix: %#v", skills)
 	}
 }
 

@@ -205,11 +205,18 @@ class TeamNotesService {
     return this.parseResponse<TeamNoteDocument>(response);
   }
 
-  async endLease(campaignId: string, noteId: string, user: UserProfile | null, leaseStartedAt?: number | null): Promise<void> {
+  async endLease(
+    campaignId: string,
+    noteId: string,
+    user: UserProfile | null,
+    leaseStartedAt?: number | null,
+    keepalive = false
+  ): Promise<void> {
     const response = await fetch(`/api/campaigns/${campaignId}/team-notes/${noteId}/lease/end`, {
       method: 'POST',
       headers: buildCollaborationHeaders(user, campaignId),
       body: JSON.stringify({ leaseStartedAt }),
+      keepalive,
     });
     if (!response.ok) {
       throw new Error(await readCollaborationErrorMessage<TeamNoteDocument>(response, {
