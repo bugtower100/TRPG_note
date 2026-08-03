@@ -16,11 +16,14 @@ interface RelationGraphResourcePickerModalProps {
   selectedFolderPath: string;
   expandedFolders: string[];
   selectedRef?: string;
+  loading?: boolean;
+  errorText?: string;
   onKeywordChange: (value: string) => void;
   onSelectFolder: (path: string) => void;
   onToggleFolder: (path: string) => void;
   onClose: () => void;
   onSelectResource: (ref: string) => void;
+  onRetry?: () => void;
 }
 
 const RelationGraphResourcePickerModal: React.FC<RelationGraphResourcePickerModalProps> = ({
@@ -31,11 +34,14 @@ const RelationGraphResourcePickerModal: React.FC<RelationGraphResourcePickerModa
   selectedFolderPath,
   expandedFolders,
   selectedRef,
+  loading = false,
+  errorText,
   onKeywordChange,
   onSelectFolder,
   onToggleFolder,
   onClose,
   onSelectResource,
+  onRetry,
 }) => {
   const filteredResourceTree = useMemo(
     () => buildResourceTree(resourceFolders, resources, keyword),
@@ -66,8 +72,12 @@ const RelationGraphResourcePickerModal: React.FC<RelationGraphResourcePickerModa
           />
         </div>
         <div className="min-h-0 flex-1 grid grid-cols-1 md:grid-cols-[220px_minmax(0,1fr)]">
-          <div className="border-r border-theme overflow-auto p-2">
-            {resources.length === 0 && resourceFolders.length === 0 ? (
+          <div className="max-h-40 border-b border-theme overflow-auto p-2 md:max-h-none md:border-b-0 md:border-r">
+            {loading ? (
+              <div className="text-sm theme-text-secondary py-8 text-center">正在加载分类...</div>
+            ) : errorText ? (
+              <div className="text-sm text-red-600 py-8 text-center">分类加载失败</div>
+            ) : resources.length === 0 && resourceFolders.length === 0 ? (
               <div className="text-sm theme-text-secondary py-8 text-center">暂无资源</div>
             ) : (
               <ResourceTreeView
@@ -87,7 +97,22 @@ const RelationGraphResourcePickerModal: React.FC<RelationGraphResourcePickerModa
             <div className="text-xs theme-text-secondary mb-3">
               当前分类：{resourceFolderDisplayName(selectedFolderPath)}
             </div>
-            {filteredResourceItems.length === 0 ? (
+            {loading ? (
+              <div className="text-sm theme-text-secondary py-8 text-center">正在加载资源...</div>
+            ) : errorText ? (
+              <div className="py-8 text-center">
+                <div className="text-sm text-red-600">{errorText}</div>
+                {onRetry ? (
+                  <button
+                    type="button"
+                    onClick={onRetry}
+                    className="mt-3 rounded border border-theme px-3 py-1.5 text-sm hover:bg-primary-light"
+                  >
+                    重试
+                  </button>
+                ) : null}
+              </div>
+            ) : filteredResourceItems.length === 0 ? (
               <div className="text-sm theme-text-secondary py-8 text-center">没有匹配的资源</div>
             ) : (
               <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 gap-3">

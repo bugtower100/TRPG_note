@@ -248,9 +248,8 @@ jobs:
           make_latest: true
           body: |
             ## ${{ steps.version.outputs.name }} 更新内容
-            - 匹配了没有st的简化卡；
-            - 建立模组后在主页更改模组名功能；
-            - fix：修复团队笔记连接超时问题
+            - 为地图增加了地图上传与画板功能，支持联机；
+            - 为核心功能（人物、怪物、地点、线索等）编辑增加了双击快捷进入退出可选项，支持空格/Enter快捷进入编辑模式；
           files: |
             TRPG模组笔记-${{ steps.version.outputs.app_version }}-windows-amd64.zip
             TRPG模组笔记-${{ steps.version.outputs.app_version }}-windows-arm64.zip

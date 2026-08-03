@@ -13,6 +13,7 @@ interface CustomSubItemsEditorProps {
   ensureOneItem?: boolean;
   renderItemActions?: (item: CustomSubItem) => React.ReactNode;
   useNativeDeleteConfirm?: boolean;
+  directEditOnContentClick?: boolean;
 }
 
 const CustomSubItemsEditor: React.FC<CustomSubItemsEditorProps> = ({
@@ -23,6 +24,7 @@ const CustomSubItemsEditor: React.FC<CustomSubItemsEditorProps> = ({
   ensureOneItem = false,
   renderItemActions,
   useNativeDeleteConfirm = false,
+  directEditOnContentClick = false,
 }) => {
   const [search, setSearch] = useState('');
   const [removingItem, setRemovingItem] = useState<CustomSubItem | null>(null);
@@ -95,6 +97,35 @@ const CustomSubItemsEditor: React.FC<CustomSubItemsEditorProps> = ({
     setEditingIds((prev) => prev.filter((editingId) => editingId !== id));
   };
 
+  const handleContentDoubleClick = (event: React.MouseEvent<HTMLDivElement>, id: string) => {
+    if (!directEditOnContentClick) return;
+    const target = event.target as HTMLElement;
+    const interactiveTarget = target.closest('a, button, input, select, textarea, [role="button"], .entity-link, .section-link');
+    if (interactiveTarget && interactiveTarget !== event.currentTarget) return;
+    event.stopPropagation();
+    setEditingIds([id]);
+  };
+
+  const handleContentKeyDown = (event: React.KeyboardEvent<HTMLDivElement>, id: string) => {
+    if (!directEditOnContentClick || (event.key !== 'Enter' && event.key !== ' ')) return;
+    event.preventDefault();
+    startEditing(id);
+  };
+
+  useEffect(() => {
+    if (!directEditOnContentClick || editingIds.length === 0) return;
+
+    const finishEditingOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      const activeEditor = target.closest<HTMLElement>('[data-direct-content-editor-id]');
+      if (activeEditor && editingIds.includes(activeEditor.dataset.directContentEditorId || '')) return;
+      setEditingIds([]);
+    };
+
+    document.addEventListener('dblclick', finishEditingOutside);
+    return () => document.removeEventListener('dblclick', finishEditingOutside);
+  }, [directEditOnContentClick, editingIds]);
+
   const filteredItems = useMemo(() => {
     const keyword = search.trim().toLowerCase();
     if (!keyword) return items;
@@ -161,6 +192,7 @@ const CustomSubItemsEditor: React.FC<CustomSubItemsEditorProps> = ({
                 <input
                   type="text"
                   value={item.title}
+                  data-direct-content-editor-id={item.id}
                   onChange={(e) => updateItem(item.id, { title: e.target.value })}
                   className="flex-1 min-w-[180px] p-2 border border-theme rounded focus:outline-none focus:border-primary bg-transparent"
                   placeholder="子项目标题"
@@ -194,18 +226,31 @@ const CustomSubItemsEditor: React.FC<CustomSubItemsEditorProps> = ({
             </div>
             {!collapsed && (
               isEditing ? (
-                <RichTextEditor
-                  value={item.content}
-                  onChange={(val) => updateItem(item.id, { content: val })}
-                  placeholder="子项目内容..."
-                  minHeight="100px"
-                />
+                <div data-direct-content-editor-id={item.id}>
+                  <RichTextEditor
+                    value={item.content}
+                    onChange={(val) => updateItem(item.id, { content: val })}
+                    placeholder="子项目内容..."
+                    minHeight="100px"
+                  />
+                </div>
               ) : (
-                <div className="border border-theme rounded-md bg-theme-card/60 px-3 py-3 min-h-[96px]">
+                <div
+                  className={`border border-theme rounded-md bg-theme-card/60 px-3 py-3 min-h-[96px] ${
+                    directEditOnContentClick ? 'cursor-text focus:outline-none focus:ring-2 focus:ring-primary' : ''
+                  }`}
+                  role={directEditOnContentClick ? 'button' : undefined}
+                  tabIndex={directEditOnContentClick ? 0 : undefined}
+                  aria-label={directEditOnContentClick ? `编辑${item.title || '未命名子项目'}的内容` : undefined}
+                  onDoubleClick={(event) => handleContentDoubleClick(event, item.id)}
+                  onKeyDown={(event) => handleContentKeyDown(event, item.id)}
+                >
                   {item.content?.trim() ? (
                     <RichTextDisplay content={item.content} />
                   ) : (
-                    <div className="text-sm theme-text-secondary">暂无内容，点击“开始编辑”补充。</div>
+                    <div className="text-sm theme-text-secondary">
+                      {directEditOnContentClick ? '暂无内容，双击此处即可补充。' : '暂无内容，点击“开始编辑”补充。'}
+                    </div>
                   )}
                 </div>
               )

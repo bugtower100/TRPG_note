@@ -190,6 +190,86 @@ export interface RelationGraph {
   updatedAt: number;
 }
 
+export interface LocationMapPoint {
+  id: string;
+  locationId?: string;
+  name: string;
+  introduction: string;
+  iconId: number;
+  x: number;
+  y: number;
+  visibleToPlayers: boolean;
+  labelColor: string;
+  labelStrokeColor: string;
+}
+
+export interface LocationMap {
+  id: string;
+  name: string;
+  imageRef: string;
+  points: LocationMapPoint[];
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface LocationMapDocument {
+  campaignId: string;
+  maps: LocationMap[];
+  version: number;
+  updatedBy: string;
+  updatedByName: string;
+  updatedAt: number;
+}
+
+export interface LocationMapUpdateRequest {
+  maps: LocationMap[];
+  expectedVersion: number;
+}
+
+export type LocationMapDrawingShapeType = 'freehand' | 'rectangle' | 'ellipse';
+
+export interface LocationMapDrawingPoint {
+  x: number;
+  y: number;
+}
+
+export interface LocationMapDrawingShape {
+  id: string;
+  type: LocationMapDrawingShapeType;
+  points: LocationMapDrawingPoint[];
+  strokeColor: string;
+  strokeWidth: number;
+  authorId: string;
+  authorName: string;
+  createdAt: number;
+}
+
+export interface LocationMapDrawingDocument {
+  campaignId: string;
+  mapId: string;
+  shapes: LocationMapDrawingShape[];
+  version: number;
+  updatedBy: string;
+  updatedByName: string;
+  updatedAt: number;
+}
+
+export type LocationMapDrawingOperation =
+  | {
+      operationId: string;
+      type: 'add_shape';
+      shape: Omit<LocationMapDrawingShape, 'authorId' | 'authorName'>;
+    }
+  | {
+      operationId: string;
+      type: 'delete_shape';
+      shapeId: string;
+    }
+  | {
+      operationId: string;
+      type: 'clear_own' | 'clear_all';
+    };
+
 export type MindMapLayoutDirection = 'LR' | 'TB';
 export const MIND_MAP_MAX_ENTITY_REFS = 20;
 

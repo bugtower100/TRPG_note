@@ -161,6 +161,54 @@ type humaGetSessionTasksOutput struct {
 	Body SessionTaskBoardDoc
 }
 
+type humaGetLocationMapsInput struct {
+	UserID           string `header:"X-TRPG-User-Id" doc:"当前用户 ID"`
+	Username         string `header:"X-TRPG-Username" doc:"当前用户名"`
+	CampaignPassword string `header:"X-TRPG-Campaign-Password" doc:"公开模组进入密码，仅在需要时传递"`
+	CampaignID       string `path:"campaignId" doc:"模组 ID"`
+}
+
+type humaGetLocationMapsOutput struct {
+	Body LocationMapDocument
+}
+
+type humaUpdateLocationMapsInput struct {
+	UserID           string `header:"X-TRPG-User-Id" doc:"当前用户 ID"`
+	Username         string `header:"X-TRPG-Username" doc:"当前用户名"`
+	CampaignPassword string `header:"X-TRPG-Campaign-Password" doc:"公开模组进入密码，仅在需要时传递"`
+	CampaignID       string `path:"campaignId" doc:"模组 ID"`
+	Body             LocationMapUpdateRequest
+}
+
+type humaUpdateLocationMapsOutput struct {
+	Body LocationMapDocument
+}
+
+type humaGetLocationMapDrawingInput struct {
+	UserID           string `header:"X-TRPG-User-Id" doc:"当前用户 ID"`
+	Username         string `header:"X-TRPG-Username" doc:"当前用户名"`
+	CampaignPassword string `header:"X-TRPG-Campaign-Password" doc:"公开模组进入密码，仅在需要时传递"`
+	CampaignID       string `path:"campaignId" doc:"模组 ID"`
+	MapID            string `path:"mapId" doc:"地图 ID"`
+}
+
+type humaGetLocationMapDrawingOutput struct {
+	Body LocationMapDrawingDocument
+}
+
+type humaApplyLocationMapDrawingOperationInput struct {
+	UserID           string `header:"X-TRPG-User-Id" doc:"当前用户 ID"`
+	Username         string `header:"X-TRPG-Username" doc:"当前用户名"`
+	CampaignPassword string `header:"X-TRPG-Campaign-Password" doc:"公开模组进入密码，仅在需要时传递"`
+	CampaignID       string `path:"campaignId" doc:"模组 ID"`
+	MapID            string `path:"mapId" doc:"地图 ID"`
+	Body             LocationMapDrawingOperation
+}
+
+type humaApplyLocationMapDrawingOperationOutput struct {
+	Body LocationMapDrawingDocument
+}
+
 type humaListCharacterSheetsInput struct {
 	UserID           string `header:"X-TRPG-User-Id" doc:"当前用户 ID"`
 	Username         string `header:"X-TRPG-Username" doc:"当前用户名"`
@@ -441,6 +489,54 @@ func registerPhase1OpenAPIOperations(api huma.API) {
 		Errors:      []int{400, 403, 500},
 	}, func(context.Context, *humaGetSessionTasksInput) (*humaGetSessionTasksOutput, error) {
 		return &humaGetSessionTasksOutput{}, nil
+	})
+
+	huma.Register(api, huma.Operation{
+		OperationID: "getLocationMaps",
+		Method:      http.MethodGet,
+		Path:        "/api/campaigns/{campaignId}/location-maps",
+		Summary:     "获取地图地点文档",
+		Description: "GM 与副 GM 获取完整地图地点文档；PL 仅获取公开点位，且响应不包含关联地点 ID。",
+		Tags:        []string{"campaigns-collaboration"},
+		Errors:      []int{400, 403, 500},
+	}, func(context.Context, *humaGetLocationMapsInput) (*humaGetLocationMapsOutput, error) {
+		return &humaGetLocationMapsOutput{}, nil
+	})
+
+	huma.Register(api, huma.Operation{
+		OperationID: "updateLocationMaps",
+		Method:      http.MethodPut,
+		Path:        "/api/campaigns/{campaignId}/location-maps",
+		Summary:     "更新地图地点文档",
+		Description: "仅 GM 与副 GM 可更新，使用 expectedVersion 进行乐观锁保存。",
+		Tags:        []string{"campaigns-collaboration"},
+		Errors:      []int{400, 403, 409, 500},
+	}, func(context.Context, *humaUpdateLocationMapsInput) (*humaUpdateLocationMapsOutput, error) {
+		return &humaUpdateLocationMapsOutput{}, nil
+	})
+
+	huma.Register(api, huma.Operation{
+		OperationID: "getLocationMapDrawing",
+		Method:      http.MethodGet,
+		Path:        "/api/campaigns/{campaignId}/location-maps/{mapId}/drawing",
+		Summary:     "获取地图联机画板",
+		Description: "模组成员读取指定地图已经提交的矢量图形。",
+		Tags:        []string{"campaigns-collaboration"},
+		Errors:      []int{400, 403, 404, 500},
+	}, func(context.Context, *humaGetLocationMapDrawingInput) (*humaGetLocationMapDrawingOutput, error) {
+		return &humaGetLocationMapDrawingOutput{}, nil
+	})
+
+	huma.Register(api, huma.Operation{
+		OperationID: "applyLocationMapDrawingOperation",
+		Method:      http.MethodPost,
+		Path:        "/api/campaigns/{campaignId}/location-maps/{mapId}/drawing/operations",
+		Summary:     "提交地图画板操作",
+		Description: "幂等提交新增、删除或清空操作。PL 只能删除自己的图形，GM 与副 GM 可以管理全部图形。",
+		Tags:        []string{"campaigns-collaboration"},
+		Errors:      []int{400, 403, 404, 409, 500},
+	}, func(context.Context, *humaApplyLocationMapDrawingOperationInput) (*humaApplyLocationMapDrawingOperationOutput, error) {
+		return &humaApplyLocationMapDrawingOperationOutput{}, nil
 	})
 
 	huma.Register(api, huma.Operation{

@@ -127,6 +127,7 @@ const Layout: React.FC = () => {
     if (pathname === '/team-notes') return 'team-notes';
     if (pathname === '/session-tasks') return 'session-tasks';
     if (pathname === '/clues') return 'clues';
+    if (pathname === '/locations/maps') return null;
     if (/^\/(characters|monsters|locations|organizations|events|clues|timelines)\/(shared\/[^/]+|[^/]+)$/.test(pathname)) {
       return 'entity-detail';
     }

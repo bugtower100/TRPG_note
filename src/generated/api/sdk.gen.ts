@@ -2,7 +2,7 @@
 
 import type { Client, Options as Options2, TDataShape } from './client';
 import { client } from './client.gen';
-import type { CreateCharacterSheetData, CreateCharacterSheetErrors, CreateCharacterSheetResponses, CreateV2CampaignData, CreateV2CampaignErrors, CreateV2CampaignResponses, DeleteCharacterSheetData, DeleteCharacterSheetErrors, DeleteCharacterSheetResponses, DeleteV2CampaignData, DeleteV2CampaignErrors, DeleteV2CampaignResponses, GetCampaignConfigData, GetCampaignConfigErrors, GetCampaignConfigResponses, GetCharacterSheetData, GetCharacterSheetErrors, GetCharacterSheetResponses, GetMigrationStatusData, GetMigrationStatusErrors, GetMigrationStatusResponses, GetMindMapHistoryData, GetMindMapHistoryErrors, GetMindMapHistoryResponses, GetSessionTasksData, GetSessionTasksErrors, GetSessionTasksResponses, GetV2CampaignBundleData, GetV2CampaignBundleErrors, GetV2CampaignBundleResponses, ListCampaignSharesData, ListCampaignSharesErrors, ListCampaignSharesResponses, ListCampaignVersionsData, ListCampaignVersionsErrors, ListCampaignVersionsResponses, ListCharacterSheetsData, ListCharacterSheetsErrors, ListCharacterSheetsResponses, ListPublicCampaignsData, ListPublicCampaignsErrors, ListPublicCampaignsResponses, ListTeamNotesData, ListTeamNotesErrors, ListTeamNotesResponses, ListV2CampaignsData, ListV2CampaignsErrors, ListV2CampaignsResponses, PreviewCharacterSheetImportData, PreviewCharacterSheetImportErrors, PreviewCharacterSheetImportResponses, StartMigrationData, StartMigrationErrors, StartMigrationResponses, UpdateCharacterSheetData, UpdateCharacterSheetErrors, UpdateCharacterSheetResponses, UpdateMindMapHistoryData, UpdateMindMapHistoryErrors, UpdateMindMapHistoryResponses, UpdateV2CampaignBundleData, UpdateV2CampaignBundleErrors, UpdateV2CampaignBundleResponses } from './types.gen';
+import type { ApplyLocationMapDrawingOperationData, ApplyLocationMapDrawingOperationErrors, ApplyLocationMapDrawingOperationResponses, CreateCharacterSheetData, CreateCharacterSheetErrors, CreateCharacterSheetResponses, CreateV2CampaignData, CreateV2CampaignErrors, CreateV2CampaignResponses, DeleteCharacterSheetData, DeleteCharacterSheetErrors, DeleteCharacterSheetResponses, DeleteV2CampaignData, DeleteV2CampaignErrors, DeleteV2CampaignResponses, GetCampaignConfigData, GetCampaignConfigErrors, GetCampaignConfigResponses, GetCharacterSheetData, GetCharacterSheetErrors, GetCharacterSheetResponses, GetLocationMapDrawingData, GetLocationMapDrawingErrors, GetLocationMapDrawingResponses, GetLocationMapsData, GetLocationMapsErrors, GetLocationMapsResponses, GetMigrationStatusData, GetMigrationStatusErrors, GetMigrationStatusResponses, GetMindMapHistoryData, GetMindMapHistoryErrors, GetMindMapHistoryResponses, GetSessionTasksData, GetSessionTasksErrors, GetSessionTasksResponses, GetV2CampaignBundleData, GetV2CampaignBundleErrors, GetV2CampaignBundleResponses, ListCampaignSharesData, ListCampaignSharesErrors, ListCampaignSharesResponses, ListCampaignVersionsData, ListCampaignVersionsErrors, ListCampaignVersionsResponses, ListCharacterSheetsData, ListCharacterSheetsErrors, ListCharacterSheetsResponses, ListPublicCampaignsData, ListPublicCampaignsErrors, ListPublicCampaignsResponses, ListTeamNotesData, ListTeamNotesErrors, ListTeamNotesResponses, ListV2CampaignsData, ListV2CampaignsErrors, ListV2CampaignsResponses, PreviewCharacterSheetImportData, PreviewCharacterSheetImportErrors, PreviewCharacterSheetImportResponses, StartMigrationData, StartMigrationErrors, StartMigrationResponses, UpdateCharacterSheetData, UpdateCharacterSheetErrors, UpdateCharacterSheetResponses, UpdateLocationMapsData, UpdateLocationMapsErrors, UpdateLocationMapsResponses, UpdateMindMapHistoryData, UpdateMindMapHistoryErrors, UpdateMindMapHistoryResponses, UpdateV2CampaignBundleData, UpdateV2CampaignBundleErrors, UpdateV2CampaignBundleResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -94,6 +94,48 @@ export const updateCharacterSheet = <ThrowOnError extends boolean = false>(optio
  * 返回当前用户可见的模组配置与成员列表。公开模组在需要时可通过进入密码头访问。
  */
 export const getCampaignConfig = <ThrowOnError extends boolean = false>(options: Options<GetCampaignConfigData, ThrowOnError>) => (options.client ?? client).get<GetCampaignConfigResponses, GetCampaignConfigErrors, ThrowOnError>({ url: '/api/campaigns/{campaignId}/config', ...options });
+
+/**
+ * 获取地图地点文档
+ *
+ * GM 与副 GM 获取完整地图地点文档；PL 仅获取公开点位，且响应不包含关联地点 ID。
+ */
+export const getLocationMaps = <ThrowOnError extends boolean = false>(options: Options<GetLocationMapsData, ThrowOnError>) => (options.client ?? client).get<GetLocationMapsResponses, GetLocationMapsErrors, ThrowOnError>({ url: '/api/campaigns/{campaignId}/location-maps', ...options });
+
+/**
+ * 更新地图地点文档
+ *
+ * 仅 GM 与副 GM 可更新，使用 expectedVersion 进行乐观锁保存。
+ */
+export const updateLocationMaps = <ThrowOnError extends boolean = false>(options: Options<UpdateLocationMapsData, ThrowOnError>) => (options.client ?? client).put<UpdateLocationMapsResponses, UpdateLocationMapsErrors, ThrowOnError>({
+    url: '/api/campaigns/{campaignId}/location-maps',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * 获取地图联机画板
+ *
+ * 模组成员读取指定地图已经提交的矢量图形。
+ */
+export const getLocationMapDrawing = <ThrowOnError extends boolean = false>(options: Options<GetLocationMapDrawingData, ThrowOnError>) => (options.client ?? client).get<GetLocationMapDrawingResponses, GetLocationMapDrawingErrors, ThrowOnError>({ url: '/api/campaigns/{campaignId}/location-maps/{mapId}/drawing', ...options });
+
+/**
+ * 提交地图画板操作
+ *
+ * 幂等提交新增、删除或清空操作。PL 只能删除自己的图形，GM 与副 GM 可以管理全部图形。
+ */
+export const applyLocationMapDrawingOperation = <ThrowOnError extends boolean = false>(options: Options<ApplyLocationMapDrawingOperationData, ThrowOnError>) => (options.client ?? client).post<ApplyLocationMapDrawingOperationResponses, ApplyLocationMapDrawingOperationErrors, ThrowOnError>({
+    url: '/api/campaigns/{campaignId}/location-maps/{mapId}/drawing/operations',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
 
 /**
  * 获取任务看板

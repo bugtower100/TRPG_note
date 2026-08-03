@@ -187,6 +187,101 @@ export type ErrorModel = {
     type?: string;
 };
 
+export type LocationMap = {
+    createdAt: number;
+    id: string;
+    imageRef: string;
+    name: string;
+    points: Array<LocationMapPoint> | null;
+    updatedAt: number;
+};
+
+export type LocationMapDocument = {
+    /**
+     * A URL to the JSON Schema for this object.
+     */
+    readonly $schema?: string;
+    campaignId: string;
+    maps: Array<LocationMap> | null;
+    updatedAt: number;
+    updatedBy: string;
+    updatedByName: string;
+    version: number;
+};
+
+export type LocationMapDrawingDocument = {
+    /**
+     * A URL to the JSON Schema for this object.
+     */
+    readonly $schema?: string;
+    appliedOperationIds?: Array<string> | null;
+    campaignId: string;
+    mapId: string;
+    shapes: Array<LocationMapDrawingShape> | null;
+    updatedAt: number;
+    updatedBy: string;
+    updatedByName: string;
+    version: number;
+};
+
+export type LocationMapDrawingOperation = {
+    /**
+     * A URL to the JSON Schema for this object.
+     */
+    readonly $schema?: string;
+    operationId: string;
+    shape?: LocationMapDrawingShapeInput;
+    shapeId?: string;
+    type: string;
+};
+
+export type LocationMapDrawingPoint = {
+    x: number;
+    y: number;
+};
+
+export type LocationMapDrawingShape = {
+    authorId: string;
+    authorName: string;
+    createdAt: number;
+    id: string;
+    points: Array<LocationMapDrawingPoint> | null;
+    strokeColor: string;
+    strokeWidth: number;
+    type: string;
+};
+
+export type LocationMapDrawingShapeInput = {
+    createdAt: number;
+    id: string;
+    points: Array<LocationMapDrawingPoint> | null;
+    strokeColor: string;
+    strokeWidth: number;
+    type: string;
+};
+
+export type LocationMapPoint = {
+    iconId: number;
+    id: string;
+    introduction: string;
+    labelColor: string;
+    labelStrokeColor: string;
+    locationId?: string;
+    name: string;
+    visibleToPlayers: boolean;
+    x: number;
+    y: number;
+};
+
+export type LocationMapUpdateRequest = {
+    /**
+     * A URL to the JSON Schema for this object.
+     */
+    readonly $schema?: string;
+    expectedVersion: number;
+    maps: Array<LocationMap> | null;
+};
+
 export type MigrationStatusResponse = {
     /**
      * A URL to the JSON Schema for this object.
@@ -550,6 +645,38 @@ export type ErrorModelWritable = {
      * A URI reference to human-readable documentation for the error.
      */
     type?: string;
+};
+
+export type LocationMapDocumentWritable = {
+    campaignId: string;
+    maps: Array<LocationMap> | null;
+    updatedAt: number;
+    updatedBy: string;
+    updatedByName: string;
+    version: number;
+};
+
+export type LocationMapDrawingDocumentWritable = {
+    appliedOperationIds?: Array<string> | null;
+    campaignId: string;
+    mapId: string;
+    shapes: Array<LocationMapDrawingShape> | null;
+    updatedAt: number;
+    updatedBy: string;
+    updatedByName: string;
+    version: number;
+};
+
+export type LocationMapDrawingOperationWritable = {
+    operationId: string;
+    shape?: LocationMapDrawingShapeInput;
+    shapeId?: string;
+    type: string;
+};
+
+export type LocationMapUpdateRequestWritable = {
+    expectedVersion: number;
+    maps: Array<LocationMap> | null;
 };
 
 export type MigrationStatusResponseWritable = {
@@ -1078,6 +1205,254 @@ export type GetCampaignConfigResponses = {
 };
 
 export type GetCampaignConfigResponse = GetCampaignConfigResponses[keyof GetCampaignConfigResponses];
+
+export type GetLocationMapsData = {
+    body?: never;
+    headers?: {
+        /**
+         * 当前用户 ID
+         */
+        'X-TRPG-User-Id'?: string;
+        /**
+         * 当前用户名
+         */
+        'X-TRPG-Username'?: string;
+        /**
+         * 公开模组进入密码，仅在需要时传递
+         */
+        'X-TRPG-Campaign-Password'?: string;
+    };
+    path: {
+        /**
+         * 模组 ID
+         */
+        campaignId: string;
+    };
+    query?: never;
+    url: '/api/campaigns/{campaignId}/location-maps';
+};
+
+export type GetLocationMapsErrors = {
+    /**
+     * Bad Request
+     */
+    400: ErrorModel;
+    /**
+     * Forbidden
+     */
+    403: ErrorModel;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorModel;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorModel;
+};
+
+export type GetLocationMapsError = GetLocationMapsErrors[keyof GetLocationMapsErrors];
+
+export type GetLocationMapsResponses = {
+    /**
+     * OK
+     */
+    200: LocationMapDocument;
+};
+
+export type GetLocationMapsResponse = GetLocationMapsResponses[keyof GetLocationMapsResponses];
+
+export type UpdateLocationMapsData = {
+    body: LocationMapUpdateRequestWritable;
+    headers?: {
+        /**
+         * 当前用户 ID
+         */
+        'X-TRPG-User-Id'?: string;
+        /**
+         * 当前用户名
+         */
+        'X-TRPG-Username'?: string;
+        /**
+         * 公开模组进入密码，仅在需要时传递
+         */
+        'X-TRPG-Campaign-Password'?: string;
+    };
+    path: {
+        /**
+         * 模组 ID
+         */
+        campaignId: string;
+    };
+    query?: never;
+    url: '/api/campaigns/{campaignId}/location-maps';
+};
+
+export type UpdateLocationMapsErrors = {
+    /**
+     * Bad Request
+     */
+    400: ErrorModel;
+    /**
+     * Forbidden
+     */
+    403: ErrorModel;
+    /**
+     * Conflict
+     */
+    409: ErrorModel;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorModel;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorModel;
+};
+
+export type UpdateLocationMapsError = UpdateLocationMapsErrors[keyof UpdateLocationMapsErrors];
+
+export type UpdateLocationMapsResponses = {
+    /**
+     * OK
+     */
+    200: LocationMapDocument;
+};
+
+export type UpdateLocationMapsResponse = UpdateLocationMapsResponses[keyof UpdateLocationMapsResponses];
+
+export type GetLocationMapDrawingData = {
+    body?: never;
+    headers?: {
+        /**
+         * 当前用户 ID
+         */
+        'X-TRPG-User-Id'?: string;
+        /**
+         * 当前用户名
+         */
+        'X-TRPG-Username'?: string;
+        /**
+         * 公开模组进入密码，仅在需要时传递
+         */
+        'X-TRPG-Campaign-Password'?: string;
+    };
+    path: {
+        /**
+         * 模组 ID
+         */
+        campaignId: string;
+        /**
+         * 地图 ID
+         */
+        mapId: string;
+    };
+    query?: never;
+    url: '/api/campaigns/{campaignId}/location-maps/{mapId}/drawing';
+};
+
+export type GetLocationMapDrawingErrors = {
+    /**
+     * Bad Request
+     */
+    400: ErrorModel;
+    /**
+     * Forbidden
+     */
+    403: ErrorModel;
+    /**
+     * Not Found
+     */
+    404: ErrorModel;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorModel;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorModel;
+};
+
+export type GetLocationMapDrawingError = GetLocationMapDrawingErrors[keyof GetLocationMapDrawingErrors];
+
+export type GetLocationMapDrawingResponses = {
+    /**
+     * OK
+     */
+    200: LocationMapDrawingDocument;
+};
+
+export type GetLocationMapDrawingResponse = GetLocationMapDrawingResponses[keyof GetLocationMapDrawingResponses];
+
+export type ApplyLocationMapDrawingOperationData = {
+    body: LocationMapDrawingOperationWritable;
+    headers?: {
+        /**
+         * 当前用户 ID
+         */
+        'X-TRPG-User-Id'?: string;
+        /**
+         * 当前用户名
+         */
+        'X-TRPG-Username'?: string;
+        /**
+         * 公开模组进入密码，仅在需要时传递
+         */
+        'X-TRPG-Campaign-Password'?: string;
+    };
+    path: {
+        /**
+         * 模组 ID
+         */
+        campaignId: string;
+        /**
+         * 地图 ID
+         */
+        mapId: string;
+    };
+    query?: never;
+    url: '/api/campaigns/{campaignId}/location-maps/{mapId}/drawing/operations';
+};
+
+export type ApplyLocationMapDrawingOperationErrors = {
+    /**
+     * Bad Request
+     */
+    400: ErrorModel;
+    /**
+     * Forbidden
+     */
+    403: ErrorModel;
+    /**
+     * Not Found
+     */
+    404: ErrorModel;
+    /**
+     * Conflict
+     */
+    409: ErrorModel;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorModel;
+    /**
+     * Internal Server Error
+     */
+    500: ErrorModel;
+};
+
+export type ApplyLocationMapDrawingOperationError = ApplyLocationMapDrawingOperationErrors[keyof ApplyLocationMapDrawingOperationErrors];
+
+export type ApplyLocationMapDrawingOperationResponses = {
+    /**
+     * OK
+     */
+    200: LocationMapDrawingDocument;
+};
+
+export type ApplyLocationMapDrawingOperationResponse = ApplyLocationMapDrawingOperationResponses[keyof ApplyLocationMapDrawingOperationResponses];
 
 export type GetSessionTasksData = {
     body?: never;

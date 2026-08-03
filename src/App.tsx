@@ -11,6 +11,7 @@ const Dashboard = lazy(() => import('./pages/Dashboard'));
 const Settings = lazy(() => import('./pages/Settings'));
 const CharacterList = lazy(() => import('./pages/characters/CharacterList'));
 const LocationList = lazy(() => import('./pages/locations/LocationList'));
+const LocationMaps = lazy(() => import('./pages/locations/LocationMaps'));
 const OrganizationList = lazy(() => import('./pages/organizations/OrganizationList'));
 const EventList = lazy(() => import('./pages/events/EventList'));
 const EventDetail = lazy(() => import('./pages/events/EventDetail'));
@@ -68,6 +69,7 @@ function AppContent() {
               <Route path="monsters/:id" element={<MonsterDetail />} />
               <Route path="monsters/shared/:shareId" element={<SharedEntityDetailRoute entityType="monsters" />} />
               <Route path="locations" element={<LocationList />} />
+              <Route path="locations/maps" element={<LocationMaps />} />
               <Route path="locations/:id" element={<LocationDetail />} />
               <Route path="locations/shared/:shareId" element={<SharedEntityDetailRoute entityType="locations" />} />
               <Route path="organizations" element={<OrganizationList />} />

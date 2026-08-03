@@ -9,6 +9,10 @@ export const queryKeys = {
     versions: (campaignId: string, userId?: string) => ['campaigns', campaignId, 'versions', userId ?? 'anonymous'] as const,
     sessionTasks: (campaignId: string, userId?: string) =>
       ['campaigns', campaignId, 'session-tasks', userId ?? 'anonymous'] as const,
+    locationMaps: (campaignId: string, userId?: string) =>
+      ['campaigns', campaignId, 'location-maps', userId ?? 'anonymous'] as const,
+    locationMapDrawing: (campaignId: string, mapId: string, userId?: string) =>
+      ['campaigns', campaignId, 'location-maps', mapId, 'drawing', userId ?? 'anonymous'] as const,
     bundle: (campaignId: string, userId?: string) => ['campaigns', campaignId, 'bundle', userId ?? 'anonymous'] as const,
     characterSheets: (campaignId: string, userId?: string) =>
       ['campaigns', campaignId, 'character-sheets', userId ?? 'anonymous'] as const,

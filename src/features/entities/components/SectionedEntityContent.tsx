@@ -6,6 +6,7 @@ import EntityTagEditor from '../../../components/common/EntityTagEditor';
 import { ShareSectionAction, ShareSubItemAction } from '../../../components/common/EntityShareActions';
 import { BaseEntity, CustomSubItem, GraphEntityType } from '../../../types';
 import { DetailSectionDef } from '../hooks/useSectionedEntityDetail';
+import { useDirectContentEditPreference } from '../../../hooks/useDirectContentEditPreference';
 
 interface SectionedEntityContentProps<T extends BaseEntity> {
   entity: T;
@@ -40,6 +41,8 @@ const SectionedEntityContent = <T extends BaseEntity>({
   removeCustomSection,
   setSectionTitle,
 }: SectionedEntityContentProps<T>) => {
+  const { directContentEdit } = useDirectContentEditPreference();
+
   return (
     <div className="space-y-6">
       <EntityTagEditor tags={entity.tags} onChange={onTagsChange} />
@@ -67,6 +70,7 @@ const SectionedEntityContent = <T extends BaseEntity>({
             onChange={(items) => onSectionItemsChange(section.key, items)}
             ensureOneItem
             defaultFirstItemTitle="详细情况"
+            directEditOnContentClick={directContentEdit}
             renderItemActions={(item) => <ShareSubItemAction entityType={entityType} entity={entity} item={item} />}
           />
         </CollapsibleSection>
@@ -90,6 +94,7 @@ const SectionedEntityContent = <T extends BaseEntity>({
             onChange={(items) => onSectionItemsChange(sectionKey, items)}
             ensureOneItem
             defaultFirstItemTitle="详细情况"
+            directEditOnContentClick={directContentEdit}
             renderItemActions={(item) => <ShareSubItemAction entityType={entityType} entity={entity} item={item} />}
           />
         </CollapsibleSection>

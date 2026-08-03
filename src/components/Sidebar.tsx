@@ -5,7 +5,7 @@ import { APP_VERSION } from '../constants/appVersion';
 import { useCampaignMemberRole } from '../hooks/useCampaignMemberRole';
 import { 
   LayoutDashboard, Users, MapPin, Building, Calendar, 
-  Search, Clock, Settings, LogOut, Skull, Home, Share2, NotebookPen, Kanban, ScrollText, BrainCircuit
+  Search, Clock, Settings, LogOut, Skull, Home, Share2, NotebookPen, Kanban, ScrollText, BrainCircuit, Map
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -39,7 +39,14 @@ const Sidebar: React.FC<SidebarProps> = ({ className = '', onNavigate }) => {
           managerOnly: true,
         },
         { to: '/team-notes', icon: <NotebookPen size={20} />, label: '团队笔记' },
-        { to: '/locations', icon: <MapPin size={20} />, label: '地点' },
+        {
+          to: '/locations',
+          icon: <MapPin size={20} />,
+          label: '地点',
+          children: [
+            { to: '/locations/maps', icon: <Map size={16} />, label: '地图地点' },
+          ],
+        },
         { to: '/organizations', icon: <Building size={20} />, label: '组织' },
         { to: '/events', icon: <Calendar size={20} />, label: '事件' },
         { to: '/clues', icon: <Search size={20} />, label: '线索' },

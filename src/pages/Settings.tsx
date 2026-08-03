@@ -11,6 +11,7 @@ import {
   downloadCustomThemeTemplate,
   parseCustomThemeFile,
 } from '../features/themes/themeService';
+import { useDirectContentEditPreference } from '../hooks/useDirectContentEditPreference';
 
 const ImportAssistant = lazy(() => import('./ImportAssistant'));
 const VersionHistory = lazy(() => import('./VersionHistory'));
@@ -36,6 +37,7 @@ const Settings: React.FC = () => {
   const [versionCollapsed, setVersionCollapsed] = useState(true);
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
   const [themeStatus, setThemeStatus] = useState('');
+  const { directContentEdit, setDirectContentEdit } = useDirectContentEditPreference();
   const themes: { id: CampaignTheme; label: string; icon: React.ReactNode; desc: string }[] = useMemo(() => BUILTIN_THEME_OPTIONS.filter((item) => item.id !== 'custom').map((item) => ({
     ...item,
     icon:
@@ -180,6 +182,24 @@ const Settings: React.FC = () => {
           )}
           {themeStatus && <div className="text-sm theme-text-secondary">{themeStatus}</div>}
         </div>
+      </section>
+
+      <section className="bg-theme-card p-4 sm:p-6 rounded-lg shadow-sm border border-theme">
+        <h3 className="text-lg font-medium">编辑偏好</h3>
+        <label className="mt-4 flex items-start justify-between gap-4 rounded-lg border border-theme p-4 cursor-pointer hover:bg-primary-light/30">
+          <span>
+            <span className="block font-medium">点击内容直接进入编辑</span>
+            <span className="mt-1 block text-sm theme-text-secondary">
+              开启后，双击普通资料页的正文内容即可进入编辑模式，双击编辑器外部即可结束编辑；关闭后需要点击“开始编辑”。
+            </span>
+          </span>
+          <input
+            type="checkbox"
+            checked={directContentEdit}
+            onChange={(event) => setDirectContentEdit(event.target.checked)}
+            className="mt-1 h-5 w-5 shrink-0 rounded border-theme text-primary focus:ring-primary"
+          />
+        </label>
       </section>
 
       <section className="bg-theme-card p-4 sm:p-6 rounded-lg shadow-sm border border-theme">

@@ -1081,6 +1081,8 @@ func main() {
 	backupAPI := router.Group("/api/backups")
 
 	registerBackupRoutes(backupAPI, db, cfg)
+	registerLocationMapRoutes(campaignAPI, db)
+	registerLocationMapDrawingRoutes(campaignAPI, db)
 
 	systemAPI.GET("/migration/status", func(c *gin.Context) {
 		status, err := buildMigrationStatus(db)
