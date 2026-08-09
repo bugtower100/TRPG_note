@@ -11,6 +11,7 @@ import CollapsibleSection from '../../components/common/CollapsibleSection';
 import { ShareSectionAction, ShareSubItemAction } from '../../components/common/EntityShareActions';
 import { markdownToPreviewText } from '../../components/common/richTextReference';
 import EntityDetailHeader from '../../features/entities/components/EntityDetailHeader';
+import SectionLinkToggle from '../../features/entities/components/SectionLinkToggle';
 import { useSectionedEntityDetail } from '../../features/entities/hooks/useSectionedEntityDetail';
 import { useCampaignMemberRole } from '../../hooks/useCampaignMemberRole';
 import {
@@ -46,6 +47,8 @@ const TimelineDetail: React.FC<TimelineDetailProps> = ({ entityId, embedded = fa
     setSectionTitle,
     isSectionVisible,
     setSectionVisible,
+    isSectionLinkEnabled,
+    setSectionLinkEnabled,
     removeCustomSection,
     allVisibleExpanded,
     toggleAllSections,
@@ -310,7 +313,15 @@ const TimelineDetail: React.FC<TimelineDetailProps> = ({ entityId, embedded = fa
           onRemove={() => setSectionVisible('intro', false)}
           editableTitle
           onRenameTitle={(title) => setSectionTitle('intro', title)}
-          headerActions={<ShareSectionAction entityType="timelines" entity={timeline} sectionKey="intro" />}
+          headerActions={(
+            <>
+              <SectionLinkToggle
+                enabled={isSectionLinkEnabled('intro')}
+                onChange={(enabled) => setSectionLinkEnabled('intro', enabled)}
+              />
+              <ShareSectionAction entityType="timelines" entity={timeline} sectionKey="intro" />
+            </>
+          )}
         >
           <div className="space-y-3">
             {isEditingIntro ? (
@@ -351,6 +362,10 @@ const TimelineDetail: React.FC<TimelineDetailProps> = ({ entityId, embedded = fa
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            <SectionLinkToggle
+              enabled={isSectionLinkEnabled('events')}
+              onChange={(enabled) => setSectionLinkEnabled('events', enabled)}
+            />
             <label className="flex items-center gap-2 text-sm theme-text-secondary">
               显示优先级
               <select
@@ -499,7 +514,15 @@ const TimelineDetail: React.FC<TimelineDetailProps> = ({ entityId, embedded = fa
           onRemove={() => removeCustomSection(sectionKey)}
           editableTitle
           onRenameTitle={(title) => setSectionTitle(sectionKey, title)}
-          headerActions={<ShareSectionAction entityType="timelines" entity={timeline} sectionKey={sectionKey} />}
+          headerActions={(
+            <>
+              <SectionLinkToggle
+                enabled={isSectionLinkEnabled(sectionKey)}
+                onChange={(enabled) => setSectionLinkEnabled(sectionKey, enabled)}
+              />
+              <ShareSectionAction entityType="timelines" entity={timeline} sectionKey={sectionKey} />
+            </>
+          )}
         >
           <CustomSubItemsEditor
             title={getSectionTitle(sectionKey, '自定义区块') + ' / 子项目'}

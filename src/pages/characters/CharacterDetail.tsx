@@ -38,6 +38,8 @@ const CharacterDetail: React.FC<CharacterDetailProps> = ({ entityId }) => {
     setSectionTitle,
     isSectionVisible,
     setSectionVisible,
+    isSectionLinkEnabled,
+    setSectionLinkEnabled,
     addCustomSection,
     removeCustomSection,
     allVisibleExpanded,
@@ -158,6 +160,8 @@ const CharacterDetail: React.FC<CharacterDetailProps> = ({ entityId }) => {
         onSectionItemsChange={handleSectionItemsChange}
         isSectionVisible={isSectionVisible}
         setSectionVisible={setSectionVisible}
+        isSectionLinkEnabled={isSectionLinkEnabled}
+        setSectionLinkEnabled={setSectionLinkEnabled}
         addCustomSection={addCustomSection}
         removeCustomSection={removeCustomSection}
         setSectionTitle={setSectionTitle}

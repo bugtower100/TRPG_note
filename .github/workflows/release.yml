@@ -248,8 +248,8 @@ jobs:
           make_latest: true
           body: |
             ## ${{ steps.version.outputs.name }} 更新内容
-            - 为地图增加了地图上传与画板功能，支持联机；
-            - 为核心功能（人物、怪物、地点、线索等）编辑增加了双击快捷进入退出可选项，支持空格/Enter快捷进入编辑模式；
+            - 增加了项目多关键词匹配功能；
+            - 增加了子条目导向开关功能；
           files: |
             TRPG模组笔记-${{ steps.version.outputs.app_version }}-windows-amd64.zip
             TRPG模组笔记-${{ steps.version.outputs.app_version }}-windows-arm64.zip

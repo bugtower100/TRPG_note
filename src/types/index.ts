@@ -25,6 +25,7 @@ export interface BaseEntity {
   customSubItems?: CustomSubItem[];
   sectionSubItems?: Record<string, CustomSubItem[]>;
   sectionVisibility?: Record<string, boolean>;
+  sectionLinkEnabled?: Record<string, boolean>;
   sectionTitles?: Record<string, string>;
   customSections?: string[];
   relatedImages: string[];

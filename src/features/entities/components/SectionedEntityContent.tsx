@@ -7,6 +7,7 @@ import { ShareSectionAction, ShareSubItemAction } from '../../../components/comm
 import { BaseEntity, CustomSubItem, GraphEntityType } from '../../../types';
 import { DetailSectionDef } from '../hooks/useSectionedEntityDetail';
 import { useDirectContentEditPreference } from '../../../hooks/useDirectContentEditPreference';
+import SectionLinkToggle from './SectionLinkToggle';
 
 interface SectionedEntityContentProps<T extends BaseEntity> {
   entity: T;
@@ -20,6 +21,8 @@ interface SectionedEntityContentProps<T extends BaseEntity> {
   onSectionItemsChange: (key: string, items: CustomSubItem[]) => void;
   isSectionVisible: (key: string) => boolean;
   setSectionVisible: (key: string, visible: boolean) => void;
+  isSectionLinkEnabled: (key: string) => boolean;
+  setSectionLinkEnabled: (key: string, enabled: boolean) => void;
   addCustomSection: () => void;
   removeCustomSection: (key: string) => void;
   setSectionTitle: (key: string, title: string) => void;
@@ -37,6 +40,8 @@ const SectionedEntityContent = <T extends BaseEntity>({
   onSectionItemsChange,
   isSectionVisible,
   setSectionVisible,
+  isSectionLinkEnabled,
+  setSectionLinkEnabled,
   addCustomSection,
   removeCustomSection,
   setSectionTitle,
@@ -62,7 +67,15 @@ const SectionedEntityContent = <T extends BaseEntity>({
           onRemove={() => setSectionVisible(section.key, false)}
           editableTitle
           onRenameTitle={(title) => setSectionTitle(section.key, title)}
-          headerActions={<ShareSectionAction entityType={entityType} entity={entity} sectionKey={section.key} />}
+          headerActions={(
+            <>
+              <SectionLinkToggle
+                enabled={isSectionLinkEnabled(section.key)}
+                onChange={(enabled) => setSectionLinkEnabled(section.key, enabled)}
+              />
+              <ShareSectionAction entityType={entityType} entity={entity} sectionKey={section.key} />
+            </>
+          )}
         >
           <CustomSubItemsEditor
             title={getSectionTitle(section.key, section.title) + ' / 子项目'}
@@ -86,7 +99,15 @@ const SectionedEntityContent = <T extends BaseEntity>({
           onRemove={() => removeCustomSection(sectionKey)}
           editableTitle
           onRenameTitle={(title) => setSectionTitle(sectionKey, title)}
-          headerActions={<ShareSectionAction entityType={entityType} entity={entity} sectionKey={sectionKey} />}
+          headerActions={(
+            <>
+              <SectionLinkToggle
+                enabled={isSectionLinkEnabled(sectionKey)}
+                onChange={(enabled) => setSectionLinkEnabled(sectionKey, enabled)}
+              />
+              <ShareSectionAction entityType={entityType} entity={entity} sectionKey={sectionKey} />
+            </>
+          )}
         >
           <CustomSubItemsEditor
             title={getSectionTitle(sectionKey, '自定义区块') + ' / 子项目'}

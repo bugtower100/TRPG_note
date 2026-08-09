@@ -304,7 +304,10 @@ export const buildRichKeywordData = (campaignData: RichKeywordSource): RichKeywo
     list.forEach((item) => {
       const defs = DEFAULT_SECTION_KEYS[entityType] || [];
       defs.forEach((def) => {
-        if (item.sectionVisibility?.[def.key] === false) return;
+        if (
+          item.sectionVisibility?.[def.key] === false
+          || item.sectionLinkEnabled?.[def.key] === false
+        ) return;
         const title = item.sectionTitles?.[def.key] || def.title;
         if (!title) return;
         addSectionEntry(title, {
@@ -317,7 +320,10 @@ export const buildRichKeywordData = (campaignData: RichKeywordSource): RichKeywo
       });
 
       (item.customSections || []).forEach((sectionKey: string) => {
-        if (item.sectionVisibility?.[sectionKey] === false) return;
+        if (
+          item.sectionVisibility?.[sectionKey] === false
+          || item.sectionLinkEnabled?.[sectionKey] === false
+        ) return;
         const title = item.sectionTitles?.[sectionKey];
         if (!title) return;
         addSectionEntry(title, {

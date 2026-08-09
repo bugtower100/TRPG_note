@@ -119,6 +119,25 @@ export const useSectionedEntityDetail = <T extends BaseEntity>({
     });
   }, [updateItem]);
 
+  const isSectionLinkEnabled = useCallback((key: string) => (
+    entity?.sectionLinkEnabled?.[key] !== false
+  ), [entity]);
+
+  const setSectionLinkEnabled = useCallback((key: string, enabled: boolean) => {
+    setEntity((prev) => {
+      if (!prev) return prev;
+      const next = {
+        ...prev,
+        sectionLinkEnabled: {
+          ...(prev.sectionLinkEnabled || {}),
+          [key]: enabled,
+        },
+      };
+      updateItem(next);
+      return next;
+    });
+  }, [updateItem]);
+
   const addCustomSection = useCallback(() => {
     const name = window.prompt('请输入新内置区块名称', '新内置区块');
     if (!name || !name.trim()) return;
@@ -130,6 +149,7 @@ export const useSectionedEntityDetail = <T extends BaseEntity>({
         customSections: [...(prev.customSections || []), key],
         sectionTitles: { ...(prev.sectionTitles || {}), [key]: name.trim() },
         sectionVisibility: { ...(prev.sectionVisibility || {}), [key]: true },
+        sectionLinkEnabled: { ...(prev.sectionLinkEnabled || {}), [key]: true },
         sectionSubItems: { ...(prev.sectionSubItems || {}), [key]: [] },
       };
       updateItem(next);
@@ -143,15 +163,18 @@ export const useSectionedEntityDetail = <T extends BaseEntity>({
       if (!prev) return prev;
       const nextTitles = { ...(prev.sectionTitles || {}) };
       const nextVisibility = { ...(prev.sectionVisibility || {}) };
+      const nextLinkEnabled = { ...(prev.sectionLinkEnabled || {}) };
       const nextSubItems = { ...(prev.sectionSubItems || {}) };
       delete nextTitles[key];
       delete nextVisibility[key];
+      delete nextLinkEnabled[key];
       delete nextSubItems[key];
       const next = {
         ...prev,
         customSections: (prev.customSections || []).filter((sectionKey) => sectionKey !== key),
         sectionTitles: nextTitles,
         sectionVisibility: nextVisibility,
+        sectionLinkEnabled: nextLinkEnabled,
         sectionSubItems: nextSubItems,
       };
       updateItem(next);
@@ -195,6 +218,8 @@ export const useSectionedEntityDetail = <T extends BaseEntity>({
     setSectionTitle,
     isSectionVisible,
     setSectionVisible,
+    isSectionLinkEnabled,
+    setSectionLinkEnabled,
     addCustomSection,
     removeCustomSection,
     visibleSectionKeys,

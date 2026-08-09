@@ -201,6 +201,7 @@ class DataService {
       let customSubItems = this.normalizeSubItems(e?.customSubItems);
       const sectionSubItems = this.normalizeSectionSubItems(e?.sectionSubItems);
       const sectionVisibility = this.normalizeRecord(e?.sectionVisibility);
+      const sectionLinkEnabled = this.normalizeRecord(e?.sectionLinkEnabled);
       const sectionTitles = this.normalizeRecord(e?.sectionTitles);
       const customSections = this.normalizeCustomSections(e?.customSections);
 
@@ -231,6 +232,7 @@ class DataService {
         customSubItems,
         sectionSubItems,
         sectionVisibility,
+        sectionLinkEnabled,
         sectionTitles,
         customSections,
         relatedImages: safeArray<string>(e?.relatedImages, []),

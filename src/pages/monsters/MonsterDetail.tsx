@@ -33,6 +33,8 @@ const MonsterDetail: React.FC<MonsterDetailProps> = ({ entityId }) => {
     setSectionTitle,
     isSectionVisible,
     setSectionVisible,
+    isSectionLinkEnabled,
+    setSectionLinkEnabled,
     addCustomSection,
     removeCustomSection,
     allVisibleExpanded,
@@ -79,6 +81,8 @@ const MonsterDetail: React.FC<MonsterDetailProps> = ({ entityId }) => {
         onSectionItemsChange={setSectionItems}
         isSectionVisible={isSectionVisible}
         setSectionVisible={setSectionVisible}
+        isSectionLinkEnabled={isSectionLinkEnabled}
+        setSectionLinkEnabled={setSectionLinkEnabled}
         addCustomSection={addCustomSection}
         removeCustomSection={removeCustomSection}
         setSectionTitle={setSectionTitle}

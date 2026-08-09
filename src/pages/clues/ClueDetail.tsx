@@ -32,6 +32,8 @@ const ClueDetail: React.FC<ClueDetailProps> = ({ entityId }) => {
     setSectionTitle,
     isSectionVisible,
     setSectionVisible,
+    isSectionLinkEnabled,
+    setSectionLinkEnabled,
     addCustomSection,
     removeCustomSection,
     allVisibleExpanded,
@@ -78,6 +80,8 @@ const ClueDetail: React.FC<ClueDetailProps> = ({ entityId }) => {
         onSectionItemsChange={setSectionItems}
         isSectionVisible={isSectionVisible}
         setSectionVisible={setSectionVisible}
+        isSectionLinkEnabled={isSectionLinkEnabled}
+        setSectionLinkEnabled={setSectionLinkEnabled}
         addCustomSection={addCustomSection}
         removeCustomSection={removeCustomSection}
         setSectionTitle={setSectionTitle}
