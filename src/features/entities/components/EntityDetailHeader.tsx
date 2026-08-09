@@ -2,6 +2,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import EntityShareActions from '../../../components/common/EntityShareActions';
 import { BaseEntity, GraphEntityType } from '../../../types';
+import EntityKeywordEditor from './EntityKeywordEditor';
 
 interface EntityDetailHeaderProps<T extends BaseEntity> {
   entity: T;
@@ -48,6 +49,11 @@ const EntityDetailHeader = <T extends BaseEntity>({
           onChange={(e) => onChange('name' as keyof T, e.target.value as T[keyof T])}
           className="flex-1 min-w-0 text-xl sm:text-2xl font-bold border-b border-transparent hover:border-gray-300 focus:border-primary focus:outline-none bg-transparent"
           style={{ color: entity.titleColor || '#111827' }}
+        />
+        <EntityKeywordEditor
+          entityName={entity.name}
+          keywords={entity.keywords}
+          onChange={(keywords) => onChange('keywords' as keyof T, keywords as T[keyof T])}
         />
         <input
           type="color"

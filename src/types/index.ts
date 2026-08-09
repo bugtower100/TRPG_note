@@ -16,6 +16,8 @@ export interface CustomSubItem {
 export interface BaseEntity {
   id: string;
   name: string;
+  /** Additional phrases that should resolve to this entity in rich text. */
+  keywords?: string[];
   titleColor?: string;
   sortOrder?: number;
   details: string;

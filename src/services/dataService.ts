@@ -122,6 +122,21 @@ class DataService {
     return Array.from(new Set(normalized));
   }
 
+  private normalizeKeywords(keywords: any): string[] {
+    if (!Array.isArray(keywords)) return [];
+    const seen = new Set<string>();
+    const normalized: string[] = [];
+    for (const value of keywords) {
+      if (typeof value !== 'string') continue;
+      const keyword = value.trim().replace(/\s+/g, ' ');
+      const key = keyword.toLowerCase();
+      if (!keyword || seen.has(key)) continue;
+      seen.add(key);
+      normalized.push(keyword);
+    }
+    return normalized;
+  }
+
   private sanitizeUserProfile(user: UserProfile & { loginPasswordHash?: string }): UserProfile {
     return {
       id: user.id,
@@ -208,6 +223,7 @@ class DataService {
       return {
         id: typeof e?.id === 'string' && e.id ? e.id : uuidv4(),
         name: typeof e?.name === 'string' ? e.name : '未命名',
+        keywords: this.normalizeKeywords(e?.keywords),
         titleColor: typeof e?.titleColor === 'string' && e.titleColor.trim() ? e.titleColor : '#111827',
         sortOrder: typeof e?.sortOrder === 'number' ? e.sortOrder : fallbackIndex,
         details: typeof e?.details === 'string' ? e.details : '',

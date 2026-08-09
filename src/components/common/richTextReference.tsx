@@ -258,12 +258,14 @@ export const buildRichKeywordData = (campaignData: RichKeywordSource): RichKeywo
     list: Array<{
       id: string;
       name: string;
+      keywords?: string[];
       details?: string;
       description?: string;
       sectionSubItems?: Record<string, Array<{ content?: string }>>;
     }>,
     type: string
   ) => {
+    // Canonical names always win when an alias conflicts with another entry name.
     list.forEach((item) => {
       if (!item.name) return;
       entityMap.set(item.name.toLowerCase(), {
@@ -272,6 +274,22 @@ export const buildRichKeywordData = (campaignData: RichKeywordSource): RichKeywo
         details: getEntityPrimaryMarkdown(item, type),
         name: item.name,
       });
+    });
+
+    list.forEach((item) => {
+      if (!item.name) return;
+      const entry = {
+        id: item.id,
+        type,
+        details: getEntityPrimaryMarkdown(item, type),
+        name: item.name,
+      };
+      for (const rawKeyword of item.keywords || []) {
+        const keyword = rawKeyword.trim();
+        const key = keyword.toLowerCase();
+        if (!keyword || entityMap.has(key)) continue;
+        entityMap.set(key, entry);
+      }
     });
   };
 
