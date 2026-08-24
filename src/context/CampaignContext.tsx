@@ -68,6 +68,7 @@ export const CampaignProvider: React.FC<{ children: ReactNode }> = ({ children }
   const isComposingRef = useRef(false);
   const saveDeferredByCompositionRef = useRef(false);
   const bundleVersionRef = useRef(0);
+  const bundleWriteTokenRef = useRef('');
   const saveRequestIdRef = useRef(0);
   const mountedRef = useRef(true);
 
@@ -164,9 +165,11 @@ export const CampaignProvider: React.FC<{ children: ReactNode }> = ({ children }
     campaignId: string,
     bundle: CampaignData,
     version: number,
-    targetUserId?: string
+    targetUserId?: string,
+    writeToken: string = ''
   ) => {
     bundleVersionRef.current = version;
+    bundleWriteTokenRef.current = writeToken;
     pendingSaveRef.current = null;
     resetUnsavedState();
     if (targetUserId) {
@@ -201,7 +204,7 @@ export const CampaignProvider: React.FC<{ children: ReactNode }> = ({ children }
       if (!mountedRef.current) {
         return;
       }
-      applyLoadedCampaign(currentCampaignId, result.bundle, result.version, user.id);
+      applyLoadedCampaign(currentCampaignId, result.bundle, result.version, user.id, result.writeToken || '');
     } catch (error) {
       if (mountedRef.current) {
         setSessionError(error instanceof Error ? error.message : '重新加载模组失败。');
@@ -258,12 +261,13 @@ export const CampaignProvider: React.FC<{ children: ReactNode }> = ({ children }
         campaignId,
         nextData,
         targetUser,
-        bundleVersionRef.current
+        bundleVersionRef.current,
+        bundleWriteTokenRef.current
       );
       if (!mountedRef.current || requestId !== saveRequestIdRef.current) {
         return true;
       }
-      applyLoadedCampaign(campaignId, result.bundle, result.version, targetUser.id);
+      applyLoadedCampaign(campaignId, result.bundle, result.version, targetUser.id, result.writeToken || '');
       setSessionError(null);
       return true;
     } catch (error) {
@@ -375,7 +379,7 @@ export const CampaignProvider: React.FC<{ children: ReactNode }> = ({ children }
         if (!mountedRef.current) {
           return;
         }
-        applyLoadedCampaign(lastCampaignId, result.bundle, result.version, currentUser.id);
+        applyLoadedCampaign(lastCampaignId, result.bundle, result.version, currentUser.id, result.writeToken || '');
       } catch (error) {
         if (mountedRef.current) {
           setSessionError(error instanceof Error ? error.message : '初始化模组列表失败。');
@@ -529,6 +533,7 @@ export const CampaignProvider: React.FC<{ children: ReactNode }> = ({ children }
     resetUnsavedState();
     setSessionError(null);
     bundleVersionRef.current = 0;
+    bundleWriteTokenRef.current = '';
     pendingSaveRef.current = null;
     localStorage.removeItem('trpg_last_campaign_id');
     if (previousUserId) {
@@ -563,7 +568,7 @@ export const CampaignProvider: React.FC<{ children: ReactNode }> = ({ children }
       if (!mountedRef.current) {
         return;
       }
-      applyLoadedCampaign(id, result.bundle, result.version, user.id);
+      applyLoadedCampaign(id, result.bundle, result.version, user.id, result.writeToken || '');
     } catch (error) {
       if (mountedRef.current) {
         setSessionError(error instanceof Error ? error.message : '模组加载失败。');
@@ -588,7 +593,7 @@ export const CampaignProvider: React.FC<{ children: ReactNode }> = ({ children }
         return;
       }
       setCampaignListForUser(user.id, (prev) => [result.summary, ...prev.filter((item) => item.id !== result.summary.id)]);
-      applyLoadedCampaign(result.summary.id, result.bundle.bundle, result.bundle.version, user.id);
+      applyLoadedCampaign(result.summary.id, result.bundle.bundle, result.bundle.version, user.id, result.bundle.writeToken || '');
     } catch (error) {
       if (mountedRef.current) {
         setSessionError(error instanceof Error ? error.message : '创建模组失败。');
@@ -616,6 +621,7 @@ export const CampaignProvider: React.FC<{ children: ReactNode }> = ({ children }
       resetUnsavedState();
       pendingSaveRef.current = null;
       bundleVersionRef.current = 0;
+      bundleWriteTokenRef.current = '';
     })();
   }, [campaignDataState, flushPendingSave, resetUnsavedState]);
 
@@ -638,6 +644,7 @@ export const CampaignProvider: React.FC<{ children: ReactNode }> = ({ children }
         resetUnsavedState();
         pendingSaveRef.current = null;
         bundleVersionRef.current = 0;
+        bundleWriteTokenRef.current = '';
       }
     } catch (error) {
       if (mountedRef.current) {

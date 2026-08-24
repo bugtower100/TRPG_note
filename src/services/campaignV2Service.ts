@@ -15,6 +15,8 @@ export interface CampaignBundleV2Response {
   campaignId: string;
   version: number;
   bundle: CampaignData;
+  redacted: boolean;
+  writeToken?: string;
 }
 
 export interface V2CreateCampaignResponse {
@@ -43,6 +45,8 @@ const messageFromPayload = (
       return '后端数据处理失败，请稍后重试。';
     case 'not_found':
       return '模组不存在或已被删除。';
+    case 'bundle_reload_required':
+      return '用户权限或服务会话已经变化，请重新加载完整模组后再编辑。';
     default:
       return payload.error;
   }
@@ -125,7 +129,8 @@ export const campaignV2Service = {
     campaignId: string,
     bundle: CampaignData,
     user: UserProfile | null,
-    expectedVersion: number
+    expectedVersion: number,
+    writeToken: string
   ): Promise<CampaignBundleV2Response> {
     try {
       return unwrapGeneratedResponse(await updateGeneratedV2CampaignBundle({
@@ -134,6 +139,7 @@ export const campaignV2Service = {
         path: { campaignId },
         body: {
           expectedVersion,
+          writeToken,
           bundle: bundle as unknown as GeneratedV2CampaignBundle,
         },
       })) as unknown as CampaignBundleV2Response;

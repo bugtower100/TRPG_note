@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { NavLink } from 'react-router-dom';
 import { useCampaignData, useCampaignSession } from '../context/CampaignContext';
 import { APP_VERSION } from '../constants/appVersion';
 import { useCampaignMemberRole } from '../hooks/useCampaignMemberRole';
+import { isCampaignManagerRole } from '../utils/campaignRoles';
 import { 
   LayoutDashboard, Users, MapPin, Building, Calendar, 
   Search, Clock, Settings, LogOut, Skull, Home, Share2, NotebookPen, Kanban, ScrollText, BrainCircuit, Map
@@ -15,8 +16,18 @@ interface SidebarProps {
 
 const Sidebar: React.FC<SidebarProps> = ({ className = '', onNavigate }) => {
   const { campaignData } = useCampaignData();
-  const { logout, exitCampaign } = useCampaignSession();
-  const { canManageCampaignContent } = useCampaignMemberRole();
+  const { logout, exitCampaign, reloadCurrentCampaign } = useCampaignSession();
+  const { canManageCampaignContent, memberRole, configQuery } = useCampaignMemberRole();
+  const previousRoleRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!configQuery.data) return;
+    const previousRole = previousRoleRef.current;
+    previousRoleRef.current = memberRole;
+    if (previousRole === 'PL' && isCampaignManagerRole(memberRole)) {
+      void reloadCurrentCampaign().catch(() => void 0);
+    }
+  }, [configQuery.data, memberRole, reloadCurrentCampaign]);
 
   const navGroups = [
     {

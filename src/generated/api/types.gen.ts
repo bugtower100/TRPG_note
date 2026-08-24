@@ -497,7 +497,9 @@ export type V2CampaignBundleResponse = {
     readonly $schema?: string;
     bundle: V2CampaignBundle;
     campaignId: string;
+    redacted: boolean;
     version: number;
+    writeToken?: string;
 };
 
 export type V2CampaignBundleUpdateRequest = {
@@ -507,6 +509,7 @@ export type V2CampaignBundleUpdateRequest = {
     readonly $schema?: string;
     bundle: V2CampaignBundle;
     expectedVersion: number;
+    writeToken: string;
 };
 
 export type V2CampaignSummary = {
@@ -729,12 +732,15 @@ export type StartMigrationResponseWritable = {
 export type V2CampaignBundleResponseWritable = {
     bundle: V2CampaignBundle;
     campaignId: string;
+    redacted: boolean;
     version: number;
+    writeToken?: string;
 };
 
 export type V2CampaignBundleUpdateRequestWritable = {
     bundle: V2CampaignBundle;
     expectedVersion: number;
+    writeToken: string;
 };
 
 export type V2CreateCampaignRequestWritable = {

@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useCampaignSession, useCampaignTheme } from '../context/CampaignContext';
-import { Download, Upload, Plus, ChevronDown } from 'lucide-react';
+import { Download, Upload, Plus, ChevronDown, HardDrive } from 'lucide-react';
 import { dataService } from '../services/dataService';
 import { GuideHelpButton } from '../components/common/InteractiveGuide';
 import ReleaseUpdateButton from '../components/common/ReleaseUpdateButton';
@@ -8,6 +8,7 @@ import { CampaignConfig } from '../types';
 import { APP_VERSION } from '../constants/appVersion';
 import { backupService } from '../services/backupService';
 import BackupExportDialog from '../components/common/BackupExportDialog';
+import AutomaticBackupSettingsDialog from '../components/common/AutomaticBackupSettingsDialog';
 import LandingLoginView from '../features/landing/components/LandingLoginView';
 import LandingImportAssistantModal from '../features/landing/components/LandingImportAssistantModal';
 import OwnedCampaignCard from '../features/landing/components/OwnedCampaignCard';
@@ -58,6 +59,7 @@ const LandingPage: React.FC = () => {
   const [passwordStatus, setPasswordStatus] = useState('');
   const [passwordMenuOpen, setPasswordMenuOpen] = useState(false);
   const [importAssistantOpen, setImportAssistantOpen] = useState(false);
+  const [automaticBackupOpen, setAutomaticBackupOpen] = useState(false);
   const [exportDialogTarget, setExportDialogTarget] = useState<{ type: 'all' } | { type: 'campaign'; campaignId: string } | null>(null);
   const {
     campaignConfigs,
@@ -71,6 +73,7 @@ const LandingPage: React.FC = () => {
     handleUpdateMemberRole,
     getMemberSummary,
     handleRenameCampaign,
+    handleUpdateCampaignDescription,
   } = useLandingCampaigns({ user, campaignList, reloadCampaignList });
 
   const handleLogin = (e: React.FormEvent) => {
@@ -279,6 +282,14 @@ const LandingPage: React.FC = () => {
                 <span>导入模组</span>
             </button>
             <button
+                onClick={() => setAutomaticBackupOpen(true)}
+                className="flex gap-2 items-center px-4 py-2 rounded border border-theme theme-card theme-text-secondary shadow-sm hover:bg-primary-light"
+                title="设置数据库自动备份"
+            >
+                <HardDrive size={18} />
+                <span>自动备份</span>
+            </button>
+            <button
                 onClick={() => setExportDialogTarget({ type: 'all' })}
                 className="flex gap-2 items-center px-4 py-2 rounded border border-theme theme-card theme-text-secondary shadow-sm hover:bg-primary-light"
                 title="导出当前账号下的所有模组备份包"
@@ -431,6 +442,7 @@ const LandingPage: React.FC = () => {
                   onRemoveMember={(campaignId, memberUserId) => void handleRemoveMember(campaignId, memberUserId)}
                   onUpdateMemberRole={(campaignId, memberUserId, role) => void handleUpdateMemberRole(campaignId, memberUserId, role)}
                   onRename={handleRenameCampaign}
+                  onUpdateDescription={handleUpdateCampaignDescription}
                   currentUserId={user?.id || ''}
                   onEnter={(nextCampaign) => void handleEnterCampaign(nextCampaign)}
                   onOpenExport={(campaignId) => setExportDialogTarget({ type: 'campaign', campaignId })}
@@ -514,6 +526,12 @@ const LandingPage: React.FC = () => {
         <LandingImportAssistantModal
           open={importAssistantOpen}
           onClose={() => setImportAssistantOpen(false)}
+        />
+
+        <AutomaticBackupSettingsDialog
+          open={automaticBackupOpen}
+          user={user}
+          onClose={() => setAutomaticBackupOpen(false)}
         />
 
         <BackupExportDialog

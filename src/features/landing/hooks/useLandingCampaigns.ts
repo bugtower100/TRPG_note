@@ -128,6 +128,22 @@ export const useLandingCampaigns = ({ user, campaignList, reloadCampaignList }: 
     ]);
   };
 
+  const handleUpdateCampaignDescription = async (campaignId: string, description: string) => {
+    if (!user) {
+      throw new Error('当前用户信息缺失，请重新登录后再试。');
+    }
+    const lastModified = Date.now();
+    const next = await teamNotesService.updateConfig(campaignId, user, {
+      description,
+      lastModified,
+    });
+    syncConfigCache(campaignId, next);
+    await Promise.all([
+      reloadCampaignList(),
+      refreshPublicCampaignsCache(),
+    ]);
+  };
+
   const handleUpdateJoinPassword = async (campaignId: string) => {
     if (!user) return;
     const current = campaignConfigs[campaignId];
@@ -234,6 +250,7 @@ export const useLandingCampaigns = ({ user, campaignList, reloadCampaignList }: 
     setCampaignVisibility,
     handleSaveCampaignConfig,
     handleRenameCampaign,
+    handleUpdateCampaignDescription,
     handleUpdateJoinPassword,
     ensurePublicCampaignAccess,
     handleRemoveMember,

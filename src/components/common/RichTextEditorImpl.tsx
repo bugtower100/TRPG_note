@@ -935,7 +935,15 @@ const MilkdownEditorInner: React.FC<MilkdownEditorInnerProps> = ({
         </button>
       </div>
 
-      <div className="relative milkdown-theme-bridge" ref={editorHostRef}>
+      <div
+        className="relative milkdown-theme-bridge resize-y overflow-y-auto overscroll-contain"
+        ref={editorHostRef}
+        style={{
+          height: minHeight,
+          minHeight: '6rem',
+          maxHeight: 'calc(100dvh - 12rem)',
+        }}
+      >
         {!isFocused && !value.trim() && (
           <div className="absolute left-3 top-3 text-sm theme-text-secondary pointer-events-none z-10">
             {placeholder}
@@ -948,13 +956,14 @@ const MilkdownEditorInner: React.FC<MilkdownEditorInnerProps> = ({
             </div>
           </div>
         )}
-        <div className="milkdown-editor-shell" style={{ minHeight }}>
+        <div className="milkdown-editor-shell">
           <Milkdown />
         </div>
       </div>
 
-      <div className="px-3 py-1 bg-theme-card/50 text-xs theme-text-secondary text-right border-t border-theme">
-        支持 Markdown，自动识别实体并增强
+      <div className="flex flex-wrap items-center justify-between gap-x-3 px-3 py-1 bg-theme-card/50 text-xs theme-text-secondary border-t border-theme">
+        <span>支持 Markdown，自动识别实体并增强</span>
+        <span>拖动编辑区右下角可调整高度</span>
       </div>
 
       {tooltip.visible && createPortal(

@@ -1058,6 +1058,10 @@ func main() {
 
 	cfg := loadConfig()
 	db := openDB(cfg)
+	bundleTokenSigner, err := newBundleWriteTokenSigner()
+	if err != nil {
+		log.Fatalf("failed to initialize bundle write-token signer: %v", err)
+	}
 	assetDir := filepath.Join(filepath.Dir(cfg.DBPath), "graph_assets")
 	if err := os.MkdirAll(assetDir, 0o755); err != nil {
 		log.Fatalf("failed to create graph asset dir: %v", err)
@@ -1081,6 +1085,12 @@ func main() {
 	backupAPI := router.Group("/api/backups")
 
 	registerBackupRoutes(backupAPI, db, cfg)
+	automaticBackupManager, err := newAutomaticBackupManager(db, cfg)
+	if err != nil {
+		log.Fatalf("failed to initialize automatic backups: %v", err)
+	}
+	automaticBackupManager.registerRoutes(backupAPI)
+	automaticBackupManager.start()
 	registerLocationMapRoutes(campaignAPI, db)
 	registerLocationMapDrawingRoutes(campaignAPI, db)
 
@@ -2884,6 +2894,8 @@ func main() {
 		}
 		if !isCampaignManagerRole(memberRole(cfg, userID)) {
 			bundle = redactV2CampaignBundleForPL(bundle)
+		} else {
+			bundle.WriteToken = bundleTokenSigner.issue(campaignID, userID, bundle.Version)
 		}
 		c.JSON(200, bundle)
 	})
@@ -2977,6 +2989,7 @@ func main() {
 			c.JSON(500, gin.H{"error": "database_error"})
 			return
 		}
+		result.Bundle.WriteToken = bundleTokenSigner.issue(result.Summary.ID, userID, result.Bundle.Version)
 		c.JSON(200, result)
 	})
 
@@ -3001,6 +3014,10 @@ func main() {
 			c.JSON(400, gin.H{"error": "invalid_body"})
 			return
 		}
+		if !bundleTokenSigner.valid(req.WriteToken, campaignID, userID, req.ExpectedVersion) {
+			c.JSON(409, gin.H{"error": "bundle_reload_required"})
+			return
+		}
 		result, err := saveV2CampaignBundle(db, campaignID, req)
 		if err != nil {
 			var conflictErr *V2BundleConflictError
@@ -3015,6 +3032,7 @@ func main() {
 			c.JSON(500, gin.H{"error": "database_error"})
 			return
 		}
+		result.WriteToken = bundleTokenSigner.issue(campaignID, userID, result.Version)
 		c.JSON(200, result)
 	})
 

@@ -17,6 +17,7 @@ export const useCampaignMemberRole = () => {
       return teamNotesService.getConfig(currentCampaignId, user);
     },
     enabled: Boolean(currentCampaignId && user),
+    refetchInterval: 10_000,
   });
 
   const memberRole = useMemo(

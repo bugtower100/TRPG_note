@@ -1,5 +1,5 @@
-import React from 'react';
-import { Trash2, Download } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import { Check, Download, Pencil, Trash2, X } from 'lucide-react';
 import { CampaignConfig, CampaignMember, CampaignMemberRole, CampaignSummary } from '../../../types';
 import { getCampaignRoleLabel, isCampaignManagerRole } from '../../../utils/campaignRoles';
 import CampaignNameEditor from '../../../components/common/CampaignNameEditor';
@@ -17,6 +17,7 @@ interface OwnedCampaignCardProps {
   onRemoveMember: (campaignId: string, memberUserId: string) => void;
   onUpdateMemberRole: (campaignId: string, memberUserId: string, role: CampaignMemberRole) => void;
   onRename: (campaignId: string, name: string) => Promise<void>;
+  onUpdateDescription: (campaignId: string, description: string) => Promise<void>;
   currentUserId: string;
   onEnter: (campaign: CampaignSummary) => void;
   onOpenExport: (campaignId: string) => void;
@@ -36,6 +37,7 @@ const OwnedCampaignCard: React.FC<OwnedCampaignCardProps> = ({
   onRemoveMember,
   onUpdateMemberRole,
   onRename,
+  onUpdateDescription,
   currentUserId,
   onEnter,
   onOpenExport,
@@ -46,6 +48,45 @@ const OwnedCampaignCard: React.FC<OwnedCampaignCardProps> = ({
   const canManageCampaign = isCampaignManagerRole(currentMemberRole);
   const canManageRoles = config?.ownerUserId === currentUserId;
   const canDeleteCampaign = config?.ownerUserId === currentUserId;
+  const descriptionInputRef = useRef<HTMLTextAreaElement>(null);
+  const [isEditingDescription, setIsEditingDescription] = useState(false);
+  const [descriptionDraft, setDescriptionDraft] = useState(campaign.description || '');
+  const [isSavingDescription, setIsSavingDescription] = useState(false);
+
+  useEffect(() => {
+    if (!isEditingDescription) {
+      setDescriptionDraft(campaign.description || '');
+    }
+  }, [campaign.description, isEditingDescription]);
+
+  useEffect(() => {
+    if (isEditingDescription) {
+      descriptionInputRef.current?.focus();
+    }
+  }, [isEditingDescription]);
+
+  const cancelDescriptionEdit = () => {
+    if (isSavingDescription) return;
+    setDescriptionDraft(campaign.description || '');
+    setIsEditingDescription(false);
+  };
+
+  const saveDescription = async () => {
+    const normalized = descriptionDraft.trim();
+    if (normalized === (campaign.description || '').trim()) {
+      setIsEditingDescription(false);
+      return;
+    }
+    setIsSavingDescription(true);
+    try {
+      await onUpdateDescription(campaign.id, normalized);
+      setIsEditingDescription(false);
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : '模组简介修改失败，请稍后重试。');
+    } finally {
+      setIsSavingDescription(false);
+    }
+  };
 
   return (
     <div data-tour="landing-campaign-card" className="flex flex-col p-4 rounded-lg border shadow-sm transition-shadow theme-card border-theme hover:shadow-md">
@@ -60,9 +101,64 @@ const OwnedCampaignCard: React.FC<OwnedCampaignCardProps> = ({
             />
           </h3>
         </div>
-        <p className="theme-text-secondary text-sm line-clamp-2 mb-3 min-h-[2.5em]">
-          {campaign.description || '暂无描述'}
-        </p>
+        {isEditingDescription ? (
+          <div className="mb-3 space-y-2">
+            <textarea
+              ref={descriptionInputRef}
+              value={descriptionDraft}
+              maxLength={1000}
+              disabled={isSavingDescription}
+              onChange={(event) => setDescriptionDraft(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Escape') {
+                  event.preventDefault();
+                  cancelDescriptionEdit();
+                } else if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) {
+                  event.preventDefault();
+                  void saveDescription();
+                }
+              }}
+              className="min-h-24 w-full resize-y rounded border border-theme bg-transparent px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/40"
+              placeholder="简要描述这个模组的背景..."
+              aria-label="模组简介"
+            />
+            <div className="flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={cancelDescriptionEdit}
+                disabled={isSavingDescription}
+                className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs theme-text-secondary hover:bg-primary-light disabled:opacity-50"
+              >
+                <X size={14} aria-hidden="true" /> 取消
+              </button>
+              <button
+                type="button"
+                onClick={() => void saveDescription()}
+                disabled={isSavingDescription}
+                className="inline-flex items-center gap-1 rounded bg-primary px-2 py-1 text-xs text-white hover:bg-primary-dark disabled:opacity-50"
+              >
+                <Check size={14} aria-hidden="true" /> {isSavingDescription ? '保存中...' : '保存简介'}
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="mb-3 flex min-h-[2.5em] items-start gap-1.5">
+            <p className="min-w-0 flex-1 text-sm theme-text-secondary line-clamp-2">
+              {campaign.description || '暂无描述'}
+            </p>
+            {canManageCampaign && (
+              <button
+                type="button"
+                onClick={() => setIsEditingDescription(true)}
+                className="shrink-0 rounded p-1 theme-text-secondary hover:bg-primary-light hover:text-primary"
+                title="修改模组简介"
+                aria-label={`修改模组简介：${campaign.name}`}
+              >
+                <Pencil size={14} aria-hidden="true" />
+              </button>
+            )}
+          </div>
+        )}
         <div className="flex items-center gap-2 flex-wrap mb-2 text-xs">
           <span className={`px-2 py-1 rounded border ${config?.visibility === 'public' ? 'border-green-300 text-green-700 bg-green-50' : 'border-theme theme-text-secondary bg-theme-card'}`}>
             {config?.visibility === 'public' ? '公开模组' : '私密模组'}

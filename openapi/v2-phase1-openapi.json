@@ -1660,15 +1660,22 @@
           "campaignId": {
             "type": "string"
           },
+          "redacted": {
+            "type": "boolean"
+          },
           "version": {
             "format": "int64",
             "type": "integer"
+          },
+          "writeToken": {
+            "type": "string"
           }
         },
         "required": [
           "campaignId",
           "version",
-          "bundle"
+          "bundle",
+          "redacted"
         ],
         "type": "object"
       },
@@ -1690,10 +1697,14 @@
           "expectedVersion": {
             "format": "int64",
             "type": "integer"
+          },
+          "writeToken": {
+            "type": "string"
           }
         },
         "required": [
           "expectedVersion",
+          "writeToken",
           "bundle"
         ],
         "type": "object"
@@ -1845,7 +1856,7 @@
   "info": {
     "description": "Phase 1 V2 migration and campaign bundle contract. Runtime business logic remains on Gin handlers; Huma is introduced here to generate OpenAPI incrementally.",
     "title": "TRPG Module Notes API",
-    "version": "v1.6.2"
+    "version": "v1.6.4"
   },
   "openapi": "3.1.0",
   "paths": {

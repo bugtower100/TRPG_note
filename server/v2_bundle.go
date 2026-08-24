@@ -27,10 +27,13 @@ type V2CampaignBundleResponse struct {
 	CampaignID string           `json:"campaignId"`
 	Version    int              `json:"version"`
 	Bundle     V2CampaignBundle `json:"bundle"`
+	Redacted   bool             `json:"redacted"`
+	WriteToken string           `json:"writeToken,omitempty"`
 }
 
 type V2CampaignBundleUpdateRequest struct {
 	ExpectedVersion int              `json:"expectedVersion"`
+	WriteToken      string           `json:"writeToken"`
 	Bundle          V2CampaignBundle `json:"bundle"`
 }
 
@@ -189,6 +192,8 @@ func loadV2CampaignBundle(db *gorm.DB, campaignID string) (V2CampaignBundleRespo
 }
 
 func redactV2CampaignBundleForPL(response V2CampaignBundleResponse) V2CampaignBundleResponse {
+	response.Redacted = true
+	response.WriteToken = ""
 	response.Bundle.Notes = ""
 	response.Bundle.Characters = []map[string]any{}
 	response.Bundle.Locations = []map[string]any{}

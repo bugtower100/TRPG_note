@@ -248,8 +248,11 @@ jobs:
           make_latest: true
           body: |
             ## ${{ steps.version.outputs.name }} 更新内容
-            - 增加了项目多关键词匹配功能；
-            - 增加了子条目导向开关功能；
+            - fix：修复了不能改简介的问题；
+            - fix：修复了编辑状态文本框会随着内容无限变长的问题；
+            - 增加了编辑状态文本框可自由调节功能；
+            - fix：修复了联机更改pl身份可能覆盖数据内容的问题
+            - 增加了自动备份：默认每 60 分钟备份,默认情况保留 3 天内存档,每次最多保留 5 个
           files: |
             TRPG模组笔记-${{ steps.version.outputs.app_version }}-windows-amd64.zip
             TRPG模组笔记-${{ steps.version.outputs.app_version }}-windows-arm64.zip
