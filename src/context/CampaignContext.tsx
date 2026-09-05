@@ -69,7 +69,7 @@ export const CampaignProvider: React.FC<{ children: ReactNode }> = ({ children }
   const saveDeferredByCompositionRef = useRef(false);
   const bundleVersionRef = useRef(0);
   const bundleWriteTokenRef = useRef('');
-  const saveRequestIdRef = useRef(0);
+  const savePromiseRef = useRef<Promise<boolean> | null>(null);
   const mountedRef = useRef(true);
 
   const clearSessionError = useCallback(() => {
@@ -236,60 +236,92 @@ export const CampaignProvider: React.FC<{ children: ReactNode }> = ({ children }
   const flushPendingSave = useCallback(async (overrideData?: CampaignData) => {
     const campaignId = currentCampaignId;
     const targetUser = user;
-    const targetData = overrideData ?? pendingSaveRef.current;
-    if (!campaignId || !targetUser || !targetData) {
+    if (overrideData) {
+      pendingSaveRef.current = overrideData;
+    }
+    if (!campaignId || !targetUser || !pendingSaveRef.current) {
       return true;
     }
 
-    const nextData: CampaignData = {
-      ...targetData,
-      id: campaignId,
-      meta: {
-        ...targetData.meta,
-        lastModified: Date.now(),
-      },
-    };
-
-    pendingSaveRef.current = nextData;
-    const requestId = ++saveRequestIdRef.current;
-    if (mountedRef.current) {
-      setIsCampaignSaving(true);
+    if (savePromiseRef.current) {
+      return savePromiseRef.current;
     }
 
-    try {
-      const result = await campaignV2Service.saveBundle(
-        campaignId,
-        nextData,
-        targetUser,
-        bundleVersionRef.current,
-        bundleWriteTokenRef.current
-      );
-      if (!mountedRef.current || requestId !== saveRequestIdRef.current) {
-        return true;
+    const savePromise = (async () => {
+      if (mountedRef.current) {
+        setIsCampaignSaving(true);
       }
-      applyLoadedCampaign(campaignId, result.bundle, result.version, targetUser.id, result.writeToken || '');
-      setSessionError(null);
-      return true;
-    } catch (error) {
-      if (mountedRef.current && requestId === saveRequestIdRef.current) {
-        setHasUnsavedChanges(true);
-        setShowUnsavedWarning(true);
-        clearUnsavedWarningTimer();
-        if (error instanceof VersionConflictError) {
-          setSessionError('检测到模组版本冲突：远端已有更新，当前修改尚未写入后端。请显式重新加载远端版本后再继续编辑。');
-        } else {
-          setSessionError(
-            `模组保存失败：${error instanceof Error ? error.message : '未知错误'}。当前修改尚未写入后端，请在保存成功前不要刷新页面或关闭窗口。`
+
+      while (pendingSaveRef.current) {
+        const targetData = pendingSaveRef.current;
+        const nextData: CampaignData = {
+          ...targetData,
+          id: campaignId,
+          meta: {
+            ...targetData.meta,
+            lastModified: Date.now(),
+          },
+        };
+
+        // Claim this snapshot before the request starts. Any edits made while it
+        // is in flight will install a newer snapshot for the next loop iteration.
+        pendingSaveRef.current = null;
+
+        try {
+          const result = await campaignV2Service.saveBundle(
+            campaignId,
+            nextData,
+            targetUser,
+            bundleVersionRef.current,
+            bundleWriteTokenRef.current
           );
+          if (!mountedRef.current) {
+            return true;
+          }
+
+          bundleVersionRef.current = result.version;
+          bundleWriteTokenRef.current = result.writeToken || '';
+          queryClient.setQueryData(queryKeys.campaigns.bundle(campaignId, targetUser.id), result);
+          syncCampaignSummary(result.bundle, campaignId);
+          setSessionError(null);
+
+          if (!pendingSaveRef.current) {
+            applyLoadedCampaign(campaignId, result.bundle, result.version, targetUser.id, result.writeToken || '');
+          }
+        } catch (error) {
+          if (mountedRef.current) {
+            // A newer pending snapshot already contains this snapshot's changes.
+            pendingSaveRef.current ??= nextData;
+            setHasUnsavedChanges(true);
+            setShowUnsavedWarning(true);
+            clearUnsavedWarningTimer();
+            if (error instanceof VersionConflictError) {
+              setSessionError('检测到模组版本冲突：远端已有更新，当前修改尚未写入后端。请显式重新加载远端版本后再继续编辑。');
+            } else {
+              setSessionError(
+                `模组保存失败：${error instanceof Error ? error.message : '未知错误'}。当前修改尚未写入后端，请在保存成功前不要刷新页面或关闭窗口。`
+              );
+            }
+          }
+          return false;
         }
       }
-      return false;
+
+      return true;
+    })();
+    savePromiseRef.current = savePromise;
+
+    try {
+      return await savePromise;
     } finally {
-      if (mountedRef.current && requestId === saveRequestIdRef.current) {
+      if (savePromiseRef.current === savePromise) {
+        savePromiseRef.current = null;
+      }
+      if (mountedRef.current) {
         setIsCampaignSaving(false);
       }
     }
-  }, [applyLoadedCampaign, clearUnsavedWarningTimer, currentCampaignId, user]);
+  }, [applyLoadedCampaign, clearUnsavedWarningTimer, currentCampaignId, queryClient, syncCampaignSummary, user]);
 
   const scheduleCampaignSave = useCallback((data: CampaignData) => {
     pendingSaveRef.current = data;
@@ -675,16 +707,6 @@ export const CampaignProvider: React.FC<{ children: ReactNode }> = ({ children }
     dataService.exportData(campaignDataState);
   }, [campaignDataState]);
 
-  const importData = useCallback(async (file: File) => {
-    try {
-      await dataService.importData(file);
-      throw new Error('正式数据导入请使用导入助手，不会再直接写入当前模组。');
-    } catch (error) {
-      setSessionError(error instanceof Error ? error.message : '导入失败，请检查文件格式。');
-      throw error;
-    }
-  }, []);
-
   const updateEntity = useCallback((collection: keyof CampaignData, item: any) => {
     setCampaignData((prev) => {
       if (!Array.isArray(prev[collection])) return prev;
@@ -809,7 +831,6 @@ export const CampaignProvider: React.FC<{ children: ReactNode }> = ({ children }
     deleteCampaign,
     exitCampaign,
     exportData,
-    importData,
   }), [
     saveCampaign,
     saveToFileSystem,
@@ -833,7 +854,6 @@ export const CampaignProvider: React.FC<{ children: ReactNode }> = ({ children }
     deleteCampaign,
     exitCampaign,
     exportData,
-    importData,
   ]);
 
   const themeValue = useMemo<CampaignThemeContextValue>(() => ({

@@ -165,6 +165,7 @@ const CharacterDetail: React.FC<CharacterDetailProps> = ({ entityId }) => {
         addCustomSection={addCustomSection}
         removeCustomSection={removeCustomSection}
         setSectionTitle={setSectionTitle}
+        onSectionOrderChange={(sectionOrder) => handleChange('sectionOrder', sectionOrder)}
       />
     </div>
   );

@@ -1,4 +1,5 @@
 import React from 'react';
+import { ArrowDown, ArrowUp } from 'lucide-react';
 import ConfirmDialog from './ConfirmDialog';
 
 interface CollapsibleSectionProps {
@@ -13,6 +14,10 @@ interface CollapsibleSectionProps {
   onRenameTitle?: (title: string) => void;
   sectionTitleLower?: string;
   headerActions?: React.ReactNode;
+  canMoveUp?: boolean;
+  canMoveDown?: boolean;
+  onMoveUp?: () => void;
+  onMoveDown?: () => void;
 }
 
 const CollapsibleSection: React.FC<CollapsibleSectionProps> = ({
@@ -27,6 +32,10 @@ const CollapsibleSection: React.FC<CollapsibleSectionProps> = ({
   onRenameTitle,
   sectionTitleLower,
   headerActions,
+  canMoveUp = false,
+  canMoveDown = false,
+  onMoveUp,
+  onMoveDown,
 }) => {
   const [showDeleteConfirm, setShowDeleteConfirm] = React.useState(false);
 
@@ -52,6 +61,30 @@ const CollapsibleSection: React.FC<CollapsibleSectionProps> = ({
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-2">
         <div className="flex items-center gap-2 flex-wrap">
           <h3 className="text-base font-medium">{title}</h3>
+          {onMoveUp && onMoveDown ? (
+            <div className="flex items-center" aria-label="调整区块顺序">
+              <button
+                type="button"
+                onClick={onMoveUp}
+                disabled={!canMoveUp}
+                aria-label={`上移区块 ${title}`}
+                title="上移区块"
+                className="inline-flex h-7 w-7 items-center justify-center rounded-l border border-theme theme-text-secondary hover:text-primary disabled:cursor-not-allowed disabled:opacity-30"
+              >
+                <ArrowUp size={14} aria-hidden="true" />
+              </button>
+              <button
+                type="button"
+                onClick={onMoveDown}
+                disabled={!canMoveDown}
+                aria-label={`下移区块 ${title}`}
+                title="下移区块"
+                className="-ml-px inline-flex h-7 w-7 items-center justify-center rounded-r border border-theme theme-text-secondary hover:text-primary disabled:cursor-not-allowed disabled:opacity-30"
+              >
+                <ArrowDown size={14} aria-hidden="true" />
+              </button>
+            </div>
+          ) : null}
           {editableTitle && (
             <button
               type="button"

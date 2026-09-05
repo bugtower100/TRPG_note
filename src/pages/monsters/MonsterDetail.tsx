@@ -86,6 +86,7 @@ const MonsterDetail: React.FC<MonsterDetailProps> = ({ entityId }) => {
         addCustomSection={addCustomSection}
         removeCustomSection={removeCustomSection}
         setSectionTitle={setSectionTitle}
+        onSectionOrderChange={(sectionOrder) => handleChange('sectionOrder', sectionOrder)}
       />
     </div>
   );

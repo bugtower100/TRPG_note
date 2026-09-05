@@ -5,7 +5,7 @@ import { APP_VERSION } from '../constants/appVersion';
 import { useCampaignMemberRole } from '../hooks/useCampaignMemberRole';
 import { isCampaignManagerRole } from '../utils/campaignRoles';
 import { 
-  LayoutDashboard, Users, MapPin, Building, Calendar, 
+  LayoutDashboard, Users, MapPin, Building, Calendar, CalendarDays,
   Search, Clock, Settings, LogOut, Skull, Home, Share2, NotebookPen, Kanban, ScrollText, BrainCircuit, Map
 } from 'lucide-react';
 
@@ -62,6 +62,7 @@ const Sidebar: React.FC<SidebarProps> = ({ className = '', onNavigate }) => {
         { to: '/events', icon: <Calendar size={20} />, label: '事件' },
         { to: '/clues', icon: <Search size={20} />, label: '线索' },
         { to: '/session-tasks', icon: <Kanban size={20} />, label: '任务看板' },
+        { to: '/sessions', icon: <CalendarDays size={20} />, label: '场次中心' },
         { to: '/timelines', icon: <Clock size={20} />, label: '时间线' },
         { to: '/settings', icon: <Settings size={20} />, label: '设置' },
       ],

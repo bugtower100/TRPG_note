@@ -1,6 +1,17 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { FolderOpen, ImagePlus, MapPinPlus, MapPlus, RefreshCw, Save, Trash2, Upload } from 'lucide-react';
+import {
+  FolderOpen,
+  ImagePlus,
+  MapPinPlus,
+  MapPlus,
+  PanelLeftClose,
+  PanelLeftOpen,
+  RefreshCw,
+  Save,
+  Trash2,
+  Upload,
+} from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { v4 as uuidv4 } from 'uuid';
 import RelationGraphResourcePickerModal from '../../features/relation-graphs/components/RelationGraphResourcePickerModal';
@@ -85,6 +96,7 @@ const LocationMaps: React.FC = () => {
   const [nameDirty, setNameDirty] = useState(false);
   const [imageLoadError, setImageLoadError] = useState('');
   const [remoteUpdateAvailable, setRemoteUpdateAvailable] = useState(false);
+  const [mapListCollapsed, setMapListCollapsed] = useState(false);
   const [conflictDraft, setConflictDraft] = useState<{
     maps: LocationMap[];
     remote: LocationMapDocument;
@@ -760,28 +772,50 @@ const LocationMaps: React.FC = () => {
           ) : null}
         </section>
       ) : (
-        <div className="grid min-h-[36rem] grid-cols-1 gap-4 lg:grid-cols-[16rem_minmax(0,1fr)]">
-          <aside className="min-w-0 rounded-lg border border-theme bg-theme-card p-3">
-            <div className="mb-3 text-sm font-semibold">地图列表</div>
-            <div className="flex gap-2 overflow-x-auto pb-1 lg:block lg:space-y-2 lg:overflow-visible lg:pb-0">
-              {maps.map((item) => (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => handleSelectMap(item.id)}
-                  className={`w-44 shrink-0 rounded-md border p-2 text-left transition lg:w-full ${
-                    item.id === activeMapId
-                      ? 'border-primary bg-primary-light text-primary'
-                      : 'border-theme hover:bg-primary-light/50'
-                  }`}
-                >
-                  <div className="truncate text-sm font-medium">{item.name}</div>
-                  <div className="mt-1 text-xs theme-text-secondary">
-                    {item.imageRef ? '已选择地图图片' : '尚未选择图片'}
-                  </div>
-                </button>
-              ))}
+        <div
+          className={`grid min-h-[36rem] grid-cols-1 gap-4 ${
+            mapListCollapsed
+              ? 'lg:grid-cols-[3.25rem_minmax(0,1fr)]'
+              : 'lg:grid-cols-[16rem_minmax(0,1fr)]'
+          }`}
+        >
+          <aside className="relative min-w-0 rounded-lg border border-theme bg-theme-card p-3">
+            <div className={`flex items-center ${mapListCollapsed ? 'justify-between lg:justify-center' : 'mb-3 justify-between'}`}>
+              <div className={`text-sm font-semibold ${mapListCollapsed ? 'lg:hidden' : ''}`}>地图列表</div>
+              <button
+                type="button"
+                onClick={() => setMapListCollapsed((current) => !current)}
+                aria-expanded={!mapListCollapsed}
+                aria-label={mapListCollapsed ? '展开地图列表' : '折叠地图列表'}
+                title={mapListCollapsed ? '展开地图列表' : '折叠地图列表'}
+                className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded hover:bg-primary-light"
+              >
+                {mapListCollapsed
+                  ? <PanelLeftOpen size={17} aria-hidden="true" />
+                  : <PanelLeftClose size={17} aria-hidden="true" />}
+              </button>
             </div>
+            {!mapListCollapsed ? (
+              <div className="flex gap-2 overflow-x-auto pb-1 lg:block lg:space-y-2 lg:overflow-visible lg:pb-0">
+                {maps.map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => handleSelectMap(item.id)}
+                    className={`w-44 shrink-0 rounded-md border p-2 text-left transition lg:w-full ${
+                      item.id === activeMapId
+                        ? 'border-primary bg-primary-light text-primary'
+                        : 'border-theme hover:bg-primary-light/50'
+                    }`}
+                  >
+                    <div className="truncate text-sm font-medium">{item.name}</div>
+                    <div className="mt-1 text-xs theme-text-secondary">
+                      {item.imageRef ? '已选择地图图片' : '尚未选择图片'}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            ) : null}
           </aside>
 
           {activeMap ? (

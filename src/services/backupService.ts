@@ -16,6 +16,7 @@ export interface BackupPreviewCampaign {
 }
 
 export interface BackupPreviewResult {
+  packageType: 'backup' | 'selective';
   manifest: {
     exportType: string;
     exportedAt: number;
@@ -28,11 +29,14 @@ export interface BackupPreviewResult {
 }
 
 export interface BackupImportResult {
+  packageType: 'backup' | 'selective';
   importedCount: number;
   addedCount: number;
   overwrittenCount: number;
   skippedCount?: number;
-  campaigns: Array<{ id: string; name: string; mode: 'added' | 'overwritten' }>;
+  campaigns: Array<{ id: string; name: string; mode: 'added' | 'overwritten' | 'merged' }>;
+  importedCounts?: Record<string, number>;
+  importedAssetCount?: number;
   skippedCampaigns?: Array<{ originalCampaignId: string; name: string; reason: 'no_match' }>;
   missingAssetCount?: number;
   missingAssets?: string[];
@@ -74,7 +78,7 @@ async function parseImportResponse(response: Response) {
   if (!response.ok) {
     throw new Error(text || '备份导入失败');
   }
-  return payload ?? { importedCount: 0, addedCount: 0, overwrittenCount: 0, skippedCount: 0, campaigns: [], skippedCampaigns: [] };
+  return payload ?? { packageType: 'backup', importedCount: 0, addedCount: 0, overwrittenCount: 0, skippedCount: 0, campaigns: [], skippedCampaigns: [] };
 }
 
 async function parsePreviewResponse(response: Response) {
@@ -103,6 +107,10 @@ async function readBackupError(response: Response, fallbackMessage: string) {
         return '整理备份资源失败，请检查当前模组数据。';
       case 'invalid_payload':
         return '本地备份数据整理失败。';
+      case 'target_campaign_required':
+        return '选择性模组导出包需要在目标模组的设置页中导入。';
+      case 'forbidden':
+        return '只有 GM 和副 GM 可以向当前模组合并选择性导出包。';
       default:
         return payload.error ? `${fallbackMessage}（${payload.error}）` : text;
     }
@@ -129,7 +137,7 @@ export const backupService = {
     if (!response.ok) {
       throw new Error(await readBackupError(response, '单模组备份导出失败'));
     }
-    await triggerResponseDownload(response, `campaign-${campaignId}.zip`);
+    await triggerResponseDownload(response, `campaign-${campaignId}.trpgzip`);
   },
 
   async exportAll(user: UserProfile | null, includeAssets: boolean = true) {
@@ -139,7 +147,7 @@ export const backupService = {
     if (!response.ok) {
       throw new Error(await readBackupError(response, '全量备份导出失败'));
     }
-    await triggerResponseDownload(response, 'trpg-note-backup.zip');
+    await triggerResponseDownload(response, 'trpg-note-backup.trpgzip');
   },
 
   async previewBundle(file: File, user: UserProfile | null) {
@@ -153,10 +161,11 @@ export const backupService = {
     return parsePreviewResponse(response);
   },
 
-  async importBundle(file: File, user: UserProfile | null, mode: BackupImportMode = 'add') {
+  async importBundle(file: File, user: UserProfile | null, mode: BackupImportMode = 'add', targetCampaignId?: string) {
     const formData = new FormData();
     formData.append('file', file);
     formData.append('mode', mode);
+    if (targetCampaignId) formData.append('targetCampaignId', targetCampaignId);
     const response = await fetch('/api/backups/import', {
       method: 'POST',
       headers: buildUserHeaders(user),

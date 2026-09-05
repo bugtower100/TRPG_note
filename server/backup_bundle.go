@@ -77,9 +77,10 @@ type backupPreviewCampaign struct {
 }
 
 type backupPreviewResponse struct {
-	Manifest  backupManifest          `json:"manifest"`
-	FileName  string                  `json:"fileName"`
-	Campaigns []backupPreviewCampaign `json:"campaigns"`
+	PackageType string                  `json:"packageType"`
+	Manifest    backupManifest          `json:"manifest"`
+	FileName    string                  `json:"fileName"`
+	Campaigns   []backupPreviewCampaign `json:"campaigns"`
 }
 
 func userStoragePrefix(userID string) string {
@@ -193,6 +194,7 @@ func buildLegacyCampaignDataFromV2(bundle V2CampaignBundle) map[string]any {
 		"timelines":      bundle.Timelines,
 		"monsters":       bundle.Monsters,
 		"sessionTasks":   bundle.SessionTasks,
+		"gameSessions":   bundle.GameSessions,
 		"relationGraphs": bundle.RelationGraphs,
 		"mindMaps":       bundle.MindMaps,
 	}
@@ -474,7 +476,7 @@ func exportBackupBundle(c *gin.Context, assetBaseDir string, exportType string, 
 		ContainsAssets:      includeAssets && len(refs) > 0,
 	}
 
-	fileName := fmt.Sprintf("TRPG模组笔记-%s-%s.zip", exportType, time.Now().Format("20060102-150405"))
+	fileName := fmt.Sprintf("TRPG模组笔记-%s-%s.trpgzip", exportType, time.Now().Format("20060102-150405"))
 	c.Header("Content-Type", "application/zip")
 	c.Header("Content-Disposition", fmt.Sprintf(`attachment; filename*=UTF-8''%s`, url.QueryEscape(fileName)))
 
@@ -593,6 +595,7 @@ func buildImportedV2Bundle(campaignID string, raw any) (V2CampaignBundle, error)
 		Timelines:      toMapSlice(root["timelines"]),
 		Monsters:       toMapSlice(root["monsters"]),
 		SessionTasks:   toMapSlice(root["sessionTasks"]),
+		GameSessions:   toMapSlice(root["gameSessions"]),
 		RelationGraphs: toMapSlice(root["relationGraphs"]),
 		MindMaps:       toMapSlice(root["mindMaps"]),
 	}, nil
@@ -836,6 +839,35 @@ func parseBackupArchive(content []byte) (backupManifest, backupBundle, map[strin
 	return manifest, bundle, assetContents, nil
 }
 
+func readTRPGPackageFormat(content []byte) (string, error) {
+	reader, err := zip.NewReader(bytes.NewReader(content), int64(len(content)))
+	if err != nil {
+		return "", fmt.Errorf("invalid_zip")
+	}
+	for _, item := range reader.File {
+		if pathpkg.Clean(strings.ReplaceAll(item.Name, "\\", "/")) != "manifest.json" {
+			continue
+		}
+		rc, err := item.Open()
+		if err != nil {
+			return "", fmt.Errorf("invalid_manifest")
+		}
+		data, readErr := io.ReadAll(rc)
+		_ = rc.Close()
+		if readErr != nil {
+			return "", fmt.Errorf("invalid_manifest")
+		}
+		var manifest struct {
+			Format string `json:"format"`
+		}
+		if json.Unmarshal(data, &manifest) != nil || strings.TrimSpace(manifest.Format) == "" {
+			return "", fmt.Errorf("invalid_manifest")
+		}
+		return manifest.Format, nil
+	}
+	return "", fmt.Errorf("invalid_manifest")
+}
+
 func extractCampaignMeta(raw any) (string, string) {
 	root, _ := raw.(map[string]any)
 	meta, _ := root["meta"].(map[string]any)
@@ -848,7 +880,7 @@ func extractCampaignMeta(raw any) (string, string) {
 }
 
 func extractCollectionCounts(raw any) map[string]int {
-	keys := []string{"characters", "monsters", "locations", "organizations", "events", "clues", "timelines", "sessionTasks", "relationGraphs", "mindMaps"}
+	keys := []string{"characters", "monsters", "locations", "organizations", "events", "clues", "timelines", "sessionTasks", "gameSessions", "relationGraphs", "mindMaps"}
 	root, _ := raw.(map[string]any)
 	counts := make(map[string]int, len(keys))
 	for _, key := range keys {
@@ -883,9 +915,10 @@ func buildBackupPreview(fileName string, manifest backupManifest, bundle backupB
 		campaigns = append(campaigns, preview)
 	}
 	return backupPreviewResponse{
-		Manifest:  manifest,
-		FileName:  fileName,
-		Campaigns: campaigns,
+		PackageType: "backup",
+		Manifest:    manifest,
+		FileName:    fileName,
+		Campaigns:   campaigns,
 	}, nil
 }
 
@@ -1028,6 +1061,35 @@ func registerBackupRoutes(group *gin.RouterGroup, db *gorm.DB, cfg Config) {
 			c.JSON(500, gin.H{"error": "read_failed"})
 			return
 		}
+		packageFormat, err := readTRPGPackageFormat(content)
+		if err != nil {
+			c.JSON(400, gin.H{"error": err.Error()})
+			return
+		}
+		if packageFormat == prepPackageFormat {
+			manifest, _, _, err := parsePrepPackage(content)
+			if err != nil {
+				c.JSON(400, gin.H{"error": err.Error()})
+				return
+			}
+			c.JSON(200, backupPreviewResponse{
+				PackageType: "selective",
+				Manifest: backupManifest{
+					Format: manifest.Format, AppVersion: manifest.AppVersion, ExportType: "selective",
+					ExportedAt: manifest.ExportedAt, CampaignCount: 1, ContainsAssets: manifest.AssetCount > 0,
+				},
+				FileName: header.Filename,
+				Campaigns: []backupPreviewCampaign{{
+					OriginalCampaignID: manifest.SourceCampaignID, Name: manifest.Name,
+					Description: "选择性模组内容", CollectionCounts: manifest.Counts, AssetCount: manifest.AssetCount,
+				}},
+			})
+			return
+		}
+		if packageFormat != backupBundleFormat {
+			c.JSON(400, gin.H{"error": "unsupported_bundle"})
+			return
+		}
 		manifest, bundle, _, err := parseBackupArchive(content)
 		if err != nil {
 			c.JSON(400, gin.H{"error": err.Error()})
@@ -1075,12 +1137,80 @@ func registerBackupRoutes(group *gin.RouterGroup, db *gorm.DB, cfg Config) {
 			c.JSON(500, gin.H{"error": "read_failed"})
 			return
 		}
+		packageFormat, err := readTRPGPackageFormat(content)
+		if err != nil {
+			c.JSON(400, gin.H{"error": err.Error()})
+			return
+		}
 		mode := strings.TrimSpace(strings.ToLower(c.PostForm("mode")))
 		if mode == "" {
 			mode = "add"
 		}
 		if mode != "add" && mode != "overwrite" {
 			c.JSON(400, gin.H{"error": "invalid_mode"})
+			return
+		}
+		if packageFormat == prepPackageFormat {
+			manifest, prepContent, assets, err := parsePrepPackage(content)
+			if err != nil {
+				c.JSON(400, gin.H{"error": err.Error()})
+				return
+			}
+			targetCampaignID := strings.TrimSpace(c.PostForm("targetCampaignId"))
+			campaignName := ""
+			resultMode := "merged"
+			importMode := mode
+			if targetCampaignID == "" {
+				newCampaignName := strings.TrimSpace(manifest.Name)
+				if newCampaignName == "" {
+					newCampaignName = strings.TrimSpace(manifest.SourceName)
+				}
+				if newCampaignName == "" {
+					newCampaignName = "导入模组"
+				}
+				created, err := createV2Campaign(db, userID, username, newCampaignName, "")
+				if err != nil {
+					c.JSON(500, gin.H{"error": "database_error"})
+					return
+				}
+				targetCampaignID = created.Summary.ID
+				campaignName = created.Summary.Name
+				resultMode = "added"
+				importMode = prepImportModeNewCampaign
+			} else {
+				campaignCfg, ok := loadCampaignConfigForRequest(c, db, targetCampaignID, userID, username)
+				if !ok {
+					return
+				}
+				if !isCampaignManagerRole(memberRole(campaignCfg, userID)) {
+					c.JSON(403, gin.H{"error": "forbidden"})
+					return
+				}
+				campaignName = campaignCfg.Name
+			}
+			result, err := importPrepContent(db, assetBaseDir, targetCampaignID, userID, username, prepContent, assets, importMode)
+			if err != nil {
+				if resultMode == "added" {
+					_ = deleteV2Campaign(db, targetCampaignID)
+				}
+				c.JSON(500, gin.H{"error": err.Error()})
+				return
+			}
+			importedCount := 0
+			for _, count := range result.ImportedCounts {
+				importedCount += count
+			}
+			c.JSON(200, gin.H{
+				"packageType": "selective", "importedCount": importedCount,
+				"addedCount": result.AddedCount, "overwrittenCount": result.OverwrittenCount, "skippedCount": 0,
+				"campaigns":      []gin.H{{"id": targetCampaignID, "name": campaignName, "mode": resultMode}},
+				"importedCounts": result.ImportedCounts, "importedAssetCount": result.ImportedAssetCount,
+				"missingAssetCount": result.MissingAssetCount, "missingAssets": []string{},
+			})
+			return
+		}
+		if packageFormat != backupBundleFormat {
+			c.JSON(400, gin.H{"error": "unsupported_bundle"})
 			return
 		}
 		_, bundle, assetContents, err := parseBackupArchive(content)
@@ -1331,6 +1461,7 @@ func registerBackupRoutes(group *gin.RouterGroup, db *gorm.DB, cfg Config) {
 		sort.Strings(missingAssets)
 
 		c.JSON(200, gin.H{
+			"packageType":       "backup",
 			"importedCount":     len(imported),
 			"addedCount":        addedCount,
 			"overwrittenCount":  overwrittenCount,

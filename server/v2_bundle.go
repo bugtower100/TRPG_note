@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"strings"
 	"time"
 
 	"gorm.io/gorm"
@@ -19,6 +20,7 @@ type V2CampaignBundle struct {
 	Timelines      []map[string]any `json:"timelines"`
 	Monsters       []map[string]any `json:"monsters"`
 	SessionTasks   []map[string]any `json:"sessionTasks"`
+	GameSessions   []map[string]any `json:"gameSessions"`
 	RelationGraphs []map[string]any `json:"relationGraphs"`
 	MindMaps       []map[string]any `json:"mindMaps"`
 }
@@ -56,6 +58,7 @@ var v2DocumentTypeOrder = []string{
 	"timelines",
 	"monsters",
 	"session_tasks",
+	"game_sessions",
 	"relation_graphs",
 	"mind_maps",
 }
@@ -80,6 +83,7 @@ func defaultV2Bundle(campaignID string) V2CampaignBundle {
 		Timelines:      []map[string]any{},
 		Monsters:       []map[string]any{},
 		SessionTasks:   []map[string]any{},
+		GameSessions:   []map[string]any{},
 		RelationGraphs: []map[string]any{},
 		MindMaps:       []map[string]any{},
 	}
@@ -173,6 +177,11 @@ func loadV2CampaignBundle(db *gorm.DB, campaignID string) (V2CampaignBundleRespo
 	} else if doc != nil {
 		version = maxInt(version, doc.Version)
 	}
+	if doc, err := loadDocumentJSON(db, campaignID, "game_sessions", &bundle.GameSessions); err != nil {
+		return V2CampaignBundleResponse{}, err
+	} else if doc != nil {
+		version = maxInt(version, doc.Version)
+	}
 	if doc, err := loadDocumentJSON(db, campaignID, "relation_graphs", &bundle.RelationGraphs); err != nil {
 		return V2CampaignBundleResponse{}, err
 	} else if doc != nil {
@@ -203,9 +212,68 @@ func redactV2CampaignBundleForPL(response V2CampaignBundleResponse) V2CampaignBu
 	response.Bundle.Timelines = []map[string]any{}
 	response.Bundle.Monsters = []map[string]any{}
 	response.Bundle.SessionTasks = []map[string]any{}
+	response.Bundle.GameSessions = redactGameSessionsForPL(response.Bundle.GameSessions)
 	response.Bundle.RelationGraphs = []map[string]any{}
 	response.Bundle.MindMaps = []map[string]any{}
 	return response
+}
+
+func redactGameSessionsForPL(sessions []map[string]any) []map[string]any {
+	redacted := make([]map[string]any, 0, len(sessions))
+	for _, session := range sessions {
+		publishedAt, ok := positiveNumber(session["playerRecapPublishedAt"])
+		if !ok || stringField(session, "status") != "completed" || strings.TrimSpace(stringField(session, "playerRecap")) == "" {
+			continue
+		}
+
+		redacted = append(redacted, map[string]any{
+			"id":                     stringField(session, "id"),
+			"title":                  stringField(session, "title"),
+			"sessionNumber":          numberField(session, "sessionNumber"),
+			"scheduledAt":            stringField(session, "scheduledAt"),
+			"inWorldDate":            stringField(session, "inWorldDate"),
+			"status":                 stringField(session, "status"),
+			"summary":                "",
+			"goals":                  []map[string]any{},
+			"agenda":                 []map[string]any{},
+			"resourceRefs":           []map[string]any{},
+			"taskIds":                []string{},
+			"participantUserIds":     []string{},
+			"liveNotes":              "",
+			"unresolvedItems":        "",
+			"gmSummary":              "",
+			"playerRecap":            stringField(session, "playerRecap"),
+			"playerRecapPublishedAt": publishedAt,
+			"createdAt":              numberField(session, "createdAt"),
+			"updatedAt":              numberField(session, "updatedAt"),
+		})
+	}
+	return redacted
+}
+
+func stringField(value map[string]any, key string) string {
+	result, _ := value[key].(string)
+	return result
+}
+
+func numberField(value map[string]any, key string) any {
+	if result, ok := positiveNumber(value[key]); ok {
+		return result
+	}
+	return 0
+}
+
+func positiveNumber(value any) (any, bool) {
+	switch number := value.(type) {
+	case int:
+		return number, number > 0
+	case int64:
+		return number, number > 0
+	case float64:
+		return number, number > 0
+	default:
+		return nil, false
+	}
 }
 
 func saveV2CampaignDocument(tx *gorm.DB, campaignID, docType string, content any, version int) error {
@@ -280,6 +348,9 @@ func saveV2CampaignBundle(db *gorm.DB, campaignID string, request V2CampaignBund
 			return err
 		}
 		if err := saveV2CampaignDocument(tx, campaignID, "session_tasks", request.Bundle.SessionTasks, nextVersion); err != nil {
+			return err
+		}
+		if err := saveV2CampaignDocument(tx, campaignID, "game_sessions", request.Bundle.GameSessions, nextVersion); err != nil {
 			return err
 		}
 		if err := saveV2CampaignDocument(tx, campaignID, "relation_graphs", request.Bundle.RelationGraphs, nextVersion); err != nil {

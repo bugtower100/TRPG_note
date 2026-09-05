@@ -462,6 +462,9 @@ export type V2CampaignBundle = {
     events: Array<{
         [key: string]: unknown;
     }> | null;
+    gameSessions: Array<{
+        [key: string]: unknown;
+    }> | null;
     id: string;
     locations: Array<{
         [key: string]: unknown;

@@ -172,6 +172,7 @@ export const useSectionedEntityDetail = <T extends BaseEntity>({
       const next = {
         ...prev,
         customSections: (prev.customSections || []).filter((sectionKey) => sectionKey !== key),
+        sectionOrder: (prev.sectionOrder || []).filter((sectionKey) => sectionKey !== key),
         sectionTitles: nextTitles,
         sectionVisibility: nextVisibility,
         sectionLinkEnabled: nextLinkEnabled,

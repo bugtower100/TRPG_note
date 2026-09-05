@@ -395,6 +395,7 @@ func migrateLegacyBundleDocuments(db *gorm.DB, campaignID string, version int, r
 		"timelines":       raw["timelines"],
 		"monsters":        raw["monsters"],
 		"session_tasks":   raw["sessionTasks"],
+		"game_sessions":   raw["gameSessions"],
 		"relation_graphs": raw["relationGraphs"],
 		"mind_maps":       raw["mindMaps"],
 	}

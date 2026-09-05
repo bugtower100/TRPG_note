@@ -43,7 +43,6 @@ export interface CampaignSessionContextValue {
   deleteCampaign: (id: string) => Promise<void>;
   exitCampaign: () => void;
   exportData: () => void;
-  importData: (file: File) => Promise<void>;
 }
 
 export interface CampaignThemeContextValue {

@@ -41,6 +41,7 @@ const TeamNotes: React.FC = () => {
   const [lockingNoteId, setLockingNoteId] = useState<string | null>(null);
   const [isReordering, setIsReordering] = useState(false);
   const saveTimerRef = useRef<number | null>(null);
+  const savePromiseRef = useRef<Promise<TeamNoteDocument> | null>(null);
   const cleanupStateRef = useRef<{
     campaignId: string | null;
     noteId: string | null;
@@ -154,12 +155,15 @@ const TeamNotes: React.FC = () => {
     if (!changed) return;
     if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current);
     saveTimerRef.current = window.setTimeout(() => {
-      teamNotesService.saveTeamNote(currentCampaignId, selectedNote.id, user, {
+      if (savePromiseRef.current) return;
+      const savePromise = teamNotesService.saveTeamNote(currentCampaignId, selectedNote.id, user, {
         title: draftTitle,
         content: draftContent,
         expectedVersion: selectedNote.version,
         leaseStartedAt,
-      }).then((saved) => {
+      });
+      savePromiseRef.current = savePromise;
+      savePromise.then((saved) => {
         setNotes((prev) => mergeSavedNote(prev, saved));
         queryClient.setQueryData<TeamNoteDocument[]>(notesQueryKey, (prev = []) =>
           mergeSavedNote(prev, saved)
@@ -171,6 +175,10 @@ const TeamNotes: React.FC = () => {
           setConflictNote(error.remote);
         }
         setStatusText(error instanceof Error ? error.message : '保存失败');
+      }).finally(() => {
+        if (savePromiseRef.current === savePromise) {
+          savePromiseRef.current = null;
+        }
       });
     }, 1200);
     return () => {
@@ -201,13 +209,22 @@ const TeamNotes: React.FC = () => {
         leaseStartedAt: currentLeaseStartedAt,
       } = cleanupStateRef.current;
       if (!campaignId || !noteId || !currentUser || !isEditing) return;
-      teamNotesService.endLease(
+      const releaseLease = (startedAt?: number | null) => teamNotesService.endLease(
         campaignId,
         noteId,
         currentUser,
-        currentLeaseStartedAt,
+        startedAt,
         true
-      ).catch(() => void 0);
+      );
+      const activeSave = savePromiseRef.current;
+      if (activeSave) {
+        void activeSave.then(
+          (saved) => releaseLease(saved.activeLease?.startedAt ?? currentLeaseStartedAt),
+          () => releaseLease(currentLeaseStartedAt)
+        ).catch(() => void 0);
+        return;
+      }
+      void releaseLease(currentLeaseStartedAt).catch(() => void 0);
     };
     window.addEventListener('pagehide', releaseCurrentLease);
     return () => {
@@ -252,18 +269,31 @@ const TeamNotes: React.FC = () => {
 
   const persistCurrentDraft = async () => {
     if (!currentCampaignId || !selectedNote || !user) return selectedNote;
-    const changed = draftTitle !== selectedNote.title || draftContent !== selectedNote.content;
-    if (!changed) return selectedNote;
+    let currentNote = selectedNote;
+    if (savePromiseRef.current) {
+      currentNote = await savePromiseRef.current;
+    }
+    const changed = draftTitle !== currentNote.title || draftContent !== currentNote.content;
+    if (!changed) return currentNote;
     if (saveTimerRef.current) {
       window.clearTimeout(saveTimerRef.current);
       saveTimerRef.current = null;
     }
-    const saved = await teamNotesService.saveTeamNote(currentCampaignId, selectedNote.id, user, {
+    const savePromise = teamNotesService.saveTeamNote(currentCampaignId, currentNote.id, user, {
       title: draftTitle,
       content: draftContent,
-      expectedVersion: selectedNote.version,
-      leaseStartedAt,
+      expectedVersion: currentNote.version,
+      leaseStartedAt: currentNote.activeLease?.startedAt ?? leaseStartedAt,
     });
+    savePromiseRef.current = savePromise;
+    let saved: TeamNoteDocument;
+    try {
+      saved = await savePromise;
+    } finally {
+      if (savePromiseRef.current === savePromise) {
+        savePromiseRef.current = null;
+      }
+    }
     setNotes((prev) => mergeSavedNote(prev, saved));
     queryClient.setQueryData<TeamNoteDocument[]>(notesQueryKey, (prev = []) =>
       mergeSavedNote(prev, saved)

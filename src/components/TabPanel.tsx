@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useCampaignTabs, Tab } from '../context/CampaignContext';
 import { Maximize2, Minimize2, X } from 'lucide-react';
 import EntityDetailView from './common/EntityDetailView';
@@ -11,6 +11,10 @@ interface TabPanelProps {
   onCloseMobile?: () => void;
 }
 
+const PANEL_MIN_WIDTH = 280;
+const PANEL_MAX_WIDTH = 960;
+const MAIN_CONTENT_MIN_WIDTH = 280;
+
 const TabPanel: React.FC<TabPanelProps> = ({
   maximized,
   onToggleMaximize,
@@ -20,11 +24,62 @@ const TabPanel: React.FC<TabPanelProps> = ({
 }) => {
   const { tabs, activeTabId, setActiveTabId, closeTab } = useCampaignTabs();
   const contentRef = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const panelWidthRef = useRef(0);
+  const resizeRef = useRef<{ startX: number; startWidth: number } | null>(null);
+  const [panelWidth, setPanelWidth] = useState<number | null>(null);
 
   const activeTab = tabs.find(t => t.id === activeTabId);
 
   const renderContent = (tab: Tab) => {
     return <EntityDetailView type={tab.type} entityId={tab.entityId} />;
+  };
+
+  const applyPanelWidth = (width: number) => {
+    const panel = panelRef.current;
+    if (!panel) return width;
+    const parentWidth = panel.parentElement?.clientWidth ?? window.innerWidth;
+    const maxWidth = Math.max(
+      PANEL_MIN_WIDTH,
+      Math.min(PANEL_MAX_WIDTH, parentWidth - MAIN_CONTENT_MIN_WIDTH)
+    );
+    const nextWidth = Math.min(maxWidth, Math.max(PANEL_MIN_WIDTH, width));
+    panelWidthRef.current = nextWidth;
+    panel.style.width = `${nextWidth}px`;
+    return nextWidth;
+  };
+
+  const handleResizeStart = (event: React.PointerEvent<HTMLDivElement>) => {
+    const panel = panelRef.current;
+    if (!panel) return;
+    event.preventDefault();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    const currentWidth = panel.getBoundingClientRect().width;
+    panelWidthRef.current = currentWidth;
+    resizeRef.current = { startX: event.clientX, startWidth: currentWidth };
+  };
+
+  const handleResizeMove = (event: React.PointerEvent<HTMLDivElement>) => {
+    const resize = resizeRef.current;
+    if (!resize) return;
+    applyPanelWidth(resize.startWidth + resize.startX - event.clientX);
+  };
+
+  const handleResizeEnd = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (!resizeRef.current) return;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    resizeRef.current = null;
+    setPanelWidth(panelWidthRef.current);
+  };
+
+  const handleResizeKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+    event.preventDefault();
+    const currentWidth = panelRef.current?.getBoundingClientRect().width ?? PANEL_MIN_WIDTH;
+    const delta = event.key === 'ArrowLeft' ? 16 : -16;
+    setPanelWidth(applyPanelWidth(currentWidth + delta));
   };
 
   useEffect(() => {
@@ -68,10 +123,36 @@ const TabPanel: React.FC<TabPanelProps> = ({
 
   return (
     <div
-      className={`border-l border-theme bg-theme-card flex flex-col h-screen shadow-xl z-20 ${
-        mobileMode ? 'fixed top-0 right-0 w-full max-w-full' : `${maximized ? 'w-full' : 'w-1/2'}`
+      ref={panelRef}
+      className={`relative border-l border-theme bg-theme-card flex flex-col h-screen shadow-xl z-20 ${
+        mobileMode ? 'fixed top-0 right-0 w-full max-w-full' : `${maximized ? 'w-full' : 'flex-none'}`
       }`}
+      style={!mobileMode && !maximized ? {
+        width: panelWidth === null ? '50%' : `${panelWidth}px`,
+        minWidth: `${PANEL_MIN_WIDTH}px`,
+        maxWidth: `calc(100% - ${MAIN_CONTENT_MIN_WIDTH}px)`,
+      } : undefined}
     >
+      {!mobileMode && !maximized ? (
+        <div
+          role="separator"
+          aria-label="调整右侧详情面板宽度"
+          aria-orientation="vertical"
+          aria-valuemin={PANEL_MIN_WIDTH}
+          aria-valuemax={PANEL_MAX_WIDTH}
+          aria-valuetext={panelWidth === null ? '页面宽度的一半' : `${Math.round(panelWidth)} 像素`}
+          tabIndex={0}
+          title="拖动调整右侧面板宽度"
+          onPointerDown={handleResizeStart}
+          onPointerMove={handleResizeMove}
+          onPointerUp={handleResizeEnd}
+          onPointerCancel={handleResizeEnd}
+          onKeyDown={handleResizeKeyDown}
+          className="group absolute inset-y-0 -left-2 z-30 flex w-4 touch-none cursor-col-resize items-center justify-center outline-none"
+        >
+          <span className="h-12 w-1 rounded-full bg-black/10 transition-colors group-hover:bg-primary group-focus:bg-primary" />
+        </div>
+      ) : null}
       {/* Tab Headers */}
       <div className="flex overflow-x-auto border-b border-theme bg-transparent">
         <div className="flex items-center px-3 border-r border-theme">

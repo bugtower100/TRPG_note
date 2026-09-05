@@ -1544,6 +1544,16 @@
               "null"
             ]
           },
+          "gameSessions": {
+            "items": {
+              "additionalProperties": {},
+              "type": "object"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
           "id": {
             "type": "string"
           },
@@ -1637,6 +1647,7 @@
           "timelines",
           "monsters",
           "sessionTasks",
+          "gameSessions",
           "relationGraphs",
           "mindMaps"
         ],

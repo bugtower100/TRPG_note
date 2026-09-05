@@ -85,6 +85,7 @@ const ClueDetail: React.FC<ClueDetailProps> = ({ entityId }) => {
         addCustomSection={addCustomSection}
         removeCustomSection={removeCustomSection}
         setSectionTitle={setSectionTitle}
+        onSectionOrderChange={(sectionOrder) => handleChange('sectionOrder', sectionOrder)}
       />
     </div>
   );

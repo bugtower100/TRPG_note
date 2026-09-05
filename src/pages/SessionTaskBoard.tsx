@@ -61,6 +61,7 @@ const SessionTaskBoard: React.FC = () => {
   const [draggingTaskId, setDraggingTaskId] = useState<string | null>(null);
   const [dropTarget, setDropTarget] = useState<TaskDropTarget | null>(null);
   const saveTimerRef = useRef<number | null>(null);
+  const savePromiseRef = useRef<Promise<SessionTaskBoardDocument> | null>(null);
   const cleanupStateRef = useRef<{
     campaignId: string | null;
     user: typeof user;
@@ -155,15 +156,19 @@ const SessionTaskBoard: React.FC = () => {
     if (!tasksChanged && !permissionsChanged) return;
     if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current);
     saveTimerRef.current = window.setTimeout(() => {
-      sessionTaskBoardService.saveTaskBoard(currentCampaignId, user, {
+      if (savePromiseRef.current) return;
+      const savePromise = sessionTaskBoardService.saveTaskBoard(currentCampaignId, user, {
         tasks: taskDrafts,
         expectedVersion: boardDoc.version,
         leaseStartedAt,
         ...(isCampaignManagerRole(memberRole) ? permissionDraft : {}),
-      }).then((saved) => {
+      });
+      savePromiseRef.current = savePromise;
+      savePromise.then((saved) => {
         setBoardDoc(saved);
         setTaskDrafts(saved.tasks);
         setPermissionDraft(resolvePermissions(saved));
+        setLeaseStartedAt(saved.activeLease?.startedAt ?? null);
         queryClient.setQueryData(taskBoardQueryKey, saved);
         setCampaignData({
           ...campaignData,
@@ -176,6 +181,10 @@ const SessionTaskBoard: React.FC = () => {
           setConflictDoc(error.remote);
         }
         setStatusText(error instanceof Error ? error.message : '保存失败');
+      }).finally(() => {
+        if (savePromiseRef.current === savePromise) {
+          savePromiseRef.current = null;
+        }
       });
     }, 1200);
     return () => {
@@ -199,7 +208,17 @@ const SessionTaskBoard: React.FC = () => {
     return () => {
       const { campaignId, user: currentUser, editing: isEditing, leaseStartedAt: currentLeaseStartedAt } = cleanupStateRef.current;
       if (!campaignId || !currentUser || !isEditing) return;
-      sessionTaskBoardService.endLease(campaignId, currentUser, currentLeaseStartedAt).catch(() => void 0);
+      const releaseLease = (startedAt?: number | null) =>
+        sessionTaskBoardService.endLease(campaignId, currentUser, startedAt, true);
+      const activeSave = savePromiseRef.current;
+      if (activeSave) {
+        void activeSave.then(
+          (saved) => releaseLease(saved.activeLease?.startedAt ?? currentLeaseStartedAt),
+          () => releaseLease(currentLeaseStartedAt)
+        ).catch(() => void 0);
+        return;
+      }
+      void releaseLease(currentLeaseStartedAt).catch(() => void 0);
     };
   }, []);
 
@@ -316,26 +335,40 @@ const SessionTaskBoard: React.FC = () => {
 
   const persistCurrentDraft = async () => {
     if (!currentCampaignId || !boardDoc || !user) return boardDoc;
-    const tasksChanged = JSON.stringify(taskDrafts) !== JSON.stringify(boardDoc.tasks);
-    const currentPermissions = resolvePermissions(boardDoc);
+    let currentDoc = boardDoc;
+    if (savePromiseRef.current) {
+      currentDoc = await savePromiseRef.current;
+    }
+    const tasksChanged = JSON.stringify(taskDrafts) !== JSON.stringify(currentDoc.tasks);
+    const currentPermissions = resolvePermissions(currentDoc);
     const permissionsChanged =
       isCampaignManagerRole(memberRole) &&
       (permissionDraft.plCanView !== currentPermissions.plCanView ||
         permissionDraft.plCanEdit !== currentPermissions.plCanEdit);
-    if (!tasksChanged && !permissionsChanged) return boardDoc;
+    if (!tasksChanged && !permissionsChanged) return currentDoc;
     if (saveTimerRef.current) {
       window.clearTimeout(saveTimerRef.current);
       saveTimerRef.current = null;
     }
-    const saved = await sessionTaskBoardService.saveTaskBoard(currentCampaignId, user, {
+    const savePromise = sessionTaskBoardService.saveTaskBoard(currentCampaignId, user, {
       tasks: taskDrafts,
-      expectedVersion: boardDoc.version,
-      leaseStartedAt,
+      expectedVersion: currentDoc.version,
+      leaseStartedAt: currentDoc.activeLease?.startedAt ?? leaseStartedAt,
       ...(isCampaignManagerRole(memberRole) ? permissionDraft : {}),
     });
+    savePromiseRef.current = savePromise;
+    let saved: SessionTaskBoardDocument;
+    try {
+      saved = await savePromise;
+    } finally {
+      if (savePromiseRef.current === savePromise) {
+        savePromiseRef.current = null;
+      }
+    }
     setBoardDoc(saved);
     setTaskDrafts(saved.tasks);
     setPermissionDraft(resolvePermissions(saved));
+    setLeaseStartedAt(saved.activeLease?.startedAt ?? null);
     queryClient.setQueryData(taskBoardQueryKey, saved);
     setCampaignData({
       ...campaignData,
@@ -349,8 +382,9 @@ const SessionTaskBoard: React.FC = () => {
   const handleStopEdit = async (): Promise<boolean> => {
     if (!currentCampaignId || !user) return false;
     try {
-      await persistCurrentDraft();
-      await sessionTaskBoardService.endLease(currentCampaignId, user, leaseStartedAt);
+      const saved = await persistCurrentDraft();
+      const currentLeaseStartedAt = saved?.activeLease?.startedAt ?? leaseStartedAt;
+      await sessionTaskBoardService.endLease(currentCampaignId, user, currentLeaseStartedAt);
       setEditing(false);
       setLeaseStartedAt(null);
       await Promise.all([configQuery.refetch(), taskBoardQuery.refetch()]).catch(() => void 0);
@@ -399,6 +433,7 @@ const SessionTaskBoard: React.FC = () => {
       setBoardDoc(saved);
       setTaskDrafts(saved.tasks);
       setPermissionDraft(resolvePermissions(saved));
+      setLeaseStartedAt(saved.activeLease?.startedAt ?? null);
       queryClient.setQueryData(taskBoardQueryKey, saved);
       setCampaignData({
         ...campaignData,

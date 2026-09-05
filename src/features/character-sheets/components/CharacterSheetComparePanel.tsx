@@ -2,6 +2,8 @@ import React from 'react';
 import type { CharacterSheetDocument } from '../../../generated/api';
 import { buildResourceFileUrl } from '../../../services/resourceService';
 import {
+  DND_SKILL_DEFINITIONS,
+  formatDndSkillProficiency,
   formatCharacterSheetSystem,
   formatSignedNumber,
   getAbilityModifier,
@@ -21,27 +23,6 @@ const CharacterSheetComparePanel: React.FC<CharacterSheetComparePanelProps> = ({
   loading,
   onExit,
 }) => {
-  const dndSkillDefinitions = [
-    ['运动', 'str', '力量'],
-    ['体操', 'dex', '敏捷'],
-    ['巧手', 'dex', '敏捷'],
-    ['隐匿', 'dex', '敏捷'],
-    ['调查', 'int', '智力'],
-    ['奥秘', 'int', '智力'],
-    ['历史', 'int', '智力'],
-    ['自然', 'int', '智力'],
-    ['宗教', 'int', '智力'],
-    ['察觉', 'wis', '感知'],
-    ['洞悉', 'wis', '感知'],
-    ['驯兽', 'wis', '感知'],
-    ['医药', 'wis', '感知'],
-    ['求生', 'wis', '感知'],
-    ['游说', 'cha', '魅力'],
-    ['欺瞒', 'cha', '魅力'],
-    ['威吓', 'cha', '魅力'],
-    ['表演', 'cha', '魅力'],
-  ] as const;
-
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
@@ -71,12 +52,12 @@ const CharacterSheetComparePanel: React.FC<CharacterSheetComparePanelProps> = ({
             ? (() => {
               const skillMap = getRecord(systemData.skills);
               const proficiencyBonus = getNumberValue(systemData.proficiencyBonus, 2);
-              return dndSkillDefinitions.map(([name, abilityKey, abilityLabel]) => {
+              return DND_SKILL_DEFINITIONS.map(([name, abilityKey, abilityLabel]) => {
                 const proficiency = getNumberValue(skillMap[name], 0);
                 const abilityModifier = getAbilityModifier(getNumberValue(stats[abilityKey], 10));
                 return {
                   name,
-                  meta: `${abilityLabel} / ${proficiency === 1 ? '熟练' : proficiency === 0.5 ? '半熟练' : '未熟练'}`,
+                  meta: `${abilityLabel} / ${formatDndSkillProficiency(proficiency)}`,
                   value: formatSignedNumber(abilityModifier + Math.floor(proficiencyBonus * proficiency)),
                 };
               });

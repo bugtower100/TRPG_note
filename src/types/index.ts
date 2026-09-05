@@ -28,6 +28,7 @@ export interface BaseEntity {
   sectionLinkEnabled?: Record<string, boolean>;
   sectionTitles?: Record<string, string>;
   customSections?: string[];
+  sectionOrder?: string[];
   relatedImages: string[];
   createdAt: number;
   updatedAt: number;
@@ -350,6 +351,55 @@ export interface SessionTaskBoardDocument {
   activeLease?: TeamNoteLease | null;
 }
 
+export type GameSessionStatus = 'preparing' | 'active' | 'completed';
+export type GameSessionGoalStatus = 'pending' | 'progressed' | 'completed' | 'dropped';
+export type GameSessionAgendaStatus = 'pending' | 'active' | 'completed' | 'skipped' | 'deferred';
+
+export interface GameSessionGoal {
+  id: string;
+  title: string;
+  status: GameSessionGoalStatus;
+}
+
+export interface GameSessionAgendaItem {
+  id: string;
+  title: string;
+  notes: string;
+  status: GameSessionAgendaStatus;
+  plannedMinutes?: number;
+}
+
+export interface GameSessionResourceRef {
+  entityType: GraphEntityType;
+  entityId: string;
+  usage: string;
+  pinned: boolean;
+}
+
+export interface GameSession {
+  id: string;
+  title: string;
+  sessionNumber: number;
+  scheduledAt: string;
+  inWorldDate: string;
+  status: GameSessionStatus;
+  summary: string;
+  goals: GameSessionGoal[];
+  agenda: GameSessionAgendaItem[];
+  resourceRefs: GameSessionResourceRef[];
+  taskIds: string[];
+  participantUserIds: string[];
+  liveNotes: string;
+  unresolvedItems: string;
+  gmSummary: string;
+  playerRecap: string;
+  playerRecapPublishedAt?: number;
+  createdAt: number;
+  updatedAt: number;
+  startedAt?: number;
+  completedAt?: number;
+}
+
 export interface CampaignData {
   id?: string; // Add optional ID for multi-campaign support
   meta: {
@@ -368,6 +418,7 @@ export interface CampaignData {
   timelines: Timeline[];
   monsters: Monster[];
   sessionTasks: SessionTask[];
+  gameSessions: GameSession[];
   relationGraphs?: RelationGraph[];
   mindMaps?: MindMapDocument[];
 }

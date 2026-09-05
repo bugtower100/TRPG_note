@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { ArrowDown, ArrowUp } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import RichTextEditor from './RichTextEditor';
 import RichTextDisplay from './RichTextDisplay';
@@ -77,6 +78,15 @@ const CustomSubItemsEditor: React.FC<CustomSubItemsEditorProps> = ({
     onChange(items.map((item) => (item.id === id ? { ...item, ...patch } : item)));
   };
 
+  const moveItem = (id: string, direction: -1 | 1) => {
+    const currentIndex = items.findIndex((item) => item.id === id);
+    const targetIndex = currentIndex + direction;
+    if (currentIndex < 0 || targetIndex < 0 || targetIndex >= items.length) return;
+    const next = [...items];
+    [next[currentIndex], next[targetIndex]] = [next[targetIndex], next[currentIndex]];
+    onChange(next);
+  };
+
   const removeItem = (id: string) => {
     const target = items.find((item) => item.id === id);
     if (!target) return;
@@ -135,6 +145,7 @@ const CustomSubItemsEditor: React.FC<CustomSubItemsEditorProps> = ({
         (item.content || '').toLowerCase().includes(keyword)
     );
   }, [items, search]);
+  const orderingEnabled = search.trim().length === 0;
 
   return (
     <div className="space-y-4">
@@ -170,9 +181,13 @@ const CustomSubItemsEditor: React.FC<CustomSubItemsEditorProps> = ({
           未找到匹配的子项目。
         </div>
       )}
+      {!orderingEnabled && filteredItems.length > 0 ? (
+        <div className="text-xs theme-text-secondary">清除搜索条件后可调整子项目顺序。</div>
+      ) : null}
       {filteredItems.map((item) => {
         const collapsed = Boolean(item.collapsed);
         const isEditing = editingIds.includes(item.id);
+        const itemIndex = items.findIndex((candidate) => candidate.id === item.id);
         return (
           <div
             key={item.id}
@@ -188,6 +203,28 @@ const CustomSubItemsEditor: React.FC<CustomSubItemsEditorProps> = ({
               >
                 {collapsed ? '展开' : '收起'}
               </button>
+              <div className="flex items-center" aria-label="调整子项目顺序">
+                <button
+                  type="button"
+                  onClick={() => moveItem(item.id, -1)}
+                  disabled={!orderingEnabled || itemIndex <= 0}
+                  aria-label={`上移子项目 ${item.title || '未命名子项目'}`}
+                  title="上移子项目"
+                  className="inline-flex h-7 w-7 items-center justify-center rounded-l border border-theme theme-text-secondary hover:text-primary disabled:cursor-not-allowed disabled:opacity-30"
+                >
+                  <ArrowUp size={14} aria-hidden="true" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => moveItem(item.id, 1)}
+                  disabled={!orderingEnabled || itemIndex >= items.length - 1}
+                  aria-label={`下移子项目 ${item.title || '未命名子项目'}`}
+                  title="下移子项目"
+                  className="-ml-px inline-flex h-7 w-7 items-center justify-center rounded-r border border-theme theme-text-secondary hover:text-primary disabled:cursor-not-allowed disabled:opacity-30"
+                >
+                  <ArrowDown size={14} aria-hidden="true" />
+                </button>
+              </div>
               {isEditing ? (
                 <input
                   type="text"
@@ -231,7 +268,7 @@ const CustomSubItemsEditor: React.FC<CustomSubItemsEditorProps> = ({
                     value={item.content}
                     onChange={(val) => updateItem(item.id, { content: val })}
                     placeholder="子项目内容..."
-                    minHeight="100px"
+                    minHeight="180px"
                   />
                 </div>
               ) : (

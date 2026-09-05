@@ -31,6 +31,7 @@ const SharedContent = lazy(() => import('./pages/SharedContent'));
 const SharedEntityDetailRoute = lazy(() => import('./pages/SharedEntityDetailRoute'));
 const SessionTaskBoard = lazy(() => import('./pages/SessionTaskBoard'));
 const CharacterSheets = lazy(() => import('./pages/CharacterSheets'));
+const GameSessions = lazy(() => import('./pages/GameSessions'));
 
 function LegacyCharacterSheetRedirect() {
   const { id } = useParams<{ id: string }>();
@@ -83,6 +84,8 @@ function AppContent() {
               <Route path="clues/shared/:shareId" element={<SharedEntityDetailRoute entityType="clues" />} />
               <Route path="clue-board" element={<Navigate to="/clues" replace />} />
               <Route path="session-tasks" element={<SessionTaskBoard />} />
+              <Route path="sessions" element={<GameSessions />} />
+              <Route path="sessions/:id" element={<GameSessions />} />
               <Route path="timelines" element={<TimelineList />} />
               <Route path="timelines/workbench" element={<TimelineWorkbench />} />
               <Route path="timelines/:id" element={<TimelineList />} />

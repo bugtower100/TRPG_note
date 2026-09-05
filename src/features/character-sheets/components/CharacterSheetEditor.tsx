@@ -86,6 +86,23 @@ const CharacterSheetEditor: React.FC<CharacterSheetEditorProps> = ({
     });
   };
 
+  const updateSystemSkills = (skills: unknown) => {
+    updateDraft((current) => {
+      const systemKey = current.system === 'dnd5e' ? 'dnd5e' : 'coc7';
+      const currentSystemPayload = getRecord(current.payload[systemKey]);
+      return {
+        ...current,
+        payload: {
+          ...current.payload,
+          [systemKey]: {
+            ...currentSystemPayload,
+            skills,
+          },
+        },
+      };
+    });
+  };
+
   const updateSystemNestedField = (sectionKey: string, key: string, value: string | number) => {
     updateDraft((current) => {
       const systemKey = current.system === 'dnd5e' ? 'dnd5e' : 'coc7';
@@ -408,6 +425,7 @@ const CharacterSheetEditor: React.FC<CharacterSheetEditorProps> = ({
           onFieldChange={updateSystemField}
           onNestedFieldChange={updateSystemNestedField}
           onDoubleNestedFieldChange={updateSystemDoubleNestedField}
+          onSkillsChange={updateSystemSkills}
         />
       ) : (
         <DndSheetFields
@@ -415,6 +433,7 @@ const CharacterSheetEditor: React.FC<CharacterSheetEditorProps> = ({
           onFieldChange={updateSystemField}
           onNestedFieldChange={updateSystemNestedField}
           onDoubleNestedFieldChange={updateSystemDoubleNestedField}
+          onSkillsChange={updateSystemSkills}
         />
       )}
 

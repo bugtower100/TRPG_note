@@ -174,11 +174,18 @@ class SharingService {
     return this.parseResponse<SharedEntityRecord>(response);
   }
 
-  async endShareLease(campaignId: string, shareId: string, user: UserProfile | null, leaseStartedAt?: number | null): Promise<void> {
+  async endShareLease(
+    campaignId: string,
+    shareId: string,
+    user: UserProfile | null,
+    leaseStartedAt?: number | null,
+    keepalive = false
+  ): Promise<void> {
     const response = await fetch(`/api/campaigns/${campaignId}/shares/${shareId}/lease/end`, {
       method: 'POST',
       headers: buildCollaborationHeaders(user, campaignId),
       body: JSON.stringify({ leaseStartedAt }),
+      keepalive,
     });
     if (!response.ok) {
       throw new Error(await readCollaborationErrorMessage<SharedEntityRecord>(response, {

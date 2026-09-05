@@ -4,6 +4,27 @@ export type CharacterSheetSystem = 'coc7' | 'dnd5e';
 export type CharacterSheetVisibility = 'owner_only' | 'party_read' | 'party_edit' | 'assigned_only';
 export type CharacterSheetMemberPermissionValue = 'read' | 'edit';
 
+export const DND_SKILL_DEFINITIONS = [
+  ['运动', 'str', '力量'],
+  ['体操', 'dex', '敏捷'],
+  ['巧手', 'dex', '敏捷'],
+  ['隐匿', 'dex', '敏捷'],
+  ['调查', 'int', '智力'],
+  ['奥秘', 'int', '智力'],
+  ['历史', 'int', '智力'],
+  ['自然', 'int', '智力'],
+  ['宗教', 'int', '智力'],
+  ['察觉', 'wis', '感知'],
+  ['洞悉', 'wis', '感知'],
+  ['驯兽', 'wis', '感知'],
+  ['医药', 'wis', '感知'],
+  ['求生', 'wis', '感知'],
+  ['游说', 'cha', '魅力'],
+  ['欺瞒', 'cha', '魅力'],
+  ['威吓', 'cha', '魅力'],
+  ['表演', 'cha', '魅力'],
+] as const;
+
 const defaultBasePayload = {
   title: '',
   age: '',
@@ -244,3 +265,10 @@ export const parseCommaSeparated = (value: string): string[] =>
 export const getAbilityModifier = (score: number) => Math.floor((score - 10) / 2);
 
 export const formatSignedNumber = (value: number) => (value >= 0 ? `+${value}` : `${value}`);
+
+export const formatDndSkillProficiency = (value: number) => {
+  if (value === 2) return '专精';
+  if (value === 1) return '熟练';
+  if (value === 0.5) return '半熟练';
+  return '未熟练';
+};

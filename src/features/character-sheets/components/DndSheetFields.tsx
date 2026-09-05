@@ -1,5 +1,6 @@
 import React from 'react';
 import {
+  DND_SKILL_DEFINITIONS,
   formatSignedNumber,
   getAbilityModifier,
   getNumberValue,
@@ -12,6 +13,7 @@ interface DndSheetFieldsProps {
   onFieldChange: (key: string, value: string | number) => void;
   onNestedFieldChange: (sectionKey: string, key: string, value: string | number) => void;
   onDoubleNestedFieldChange: (sectionKey: string, nestedKey: string, key: string, value: number) => void;
+  onSkillsChange: (skills: Record<string, unknown>) => void;
 }
 
 const DndSheetFields: React.FC<DndSheetFieldsProps> = ({
@@ -19,11 +21,13 @@ const DndSheetFields: React.FC<DndSheetFieldsProps> = ({
   onFieldChange,
   onNestedFieldChange,
   onDoubleNestedFieldChange,
+  onSkillsChange,
 }) => {
   const stats = getRecord(data.stats);
   const derived = getRecord(data.derived);
   const hp = getRecord(derived.hp);
   const currency = getRecord(data.currency);
+  const skills = getRecord(data.skills);
 
   const statKeys = [
     ['str', '力量'],
@@ -226,6 +230,33 @@ const DndSheetFields: React.FC<DndSheetFieldsProps> = ({
               className="w-full px-3 py-2 border border-theme rounded bg-transparent"
             />
           </label>
+        </div>
+      </div>
+
+      <div className="space-y-3">
+        <div>
+          <div className="text-sm font-medium">技能熟练度</div>
+          <div className="mt-1 text-xs theme-text-secondary">可单独调整需要使用的技能，不会重置角色卡中的其他内容。</div>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+          {DND_SKILL_DEFINITIONS.map(([name, _abilityKey, ability]) => (
+            <label key={name} className="flex items-center gap-3 rounded border border-theme px-3 py-2 text-sm">
+              <span className="min-w-0 flex-1">
+                <span className="font-medium">{name}</span>
+                <span className="ml-1.5 text-xs theme-text-secondary">{ability}</span>
+              </span>
+              <select
+                value={getNumberValue(skills[name], 0)}
+                onChange={(event) => onSkillsChange({ ...skills, [name]: Number(event.target.value) })}
+                className="px-2 py-1.5 border border-theme rounded bg-transparent"
+              >
+                <option value={0}>未熟练</option>
+                <option value={0.5}>半熟练</option>
+                <option value={1}>熟练</option>
+                <option value={2}>专精</option>
+              </select>
+            </label>
+          ))}
         </div>
       </div>
 

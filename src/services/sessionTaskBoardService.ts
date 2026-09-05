@@ -113,11 +113,17 @@ class SessionTaskBoardService {
     return this.parseResponse<SessionTaskBoardDocument>(response);
   }
 
-  async endLease(campaignId: string, user: UserProfile | null, leaseStartedAt?: number | null): Promise<void> {
+  async endLease(
+    campaignId: string,
+    user: UserProfile | null,
+    leaseStartedAt?: number | null,
+    keepalive = false
+  ): Promise<void> {
     const response = await fetch(`/api/campaigns/${campaignId}/session-tasks/lease/end`, {
       method: 'POST',
       headers: buildCollaborationHeaders(user, campaignId),
       body: JSON.stringify({ leaseStartedAt }),
+      keepalive,
     });
     if (!response.ok) {
       throw new Error(await readCollaborationErrorMessage<SessionTaskBoardDocument>(response, {

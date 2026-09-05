@@ -3,6 +3,8 @@ import type { CharacterSheetDocument } from '../../../generated/api';
 import { buildResourceFileUrl } from '../../../services/resourceService';
 import type { CampaignMember, Character } from '../../../types';
 import {
+  DND_SKILL_DEFINITIONS,
+  formatDndSkillProficiency,
   formatCharacterSheetSystem,
   formatCharacterSheetPermission,
   formatSignedNumber,
@@ -119,33 +121,13 @@ const CharacterSheetPreview: React.FC<CharacterSheetPreviewProps> = ({
       const stats = getRecord(dnd.stats);
       const skillMap = getRecord(dnd.skills);
       const proficiencyBonus = getNumberValue(dnd.proficiencyBonus, 2);
-      const definitions = [
-        ['运动', 'str', '力量'],
-        ['体操', 'dex', '敏捷'],
-        ['巧手', 'dex', '敏捷'],
-        ['隐匿', 'dex', '敏捷'],
-        ['调查', 'int', '智力'],
-        ['奥秘', 'int', '智力'],
-        ['历史', 'int', '智力'],
-        ['自然', 'int', '智力'],
-        ['宗教', 'int', '智力'],
-        ['察觉', 'wis', '感知'],
-        ['洞悉', 'wis', '感知'],
-        ['驯兽', 'wis', '感知'],
-        ['医药', 'wis', '感知'],
-        ['求生', 'wis', '感知'],
-        ['游说', 'cha', '魅力'],
-        ['欺瞒', 'cha', '魅力'],
-        ['威吓', 'cha', '魅力'],
-        ['表演', 'cha', '魅力'],
-      ] as const;
-      return definitions.map(([name, abilityKey, abilityLabel]) => {
+      return DND_SKILL_DEFINITIONS.map(([name, abilityKey, abilityLabel]) => {
         const proficiency = getNumberValue(skillMap[name], 0);
         const abilityModifier = getAbilityModifier(getNumberValue(stats[abilityKey], 10));
         const total = abilityModifier + Math.floor(proficiencyBonus * proficiency);
         return {
           name,
-          meta: `${abilityLabel} / ${proficiency === 1 ? '熟练' : proficiency === 0.5 ? '半熟练' : '未熟练'}`,
+          meta: `${abilityLabel} / ${formatDndSkillProficiency(proficiency)}`,
           value: `${total >= 0 ? '+' : ''}${total}`,
         };
       });

@@ -83,6 +83,11 @@ interface RichStyleRange {
   closeTo: number;
 }
 
+interface TextblockSelectionRange {
+  from: number;
+  to: number;
+}
+
 const getHtmlStyleType = (value: string): RichStyleType | null => {
   if (value === UNDERLINE_OPEN_TAG) return 'underline';
   if (COLOR_OPEN_TAG_REGEX.test(value)) return 'color';
@@ -162,6 +167,25 @@ const getEnclosingRichStyleRange = (
 
   ranges.sort((a, b) => (a.contentTo - a.contentFrom) - (b.contentTo - b.contentFrom));
   return ranges[0];
+};
+
+const getSelectedTextblockRanges = (state: EditorState, from: number, to: number) => {
+  const ranges: TextblockSelectionRange[] = [];
+
+  state.doc.descendants((node, pos) => {
+    if (!node.isTextblock) return;
+
+    const contentFrom = pos + 1;
+    const contentTo = pos + node.nodeSize - 1;
+    const rangeFrom = Math.max(from, contentFrom);
+    const rangeTo = Math.min(to, contentTo);
+
+    if (rangeFrom < rangeTo) {
+      ranges.push({ from: rangeFrom, to: rangeTo });
+    }
+  });
+
+  return ranges;
 };
 
 const createEntityDecorationPlugin = (keywordDataRef: React.MutableRefObject<ReturnType<typeof buildRichKeywordData>>) =>
@@ -570,60 +594,72 @@ const MilkdownEditorInner: React.FC<MilkdownEditorInnerProps> = ({
       const { from, to, empty } = view.state.selection;
       if (empty) return;
 
-      const tr = view.state.tr;
-      const range = matcher ? getEnclosingRichStyleRange(view.state, from, to, matcher) : null;
+      const selectedRanges = getSelectedTextblockRanges(view.state, from, to)
+        .sort((a, b) => b.from - a.from);
 
-      if (range) {
-        tr.delete(range.closeFrom, range.closeTo);
-        tr.delete(range.openFrom, range.openTo);
+      selectedRanges.forEach((selectedRange) => {
+        const currentState = view.state;
+        const tr = currentState.tr;
+        const range = matcher
+          ? getEnclosingRichStyleRange(currentState, selectedRange.from, selectedRange.to, matcher)
+          : null;
 
-        const mappedRangeFrom = tr.mapping.map(range.contentFrom);
-        const mappedRangeTo = tr.mapping.map(range.contentTo);
-        const mappedSelectionFrom = tr.mapping.map(from);
-        const mappedSelectionTo = tr.mapping.map(to);
-        const shouldToggleOffCurrentStyle = openTag === range.openValue;
+        if (range) {
+          tr.delete(range.closeFrom, range.closeTo);
+          tr.delete(range.openFrom, range.openTo);
 
-        const wrappers: Array<{ from: number; to: number; openValue: string; closeValue: string }> = [];
+          const mappedRangeFrom = tr.mapping.map(range.contentFrom);
+          const mappedRangeTo = tr.mapping.map(range.contentTo);
+          const mappedSelectionFrom = tr.mapping.map(selectedRange.from);
+          const mappedSelectionTo = tr.mapping.map(selectedRange.to);
+          const shouldToggleOffCurrentStyle = openTag === range.openValue;
 
-        if (mappedRangeFrom < mappedSelectionFrom) {
-          wrappers.push({
-            from: mappedRangeFrom,
-            to: mappedSelectionFrom,
-            openValue: range.openValue,
-            closeValue: range.closeValue,
-          });
+          const wrappers: Array<{ from: number; to: number; openValue: string; closeValue: string }> = [];
+
+          if (mappedRangeFrom < mappedSelectionFrom) {
+            wrappers.push({
+              from: mappedRangeFrom,
+              to: mappedSelectionFrom,
+              openValue: range.openValue,
+              closeValue: range.closeValue,
+            });
+          }
+
+          if (!shouldToggleOffCurrentStyle && openTag && closeTag && mappedSelectionFrom < mappedSelectionTo) {
+            wrappers.push({
+              from: mappedSelectionFrom,
+              to: mappedSelectionTo,
+              openValue: openTag,
+              closeValue: closeTag,
+            });
+          }
+
+          if (mappedSelectionTo < mappedRangeTo) {
+            wrappers.push({
+              from: mappedSelectionTo,
+              to: mappedRangeTo,
+              openValue: range.openValue,
+              closeValue: range.closeValue,
+            });
+          }
+
+          wrappers
+            .sort((a, b) => b.from - a.from)
+            .forEach((wrapper) => {
+              tr.insert(wrapper.to, htmlType.create({ value: wrapper.closeValue }));
+              tr.insert(wrapper.from, htmlType.create({ value: wrapper.openValue }));
+            });
+        } else if (openTag && closeTag) {
+          tr.insert(selectedRange.to, htmlType.create({ value: closeTag }));
+          tr.insert(selectedRange.from, htmlType.create({ value: openTag }));
         }
 
-        if (!shouldToggleOffCurrentStyle && openTag && closeTag && mappedSelectionFrom < mappedSelectionTo) {
-          wrappers.push({
-            from: mappedSelectionFrom,
-            to: mappedSelectionTo,
-            openValue: openTag,
-            closeValue: closeTag,
-          });
+        if (tr.docChanged) {
+          view.dispatch(tr);
         }
+      });
 
-        if (mappedSelectionTo < mappedRangeTo) {
-          wrappers.push({
-            from: mappedSelectionTo,
-            to: mappedRangeTo,
-            openValue: range.openValue,
-            closeValue: range.closeValue,
-          });
-        }
-
-        wrappers
-          .sort((a, b) => b.from - a.from)
-          .forEach((wrapper) => {
-            tr.insert(wrapper.to, htmlType.create({ value: wrapper.closeValue }));
-            tr.insert(wrapper.from, htmlType.create({ value: wrapper.openValue }));
-          });
-      } else if (openTag && closeTag) {
-        tr.insert(to, htmlType.create({ value: closeTag }));
-        tr.insert(from, htmlType.create({ value: openTag }));
-      }
-
-      view.dispatch(tr.scrollIntoView());
+      view.dispatch(view.state.tr.scrollIntoView());
       view.focus();
     });
   }, [loading, getEditor]);
@@ -809,7 +845,7 @@ const MilkdownEditorInner: React.FC<MilkdownEditorInnerProps> = ({
 
   return (
     <div className="space-y-0">
-      <div className="flex items-center gap-1 p-2 border-b border-theme bg-theme-card/50 overflow-x-auto overflow-y-visible">
+      <div className="flex flex-wrap items-center gap-1 p-2 border-b border-theme bg-theme-card/50 overflow-visible">
         <button type="button" onClick={() => runCommand(toggleStrongCommand)} className="p-1.5 theme-text-secondary hover:bg-primary-light hover:text-primary rounded" title="加粗">
           <Bold size={16} />
         </button>
@@ -826,6 +862,7 @@ const MilkdownEditorInner: React.FC<MilkdownEditorInnerProps> = ({
         <div className="relative shrink-0" ref={colorPanelRef}>
           <button
             type="button"
+            onMouseDown={(event) => event.preventDefault()}
             onClick={() => {
               setIsColorPanelOpen((prev) => !prev);
               setIsBgColorPanelOpen(false);
@@ -842,6 +879,7 @@ const MilkdownEditorInner: React.FC<MilkdownEditorInnerProps> = ({
                   <button
                     key={color}
                     type="button"
+                    onMouseDown={(event) => event.preventDefault()}
                     onClick={() => handleApplyTextColor(color)}
                     className="w-6 h-6 rounded border border-theme"
                     style={{ backgroundColor: color }}
@@ -859,6 +897,7 @@ const MilkdownEditorInner: React.FC<MilkdownEditorInnerProps> = ({
                 />
                 <button
                   type="button"
+                  onMouseDown={(event) => event.preventDefault()}
                   onClick={() => handleApplyTextColor(customTextColor)}
                   className="flex-1 px-2 py-1 text-xs rounded border border-theme hover:bg-primary-light"
                 >
@@ -867,6 +906,7 @@ const MilkdownEditorInner: React.FC<MilkdownEditorInnerProps> = ({
               </div>
               <button
                 type="button"
+                onMouseDown={(event) => event.preventDefault()}
                 onClick={() => handleApplyTextColor(null)}
                 className="mt-2 w-full px-2 py-1 text-xs rounded border border-theme hover:bg-primary-light"
               >
@@ -878,6 +918,7 @@ const MilkdownEditorInner: React.FC<MilkdownEditorInnerProps> = ({
         <div className="relative shrink-0" ref={bgColorPanelRef}>
           <button
             type="button"
+            onMouseDown={(event) => event.preventDefault()}
             onClick={() => {
               setIsBgColorPanelOpen((prev) => !prev);
               setIsColorPanelOpen(false);
@@ -894,6 +935,7 @@ const MilkdownEditorInner: React.FC<MilkdownEditorInnerProps> = ({
                   <button
                     key={color}
                     type="button"
+                    onMouseDown={(event) => event.preventDefault()}
                     onClick={() => handleApplyTextBgColor(color)}
                     className="w-full h-8 rounded border border-theme"
                     style={{ backgroundColor: color }}
@@ -911,6 +953,7 @@ const MilkdownEditorInner: React.FC<MilkdownEditorInnerProps> = ({
                 />
                 <button
                   type="button"
+                  onMouseDown={(event) => event.preventDefault()}
                   onClick={() => handleApplyTextBgColor(customTextBgColor)}
                   className="flex-1 px-2 py-1 text-xs rounded border border-theme hover:bg-primary-light"
                 >
@@ -919,6 +962,7 @@ const MilkdownEditorInner: React.FC<MilkdownEditorInnerProps> = ({
               </div>
               <button
                 type="button"
+                onMouseDown={(event) => event.preventDefault()}
                 onClick={() => handleApplyTextBgColor(null)}
                 className="mt-2 w-full px-2 py-1 text-xs rounded border border-theme hover:bg-primary-light"
               >
@@ -1168,7 +1212,7 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
   }, []);
 
   return (
-    <div className={`border border-theme rounded-md overflow-hidden bg-theme-card focus-within:ring-2 focus-within:ring-primary focus-within:border-transparent ${className}`}>
+    <div className={`border border-theme rounded-md overflow-visible bg-theme-card focus-within:ring-2 focus-within:ring-primary focus-within:border-transparent ${className}`}>
       <div className="flex items-center justify-between p-2 border-b border-theme bg-theme-card/50">
         <div className="text-xs theme-text-secondary">{isPreview ? '预览模式' : '编辑模式'}</div>
         {mode === 'toggle' && (

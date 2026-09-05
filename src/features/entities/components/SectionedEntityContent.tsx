@@ -26,6 +26,7 @@ interface SectionedEntityContentProps<T extends BaseEntity> {
   addCustomSection: () => void;
   removeCustomSection: (key: string) => void;
   setSectionTitle: (key: string, title: string) => void;
+  onSectionOrderChange: (sectionOrder: string[]) => void;
 }
 
 const SectionedEntityContent = <T extends BaseEntity>({
@@ -45,8 +46,35 @@ const SectionedEntityContent = <T extends BaseEntity>({
   addCustomSection,
   removeCustomSection,
   setSectionTitle,
+  onSectionOrderChange,
 }: SectionedEntityContentProps<T>) => {
   const { directContentEdit } = useDirectContentEditPreference();
+  const availableSections = [
+    ...sectionDefs.map((section) => ({ ...section, custom: false })),
+    ...(entity.customSections || []).map((key) => ({ key, title: '自定义区块', custom: true })),
+  ];
+  const sectionsByKey = new Map(availableSections.map((section) => [section.key, section]));
+  const orderedKeys: string[] = [];
+  const seenKeys = new Set<string>();
+  for (const key of [...(entity.sectionOrder || []), ...availableSections.map((section) => section.key)]) {
+    if (!sectionsByKey.has(key) || seenKeys.has(key)) continue;
+    seenKeys.add(key);
+    orderedKeys.push(key);
+  }
+  const visibleSections = orderedKeys
+    .map((key) => sectionsByKey.get(key))
+    .filter((section): section is NonNullable<typeof section> => (
+      Boolean(section) && (section.custom || isSectionVisible(section.key))
+    ));
+
+  const swapSections = (firstKey: string, secondKey: string) => {
+    const nextOrder = [...orderedKeys];
+    const firstIndex = nextOrder.indexOf(firstKey);
+    const secondIndex = nextOrder.indexOf(secondKey);
+    if (firstIndex < 0 || secondIndex < 0) return;
+    [nextOrder[firstIndex], nextOrder[secondIndex]] = [nextOrder[secondIndex], nextOrder[firstIndex]];
+    onSectionOrderChange(nextOrder);
+  };
 
   return (
     <div className="space-y-6">
@@ -57,16 +85,22 @@ const SectionedEntityContent = <T extends BaseEntity>({
         onAddCustomSection={addCustomSection}
       />
 
-      {sectionDefs.map((section) => isSectionVisible(section.key) && (
+      {visibleSections.map((section, index) => (
         <CollapsibleSection
           key={section.key}
           title={getSectionTitle(section.key, section.title)}
           collapsed={Boolean(collapsed[section.key])}
           onToggle={() => setCollapsed((prev) => ({ ...prev, [section.key]: !prev[section.key] }))}
           removable
-          onRemove={() => setSectionVisible(section.key, false)}
+          onRemove={() => (
+            section.custom ? removeCustomSection(section.key) : setSectionVisible(section.key, false)
+          )}
           editableTitle
           onRenameTitle={(title) => setSectionTitle(section.key, title)}
+          canMoveUp={index > 0}
+          canMoveDown={index < visibleSections.length - 1}
+          onMoveUp={() => swapSections(section.key, visibleSections[index - 1].key)}
+          onMoveDown={() => swapSections(section.key, visibleSections[index + 1].key)}
           headerActions={(
             <>
               <SectionLinkToggle
@@ -81,38 +115,6 @@ const SectionedEntityContent = <T extends BaseEntity>({
             title={getSectionTitle(section.key, section.title) + ' / 子项目'}
             items={getSectionItems(section.key)}
             onChange={(items) => onSectionItemsChange(section.key, items)}
-            ensureOneItem
-            defaultFirstItemTitle="详细情况"
-            directEditOnContentClick={directContentEdit}
-            renderItemActions={(item) => <ShareSubItemAction entityType={entityType} entity={entity} item={item} />}
-          />
-        </CollapsibleSection>
-      ))}
-
-      {(entity.customSections || []).map((sectionKey) => (
-        <CollapsibleSection
-          key={sectionKey}
-          title={getSectionTitle(sectionKey, '自定义区块')}
-          collapsed={Boolean(collapsed[sectionKey])}
-          onToggle={() => setCollapsed((prev) => ({ ...prev, [sectionKey]: !prev[sectionKey] }))}
-          removable
-          onRemove={() => removeCustomSection(sectionKey)}
-          editableTitle
-          onRenameTitle={(title) => setSectionTitle(sectionKey, title)}
-          headerActions={(
-            <>
-              <SectionLinkToggle
-                enabled={isSectionLinkEnabled(sectionKey)}
-                onChange={(enabled) => setSectionLinkEnabled(sectionKey, enabled)}
-              />
-              <ShareSectionAction entityType={entityType} entity={entity} sectionKey={sectionKey} />
-            </>
-          )}
-        >
-          <CustomSubItemsEditor
-            title={getSectionTitle(sectionKey, '自定义区块') + ' / 子项目'}
-            items={getSectionItems(sectionKey)}
-            onChange={(items) => onSectionItemsChange(sectionKey, items)}
             ensureOneItem
             defaultFirstItemTitle="详细情况"
             directEditOnContentClick={directContentEdit}

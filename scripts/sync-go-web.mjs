@@ -4,6 +4,7 @@ import path from 'node:path'
 const root = process.cwd()
 const distDir = path.join(root, 'dist')
 const dstDir = path.join(root, 'server', 'resource')
+const versionFile = path.join(root, 'version.txt')
 
 if (!fs.existsSync(distDir)) {
   process.exit(0)
@@ -39,3 +40,4 @@ const copy = (src, dst) => {
 }
 
 copy(distDir, dstDir)
+copy(versionFile, path.join(dstDir, 'version.txt'))

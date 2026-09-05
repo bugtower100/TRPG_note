@@ -85,6 +85,7 @@ const OrganizationDetail: React.FC<OrganizationDetailProps> = ({ entityId }) => 
         addCustomSection={addCustomSection}
         removeCustomSection={removeCustomSection}
         setSectionTitle={setSectionTitle}
+        onSectionOrderChange={(sectionOrder) => handleChange('sectionOrder', sectionOrder)}
       />
     </div>
   );

@@ -659,14 +659,23 @@ func renewPLTeamNoteLeaseAfterSave(
 	username string,
 	now int64,
 ) {
+	note.ActiveLease = renewPLLeaseAfterSave(note.ActiveLease, userID, username, now)
+}
+
+func renewPLLeaseAfterSave(
+	activeLease *TeamNoteLease,
+	userID string,
+	username string,
+	now int64,
+) *TeamNoteLease {
 	expiresAt := now + int64(10*time.Minute/time.Millisecond)
-	if note.ActiveLease != nil && note.ActiveLease.UserID == userID {
-		note.ActiveLease.Username = username
-		note.ActiveLease.Role = campaignRolePL
-		note.ActiveLease.ExpiresAt = &expiresAt
-		return
+	if activeLease != nil && activeLease.UserID == userID {
+		activeLease.Username = username
+		activeLease.Role = campaignRolePL
+		activeLease.ExpiresAt = &expiresAt
+		return activeLease
 	}
-	note.ActiveLease = &TeamNoteLease{
+	return &TeamNoteLease{
 		UserID:    userID,
 		Username:  username,
 		Role:      campaignRolePL,
@@ -1083,8 +1092,10 @@ func main() {
 	campaignAPI := router.Group("/api/campaigns")
 	v2CampaignAPI := router.Group("/api/v2/campaigns")
 	backupAPI := router.Group("/api/backups")
+	prepPackageAPI := router.Group("/api/prep-packages")
 
 	registerBackupRoutes(backupAPI, db, cfg)
+	registerPrepPackageRoutes(prepPackageAPI, db, cfg)
 	automaticBackupManager, err := newAutomaticBackupManager(db, cfg)
 	if err != nil {
 		log.Fatalf("failed to initialize automatic backups: %v", err)
@@ -2696,8 +2707,7 @@ func main() {
 		ensureTaskBoardPermissions(&doc)
 		doc.Version++
 		if role == "PL" {
-			expiresAt := now + int64(10*time.Minute/time.Millisecond)
-			doc.ActiveLease = &TeamNoteLease{UserID: userID, Username: username, Role: role, StartedAt: now, ExpiresAt: &expiresAt}
+			doc.ActiveLease = renewPLLeaseAfterSave(doc.ActiveLease, userID, username, now)
 		}
 		if _, err := kvSaveJSON(db, taskBoardKey(campaignID), doc); err != nil {
 			c.JSON(500, gin.H{"error": "database_error"})

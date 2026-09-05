@@ -37,7 +37,18 @@ func resolveAppVersion() string {
 			return normalized
 		}
 	}
+	if normalized := embeddedAppVersion(); normalized != "" {
+		return normalized
+	}
 	return normalizeAppVersion("")
+}
+
+func embeddedAppVersion() string {
+	content, err := webFS.ReadFile("resource/version.txt")
+	if err != nil {
+		return ""
+	}
+	return normalizeIfPresent(string(content))
 }
 
 func normalizeIfPresent(value string) string {

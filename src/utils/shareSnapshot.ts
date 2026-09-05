@@ -11,10 +11,16 @@ export const buildSharedSnapshot = (
   const timeline = entityType === 'timelines' ? (entity as Timeline) : null;
   const sectionTitles = entity.sectionTitles || {};
   const sectionSubItems = entity.sectionSubItems || {};
-  const allSections = Object.entries(sectionSubItems).map(([key, items]) => ({
+  const sectionEntries = Object.entries(sectionSubItems);
+  const sectionEntryMap = new Map(sectionEntries);
+  const orderedSectionKeys = [
+    ...(entity.sectionOrder || []).filter((key) => sectionEntryMap.has(key)),
+    ...sectionEntries.map(([key]) => key).filter((key) => !(entity.sectionOrder || []).includes(key)),
+  ];
+  const allSections = orderedSectionKeys.map((key) => ({
     key,
     title: sectionTitles[key] || '未命名区块',
-    items: cloneItems(items || []),
+    items: cloneItems(sectionEntryMap.get(key) || []),
   }));
 
   if (scope === 'entity') {

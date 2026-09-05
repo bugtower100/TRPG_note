@@ -44,6 +44,8 @@ const SharedContent: React.FC<SharedContentProps> = ({ embedded = false, shareId
   const [conflictShare, setConflictShare] = useState<SharedEntityRecord | null>(null);
   const [collapsedKeys, setCollapsedKeys] = useState<Record<string, boolean>>({});
   const saveTimerRef = useRef<number | null>(null);
+  const savePromiseRef = useRef<Promise<SharedEntityRecord> | null>(null);
+  const leaseStartBlockedShareIdRef = useRef<string | null>(null);
   const cleanupRef = useRef<{
     campaignId: string | null;
     shareId: string | null;
@@ -225,12 +227,25 @@ const SharedContent: React.FC<SharedContentProps> = ({ embedded = false, shareId
     return () => {
       const { campaignId, shareId, user: currentUser, editing: isEditing, leaseStartedAt: currentLeaseStartedAt } = cleanupRef.current;
       if (!campaignId || !shareId || !currentUser || !isEditing) return;
-      sharingService.endShareLease(campaignId, shareId, currentUser, currentLeaseStartedAt).catch(() => void 0);
+      const releaseLease = (startedAt?: number | null) =>
+        sharingService.endShareLease(campaignId, shareId, currentUser, startedAt, true);
+      const activeSave = savePromiseRef.current;
+      if (activeSave) {
+        void activeSave.then(
+          (saved) => releaseLease(saved.activeLease?.startedAt ?? currentLeaseStartedAt),
+          () => releaseLease(currentLeaseStartedAt)
+        ).catch(() => void 0);
+        return;
+      }
+      void releaseLease(currentLeaseStartedAt).catch(() => void 0);
     };
   }, []);
 
   useEffect(() => {
-    if (!selected || !canEditSelected || editing || !currentCampaignId || !user) return;
+    if (!selected) return;
+    if (leaseStartBlockedShareIdRef.current === selected.id) return;
+    leaseStartBlockedShareIdRef.current = null;
+    if (!canEditSelected || editing || !currentCampaignId || !user) return;
     if (selected.activeLease && selected.activeLease.userId !== user.id) {
       setLeaseConflict(true);
       return;
@@ -274,14 +289,27 @@ const SharedContent: React.FC<SharedContentProps> = ({ embedded = false, shareId
     if (nextContent === currentContent) return;
     if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current);
     saveTimerRef.current = window.setTimeout(() => {
-      sharingService.saveShareContent(currentCampaignId, selected.id, user, buildSavePayload(selected, selected.version)).then((next) => {
+      if (savePromiseRef.current) return;
+      const savePromise = sharingService.saveShareContent(
+        currentCampaignId,
+        selected.id,
+        user,
+        buildSavePayload(selected, selected.version)
+      );
+      savePromiseRef.current = savePromise;
+      savePromise.then((next) => {
         updateSharesStateAndCache((prev) => prev.map((item) => item.id === next.id ? next : item));
+        setLeaseStartedAt(next.activeLease?.startedAt ?? null);
         setStatusText(`已自动保存：${new Date(next.updatedAt).toLocaleTimeString()}`);
       }).catch((error) => {
         if (error instanceof VersionConflictError && error.remote) {
           setConflictShare(error.remote);
         }
         setStatusText(error instanceof Error ? error.message : '共享内容保存失败');
+      }).finally(() => {
+        if (savePromiseRef.current === savePromise) {
+          savePromiseRef.current = null;
+        }
       });
     }, 1200);
     return () => {
@@ -294,15 +322,34 @@ const SharedContent: React.FC<SharedContentProps> = ({ embedded = false, shareId
 
   const persistDraft = async () => {
     if (!currentCampaignId || !selected || !user) return selected;
-    const currentContent = buildComparableContent(selected);
-    const nextContent = buildDraftContent(selected);
-    if (nextContent === currentContent) return selected;
+    let currentShare = selected;
+    if (savePromiseRef.current) {
+      currentShare = await savePromiseRef.current;
+    }
+    const currentContent = buildComparableContent(currentShare);
+    const nextContent = buildDraftContent(currentShare);
+    if (nextContent === currentContent) return currentShare;
     if (saveTimerRef.current) {
       window.clearTimeout(saveTimerRef.current);
       saveTimerRef.current = null;
     }
-    const next = await sharingService.saveShareContent(currentCampaignId, selected.id, user, buildSavePayload(selected, selected.version));
+    const savePromise = sharingService.saveShareContent(
+      currentCampaignId,
+      currentShare.id,
+      user,
+      buildSavePayload(currentShare, currentShare.version)
+    );
+    savePromiseRef.current = savePromise;
+    let next: SharedEntityRecord;
+    try {
+      next = await savePromise;
+    } finally {
+      if (savePromiseRef.current === savePromise) {
+        savePromiseRef.current = null;
+      }
+    }
     updateSharesStateAndCache((prev) => prev.map((item) => item.id === next.id ? next : item));
+    setLeaseStartedAt(next.activeLease?.startedAt ?? null);
     setStatusText(`已保存：${new Date(next.updatedAt).toLocaleTimeString()}`);
     return next;
   };
@@ -312,8 +359,9 @@ const SharedContent: React.FC<SharedContentProps> = ({ embedded = false, shareId
     if (!currentCampaignId || !selected || !user) return false;
     let shouldExit = false;
     try {
-      await persistDraft();
-      await sharingService.endShareLease(currentCampaignId, selected.id, user, leaseStartedAt);
+      const saved = await persistDraft();
+      const currentLeaseStartedAt = saved?.activeLease?.startedAt ?? leaseStartedAt;
+      await sharingService.endShareLease(currentCampaignId, selected.id, user, currentLeaseStartedAt);
       shouldExit = true;
     } catch (error) {
       if (error instanceof VersionConflictError && error.remote) {
@@ -335,8 +383,12 @@ const SharedContent: React.FC<SharedContentProps> = ({ embedded = false, shareId
   const handleSelectShare = async (shareId: string) => {
     if (shareId === selectedId) return;
     if (editing) {
+      leaseStartBlockedShareIdRef.current = selected?.id ?? null;
       const stopped = await handleStopEdit();
-      if (!stopped) return;
+      if (!stopped) {
+        leaseStartBlockedShareIdRef.current = null;
+        return;
+      }
     }
     setConflictShare(null);
     setLeaseStartedAt(null);

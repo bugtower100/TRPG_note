@@ -28,7 +28,7 @@ const LandingImportAssistantModal: React.FC<LandingImportAssistantModalProps> = 
           <div>
             <h2 className="text-xl font-bold text-theme-primary">导入助手</h2>
             <p className="mt-1 text-sm theme-text-secondary">
-              可直接从主页导入新版备份包；旧版 JSON 兼容导入仍在设置页中提供。
+              可直接从主页导入新版完整备份包。
             </p>
           </div>
           <button
@@ -42,7 +42,7 @@ const LandingImportAssistantModal: React.FC<LandingImportAssistantModalProps> = 
         </div>
         <Suspense fallback={modalFallback}>
           <div className="p-5">
-            <ImportAssistant allowLegacyJsonImport={false} />
+            <ImportAssistant />
           </div>
         </Suspense>
       </div>

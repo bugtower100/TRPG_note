@@ -1,5 +1,6 @@
 import { CampaignData, UserProfile, BaseEntity, Character, Location, Organization, Event, Clue, Timeline, Monster, RelationGraph, MindMapDocument, GraphEntityType, ClueRevealStatus, ClueRevealLogItem, SessionTask, SessionTaskStatus, MIND_MAP_MAX_ENTITY_REFS } from '../types';
 import { normalizeTimelinePriority } from '../utils/timelinePriority';
+import { normalizeGameSessions } from '../utils/gameSessions';
 import { v4 as uuidv4 } from 'uuid';
 
 const STORAGE_KEYS = {
@@ -34,6 +35,7 @@ export const DEFAULT_CAMPAIGN_DATA: CampaignData = {
   timelines: [],
   monsters: [],
   sessionTasks: [],
+  gameSessions: [],
   relationGraphs: [],
   mindMaps: [],
 };
@@ -204,6 +206,7 @@ class DataService {
       const sectionLinkEnabled = this.normalizeRecord(e?.sectionLinkEnabled);
       const sectionTitles = this.normalizeRecord(e?.sectionTitles);
       const customSections = this.normalizeCustomSections(e?.customSections);
+      const sectionOrder = this.normalizeCustomSections(e?.sectionOrder);
 
       if (customSubItems.length > 0) {
         let legacyKey = 'legacy_common';
@@ -235,6 +238,7 @@ class DataService {
         sectionLinkEnabled,
         sectionTitles,
         customSections,
+        sectionOrder,
         relatedImages: safeArray<string>(e?.relatedImages, []),
         createdAt: typeof e?.createdAt === 'number' ? e.createdAt : Date.now(),
         updatedAt: typeof e?.updatedAt === 'number' ? e.updatedAt : Date.now(),
@@ -304,6 +308,7 @@ class DataService {
     }));
 
     const sessionTasks = this.normalizeSessionTasks(raw?.sessionTasks);
+    const gameSessions = normalizeGameSessions(raw?.gameSessions);
 
     const relationGraphs: RelationGraph[] = safeArray<any>(raw?.relationGraphs, []).map((g) => ({
       id: typeof g?.id === 'string' && g.id ? g.id : uuidv4(),
@@ -440,6 +445,7 @@ class DataService {
       timelines,
       monsters,
       sessionTasks,
+      gameSessions,
       relationGraphs,
       mindMaps,
     };
@@ -660,24 +666,6 @@ class DataService {
     document.body.appendChild(downloadAnchorNode);
     downloadAnchorNode.click();
     downloadAnchorNode.remove();
-  }
-
-  async importData(file: File): Promise<CampaignData> {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        try {
-          const result = e.target?.result as string;
-          const raw = JSON.parse(result);
-          const data = this.normalizeCampaignData(raw);
-          resolve(data);
-        } catch (error) {
-          reject(error);
-        }
-      };
-      reader.onerror = reject;
-      reader.readAsText(file);
-    });
   }
 
   generateId(): string {
