@@ -7,6 +7,7 @@
 @layer base {
   /* Default Theme (Elegant Purple/Off-White) */
   :root {
+    color-scheme: light;
     --bg-page: #dfcded; /* Soft off-white with hint of purple */
     --bg-card: #f7effde7; /* Warm off-white for cards instead of pure white */
     --text-primary: #373143; /* Deep muted purple/grey for text */
@@ -37,6 +38,7 @@
 
   /* Archive Theme (Future Tech) */
   [data-theme='archive'] {
+    color-scheme: dark;
     --bg-page: #1e293b; /* Slate-800 - Lighter than before */
     --bg-card: #334155; /* Slate-700 - Lighter card */
     --text-primary: #f1f5f9; /* Slate-100 - Brighter text */
@@ -70,6 +72,12 @@
     color: var(--text-primary);
     font-family: var(--font-family);
     transition: background-color 0.3s, color 0.3s;
+  }
+
+  select option,
+  select optgroup {
+    background-color: var(--bg-page);
+    color: var(--text-primary);
   }
 
   input[type="number"]::-webkit-inner-spin-button,

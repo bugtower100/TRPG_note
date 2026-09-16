@@ -248,16 +248,27 @@ const RelationGraphs: React.FC = () => {
       touchStateRef.current = null;
     };
 
+    const handleWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      setScale((currentScale) => clamp(
+        Number((currentScale * (e.deltaY < 0 ? 1.08 : 0.92)).toFixed(2)),
+        0.3,
+        3
+      ));
+    };
+
     el.addEventListener('touchstart', handleTouchStart, { passive: false });
     el.addEventListener('touchmove', handleTouchMove, { passive: false });
     el.addEventListener('touchend', handleTouchEnd, { passive: true });
     el.addEventListener('touchcancel', handleTouchEnd, { passive: true });
+    el.addEventListener('wheel', handleWheel, { passive: false });
 
     return () => {
       el.removeEventListener('touchstart', handleTouchStart as any);
       el.removeEventListener('touchmove', handleTouchMove as any);
       el.removeEventListener('touchend', handleTouchEnd as any);
       el.removeEventListener('touchcancel', handleTouchEnd as any);
+      el.removeEventListener('wheel', handleWheel);
     };
   }, [offset, scale]);
 
@@ -634,11 +645,6 @@ const RelationGraphs: React.FC = () => {
           data-tour="relation-graph-board"
           ref={boardRef}
           className="relative border border-dashed border-theme rounded bg-theme-card flex-1 min-h-[50vh] md:min-h-0 overflow-hidden"
-          onWheel={(e) => {
-            e.preventDefault();
-            const next = clamp(Number((scale * (e.deltaY < 0 ? 1.08 : 0.92)).toFixed(2)), 0.3, 3);
-            setScale(next);
-          }}
           onMouseDown={(e) => {
             if (!boardRef.current) return;
             const world = toWorldPoint(e.clientX, e.clientY);
@@ -663,7 +669,7 @@ const RelationGraphs: React.FC = () => {
           onContextMenu={(e) => e.preventDefault()}
         >
           <div className="absolute inset-0" style={{ transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale})`, transformOrigin: '0 0' }}>
-            <svg className="absolute inset-0 w-full h-full">
+            <svg className="absolute inset-0 w-full h-full overflow-visible">
               <defs>
                 <marker id="arrow-end" markerWidth="5" markerHeight="5" refX="4.2" refY="2.5" orient="auto">
                   <path d="M0,0 L5,2.5 L0,5 Z" fill="#64748b" />
@@ -708,7 +714,7 @@ const RelationGraphs: React.FC = () => {
                       fill="none"
                     />
                     {edge.label && (
-                      <>
+                      <g pointerEvents="none">
                         <rect
                           x={geometry.labelX - metrics.width / 2}
                           y={geometry.labelY - metrics.height / 2}
@@ -721,7 +727,7 @@ const RelationGraphs: React.FC = () => {
                         <text x={geometry.labelX} y={geometry.labelY + edge.labelFontSize * 0.35} textAnchor="middle" style={{ fontSize: `${edge.labelFontSize}px`, fill: edge.labelColor, userSelect: 'none' }}>
                           {edge.label}
                         </text>
-                      </>
+                      </g>
                     )}
                   </g>
                 );

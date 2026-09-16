@@ -54,6 +54,11 @@ export const computeEdgeCurveSlots = (edges: RelationGraphEdge[]): Record<string
       return;
     }
     const sortedPair = [group[0].fromNodeId, group[0].toNodeId].sort();
+    const toEdgeCurveSlot = (edge: RelationGraphEdge, visualSlot: number) => {
+      const alignedWithSortedPair =
+        edge.fromNodeId === sortedPair[0] && edge.toNodeId === sortedPair[1];
+      return alignedWithSortedPair ? visualSlot : -visualSlot;
+    };
     const bidirectionalEdges = group.filter((edge) => edge.direction === 'bidirectional');
     const directionalEdges = group.filter((edge) => edge.direction !== 'bidirectional');
     const baseSlots = balancedSlots(group.length, bidirectionalEdges.length > 0 || group.length % 2 === 1);
@@ -86,17 +91,18 @@ export const computeEdgeCurveSlots = (edges: RelationGraphEdge[]): Record<string
     bidirectionalEdges.forEach((edge) => {
       const centered = takeSpecificSlot(0);
       if (centered !== null) {
-        slots[edge.id] = centered;
+        slots[edge.id] = toEdgeCurveSlot(edge, centered);
         return;
       }
       const [nearest] = availableSlots.splice(0, 1);
-      slots[edge.id] = nearest ?? 0;
+      slots[edge.id] = toEdgeCurveSlot(edge, nearest ?? 0);
     });
 
     directionalEdges.forEach((edge) => {
       const alignedWithSortedPair =
         edge.fromNodeId === sortedPair[0] && edge.toNodeId === sortedPair[1];
-      slots[edge.id] = takePreferredSlot(alignedWithSortedPair);
+      const visualSlot = takePreferredSlot(alignedWithSortedPair);
+      slots[edge.id] = toEdgeCurveSlot(edge, visualSlot);
     });
   });
 
