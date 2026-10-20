@@ -49,7 +49,7 @@ const CharacterSheetListPanel: React.FC<CharacterSheetListPanelProps> = ({
   onSelectSheet,
 }) => {
   return (
-    <aside className="theme-card border border-theme rounded-xl p-4 space-y-4 shadow-sm">
+    <aside className="workspace-list-pane space-y-4">
       <div>
         <h2 className="text-xl font-semibold">角色卡管理器</h2>
         <div className="text-sm theme-text-secondary mt-1">
@@ -57,7 +57,7 @@ const CharacterSheetListPanel: React.FC<CharacterSheetListPanelProps> = ({
         </div>
       </div>
 
-      <div className="space-y-3 border border-theme rounded-xl p-3 bg-theme-card/60">
+      <div className="page-section space-y-3">
         <div className="text-sm font-medium">新建角色卡</div>
         <input
           value={createName}

@@ -678,7 +678,7 @@ const LocationMaps: React.FC = () => {
   }
 
   return (
-    <div className="max-w-7xl mx-auto space-y-4 pb-10">
+    <div className="map-page space-y-4">
       <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold">地图地点</h1>
@@ -779,7 +779,7 @@ const LocationMaps: React.FC = () => {
               : 'lg:grid-cols-[16rem_minmax(0,1fr)]'
           }`}
         >
-          <aside className="relative min-w-0 rounded-lg border border-theme bg-theme-card p-3">
+          <aside className="relative workspace-list-pane">
             <div className={`flex items-center ${mapListCollapsed ? 'justify-between lg:justify-center' : 'mb-3 justify-between'}`}>
               <div className={`text-sm font-semibold ${mapListCollapsed ? 'lg:hidden' : ''}`}>地图列表</div>
               <button
@@ -819,7 +819,7 @@ const LocationMaps: React.FC = () => {
           </aside>
 
           {activeMap ? (
-            <section className="min-w-0 rounded-lg border border-theme bg-theme-card p-4">
+            <section className="workspace-editor-pane">
               <div className="flex flex-col gap-3 border-b border-theme pb-4 md:flex-row md:items-center">
                 {canManageCampaignContent ? (
                   <>
@@ -880,7 +880,7 @@ const LocationMaps: React.FC = () => {
               </div>
 
               {canManageCampaignContent && activeMap.imageRef && !drawingEnabled ? (
-                <div className="mt-4 space-y-3 rounded-md border border-theme bg-black/5 p-3">
+                <div className="page-section mt-4 space-y-3">
                   <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
                     <label className="text-sm">
                       <span className="mb-1 block font-medium">关联地点</span>

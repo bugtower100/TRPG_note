@@ -43,7 +43,7 @@ const LocationDetail: React.FC<LocationDetailProps> = ({ entityId }) => {
     items: canManageCampaignContent ? campaignData.locations : [],
     navigate,
     listPath: '/locations',
-    initialCollapsed: { detail: true },
+    initialCollapsed: { detail: false },
     sectionDefs,
     updateItem: (item) => updateEntity('locations', item),
     deleteItem: (itemId) => deleteEntity('locations', itemId),
@@ -52,7 +52,7 @@ const LocationDetail: React.FC<LocationDetailProps> = ({ entityId }) => {
   if (!location) return <div>加载中...</div>;
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6 pb-12 px-2 sm:px-0">
+    <div className="entity-detail-page">
       <EntityDetailHeader
         entity={location}
         entityType="locations"

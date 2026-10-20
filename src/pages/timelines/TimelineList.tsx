@@ -5,6 +5,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { Timeline } from '../../types';
 import { ExternalLink } from 'lucide-react';
 import TimelineDetail from './TimelineDetail';
+import EntityReuseActions from '../../features/entities/components/EntityReuseActions';
 import { useCampaignMemberRole } from '../../hooks/useCampaignMemberRole';
 
 const TimelineList: React.FC = () => {
@@ -50,6 +51,7 @@ const TimelineList: React.FC = () => {
           <p className="text-sm theme-text-secondary">页面直接显示当前时间轴，右上角切换不同时间线。</p>
         </div>
         <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+          {canManageCampaignContent && <EntityReuseActions entityType="timelines" />}
           <select
             value={activeTimeline?.id || ''}
             onChange={(event) => navigate(`/timelines/${event.target.value}`)}

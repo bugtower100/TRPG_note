@@ -203,6 +203,13 @@ func loadV2CampaignBundle(db *gorm.DB, campaignID string) (V2CampaignBundleRespo
 func redactV2CampaignBundleForPL(response V2CampaignBundleResponse) V2CampaignBundleResponse {
 	response.Redacted = true
 	response.WriteToken = ""
+	meta := make(map[string]any, len(response.Bundle.Meta))
+	for key, value := range response.Bundle.Meta {
+		if key != "entityTemplates" {
+			meta[key] = value
+		}
+	}
+	response.Bundle.Meta = meta
 	response.Bundle.Notes = ""
 	response.Bundle.Characters = []map[string]any{}
 	response.Bundle.Locations = []map[string]any{}
@@ -301,25 +308,28 @@ func saveV2CampaignDocument(tx *gorm.DB, campaignID, docType string, content any
 	}
 	if err == nil {
 		doc.CreatedAt = existing.CreatedAt
+		if err := recycleRemovedEntities(tx, campaignID, docType, existing.ContentJSON, content); err != nil {
+			return err
+		}
 	}
 	return tx.Save(&doc).Error
 }
 
 func saveV2CampaignBundle(db *gorm.DB, campaignID string, request V2CampaignBundleUpdateRequest) (V2CampaignBundleResponse, error) {
-	current, err := loadV2CampaignBundle(db, campaignID)
-	if err != nil {
-		return V2CampaignBundleResponse{}, err
-	}
-	if request.ExpectedVersion > 0 && request.ExpectedVersion != current.Version {
-		return V2CampaignBundleResponse{}, &V2BundleConflictError{Current: current}
-	}
-
-	nextVersion := current.Version + 1
 	if request.Bundle.ID == "" {
 		request.Bundle.ID = campaignID
 	}
 
-	err = db.Transaction(func(tx *gorm.DB) error {
+	var saved V2CampaignBundleResponse
+	err := db.Transaction(func(tx *gorm.DB) error {
+		current, err := loadV2CampaignBundle(tx, campaignID)
+		if err != nil {
+			return err
+		}
+		if request.ExpectedVersion > 0 && request.ExpectedVersion != current.Version {
+			return &V2BundleConflictError{Current: current}
+		}
+		nextVersion := current.Version + 1
 		if err := saveV2CampaignDocument(tx, campaignID, "campaign_meta", request.Bundle.Meta, nextVersion); err != nil {
 			return err
 		}
@@ -359,11 +369,12 @@ func saveV2CampaignBundle(db *gorm.DB, campaignID string, request V2CampaignBund
 		if err := saveV2CampaignDocument(tx, campaignID, "mind_maps", request.Bundle.MindMaps, nextVersion); err != nil {
 			return err
 		}
-		return nil
+		saved, err = loadV2CampaignBundle(tx, campaignID)
+		return err
 	})
 	if err != nil {
 		return V2CampaignBundleResponse{}, err
 	}
 
-	return loadV2CampaignBundle(db, campaignID)
+	return saved, nil
 }

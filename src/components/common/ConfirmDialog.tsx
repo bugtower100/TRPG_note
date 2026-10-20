@@ -4,7 +4,7 @@ import { createPortal } from 'react-dom';
 interface ConfirmDialogProps {
   open: boolean;
   title: string;
-  description?: string;
+  description?: React.ReactNode;
   confirmText?: string;
   cancelText?: string;
   onConfirm: () => void;

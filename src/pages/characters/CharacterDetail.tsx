@@ -49,7 +49,7 @@ const CharacterDetail: React.FC<CharacterDetailProps> = ({ entityId }) => {
     items: canManageCampaignContent ? campaignData.characters : [],
     navigate,
     listPath: '/characters',
-    initialCollapsed: { basic: true, goals: true },
+    initialCollapsed: { basic: false, goals: true },
     sectionDefs,
     updateItem: (item) => updateEntity('characters', item),
     deleteItem: (itemId) => deleteEntity('characters', itemId),
@@ -92,7 +92,7 @@ const CharacterDetail: React.FC<CharacterDetailProps> = ({ entityId }) => {
   if (!character) return <div>加载中...</div>;
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6 pb-12 px-2 sm:px-0">
+    <div className="entity-detail-page">
       <EntityDetailHeader
         entity={character}
         entityType="characters"
@@ -109,14 +109,9 @@ const CharacterDetail: React.FC<CharacterDetailProps> = ({ entityId }) => {
       />
 
       {canUseCharacterSheetBridge && (
-        <section className="theme-card border border-theme rounded-xl p-4 space-y-3">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <h3 className="text-lg font-semibold">关联角色卡</h3>
-              <div className="text-sm theme-text-secondary mt-1">
-                这里只做 GM / 副GM 的快速查看桥接，不影响角色卡归属或角色实体权限。
-              </div>
-            </div>
+        <details className="character-sheets">
+          <summary className="cursor-pointer text-sm">关联角色卡 <span className="theme-text-secondary">{linkedSheetsQuery.data?.length || 0}</span></summary>
+          <div className="flex flex-wrap items-center gap-2 pt-3">
             <button
               type="button"
               onClick={() => navigate('/characters/sheets')}
@@ -124,9 +119,10 @@ const CharacterDetail: React.FC<CharacterDetailProps> = ({ entityId }) => {
             >
               打开角色卡管理
             </button>
-          </div>
           {linkedSheetsQuery.isLoading ? (
             <div className="text-sm theme-text-secondary">正在加载关联角色卡...</div>
+          ) : linkedSheetsQuery.isError ? (
+            <button type="button" onClick={() => void linkedSheetsQuery.refetch()} className="text-sm text-primary">读取失败，点击重试</button>
           ) : linkedSheetsQuery.data && linkedSheetsQuery.data.length > 0 ? (
             <div className="flex flex-wrap gap-2">
               {linkedSheetsQuery.data.map((sheet) => (
@@ -141,11 +137,12 @@ const CharacterDetail: React.FC<CharacterDetailProps> = ({ entityId }) => {
               ))}
             </div>
           ) : (
-            <div className="text-sm theme-text-secondary border border-dashed border-theme rounded-lg px-3 py-4">
-              当前还没有关联到这名角色的角色卡。
+            <div className="text-xs theme-text-secondary">
+              暂无关联角色卡。
             </div>
           )}
-        </section>
+          </div>
+        </details>
       )}
 
       <SectionedEntityContent

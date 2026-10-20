@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Check, Download, Pencil, Trash2, X } from 'lucide-react';
+import { Check, ChevronDown, Download, Pencil, Trash2, X } from 'lucide-react';
 import { CampaignConfig, CampaignMember, CampaignMemberRole, CampaignSummary } from '../../../types';
 import { getCampaignRoleLabel, isCampaignManagerRole } from '../../../utils/campaignRoles';
 import CampaignNameEditor from '../../../components/common/CampaignNameEditor';
@@ -52,6 +52,7 @@ const OwnedCampaignCard: React.FC<OwnedCampaignCardProps> = ({
   const [isEditingDescription, setIsEditingDescription] = useState(false);
   const [descriptionDraft, setDescriptionDraft] = useState(campaign.description || '');
   const [isSavingDescription, setIsSavingDescription] = useState(false);
+  const [managementOpen, setManagementOpen] = useState(false);
 
   useEffect(() => {
     if (!isEditingDescription) {
@@ -89,7 +90,7 @@ const OwnedCampaignCard: React.FC<OwnedCampaignCardProps> = ({
   };
 
   return (
-    <div data-tour="landing-campaign-card" className="flex flex-col p-4 rounded-lg border shadow-sm transition-shadow theme-card border-theme hover:shadow-md">
+    <div data-tour="landing-campaign-card" className="landing-campaign">
       <div className="flex-1">
         <div className="flex justify-between items-start mb-1">
           <h3 className="min-w-0 pr-2 text-lg font-bold">
@@ -169,11 +170,32 @@ const OwnedCampaignCard: React.FC<OwnedCampaignCardProps> = ({
             </span>
           )}
         </div>
-        <div className="flex items-center justify-between gap-2 text-xs text-gray-400">
+        <div className="flex items-center justify-between gap-2 text-xs theme-text-secondary">
           <span>最后修改: {new Date(campaign.lastModified).toLocaleDateString()}</span>
           <span>在线 {onlineMembers.length} / {previewMembers.length || 1}</span>
         </div>
-        <div data-tour="landing-campaign-members" className="mt-3 border border-theme rounded p-2.5 bg-theme-card/60">
+      </div>
+      <div className="landing-campaign__footer">
+        <button
+          type="button"
+          data-tour="landing-campaign-manage"
+          aria-expanded={managementOpen}
+          onClick={() => setManagementOpen((open) => !open)}
+          className="inline-flex items-center gap-1 py-2 text-xs theme-text-secondary hover:text-primary"
+        >
+          {canManageCampaign ? '管理模组' : '成员与备份'}
+          <ChevronDown size={14} className={managementOpen ? 'rotate-180' : ''} />
+        </button>
+        <button
+          type="button"
+          onClick={() => onEnter(campaign)}
+          className="px-4 py-2 text-sm font-medium text-white rounded-md bg-primary hover:bg-primary-dark"
+        >
+          进入模组 →
+        </button>
+      </div>
+      <div hidden={!managementOpen} className="landing-campaign__management">
+        <div data-tour="landing-campaign-members">
           <div className="flex items-center justify-between gap-2 mb-2">
             <div className="text-xs font-semibold theme-text-secondary">成员列表</div>
             <div className="text-[11px] theme-text-secondary">
@@ -236,7 +258,7 @@ const OwnedCampaignCard: React.FC<OwnedCampaignCardProps> = ({
             )}
           </div>
         </div>
-        <div data-tour="landing-campaign-access" className="mt-3 space-y-2 border border-theme rounded p-2.5 bg-theme-card/60">
+        {canManageCampaign && <div data-tour="landing-campaign-access" className="mt-4 space-y-2">
           <div className="text-xs font-semibold theme-text-secondary">访问控制</div>
           <select
             value={config?.visibility || 'private'}
@@ -263,19 +285,12 @@ const OwnedCampaignCard: React.FC<OwnedCampaignCardProps> = ({
           >
             {config?.joinPasswordConfigured ? '修改进入密码' : '设置进入密码'}
           </button>
-        </div>
-      </div>
+        </div>}
 
-      <div className="grid grid-cols-2 gap-2 pt-3 mt-4 border-t border-theme">
-        <button
-          onClick={() => onEnter(campaign)}
-          className="col-span-2 py-2 mb-1 text-sm font-medium text-white rounded transition-colors bg-primary hover:bg-primary-dark"
-        >
-          进入模组
-        </button>
+      <div className="flex flex-wrap items-center gap-3 pt-3 mt-4 border-t border-theme">
         <button
           onClick={() => onOpenExport(campaign.id)}
-          className="flex items-center justify-center gap-1 py-1.5 border border-gray-200 text-gray-600 rounded hover:bg-gray-50 text-xs"
+          className="flex items-center justify-center gap-1 px-2 py-1.5 border border-theme theme-text-secondary rounded hover:bg-primary-light text-xs"
           title="导出备份包"
         >
           <Download size={14} /> 备份
@@ -283,11 +298,12 @@ const OwnedCampaignCard: React.FC<OwnedCampaignCardProps> = ({
         <button
           onClick={() => onDelete(campaign.id)}
           disabled={!canDeleteCampaign}
-          className="flex items-center justify-center gap-1 py-1.5 border border-red-200 text-red-600 rounded hover:bg-red-50 text-xs disabled:opacity-50 disabled:hover:bg-transparent"
+          className="flex items-center justify-center gap-1 px-2 py-1.5 border border-red-200 text-red-600 rounded hover:bg-red-50 text-xs disabled:opacity-50 disabled:hover:bg-transparent"
           title={canDeleteCampaign ? '删除模组' : '仅创建者可删除模组'}
         >
           <Trash2 size={14} /> 删除
         </button>
+      </div>
       </div>
     </div>
   );

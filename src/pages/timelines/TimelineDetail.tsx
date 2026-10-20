@@ -58,7 +58,7 @@ const TimelineDetail: React.FC<TimelineDetailProps> = ({ entityId, embedded = fa
     navigate,
     listPath: '/timelines',
     navigateOnMissing: !embedded,
-    initialCollapsed: { intro: true },
+    initialCollapsed: { intro: false },
     sectionDefs,
     updateItem: (item) => updateEntity('timelines', item),
     deleteItem: (itemId) => deleteEntity('timelines', itemId),
@@ -95,10 +95,9 @@ const TimelineDetail: React.FC<TimelineDetailProps> = ({ entityId, embedded = fa
 
   const persistTimeline = commitEntity;
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (confirm('确定要删除这条时间线吗？')) {
-      handleDeleteAndNavigate();
-      onDeleted?.();
+      if (await handleDeleteAndNavigate()) onDeleted?.();
     }
   };
 
@@ -274,7 +273,7 @@ const TimelineDetail: React.FC<TimelineDetailProps> = ({ entityId, embedded = fa
   if (!timeline) return <div>加载中...</div>;
 
   return (
-    <div className={`${embedded ? 'space-y-6 pb-12' : 'max-w-5xl mx-auto space-y-6 pb-12 px-2 sm:px-0'}`}>
+    <div className="entity-detail-page timeline-detail">
       <EntityDetailHeader
         entity={timeline}
         entityType="timelines"
@@ -305,6 +304,7 @@ const TimelineDetail: React.FC<TimelineDetailProps> = ({ entityId, embedded = fa
 
       {isSectionVisible('intro') && (
         <CollapsibleSection
+          compact
           title={getSectionTitle('intro', '简介')}
           collapsed={collapsed.intro}
           onToggle={() => setCollapsed((prev) => ({ ...prev, intro: !prev.intro }))}
@@ -353,7 +353,7 @@ const TimelineDetail: React.FC<TimelineDetailProps> = ({ entityId, embedded = fa
         </CollapsibleSection>
       )}
 
-      <section className="rounded-xl border border-theme theme-card p-4 space-y-4">
+      <section className="page-section space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h3 className="text-lg font-semibold">连续时间轴</h3>
@@ -506,6 +506,7 @@ const TimelineDetail: React.FC<TimelineDetailProps> = ({ entityId, embedded = fa
 
       {(timeline.customSections || []).map((sectionKey) => (
         <CollapsibleSection
+          compact
           key={sectionKey}
           title={getSectionTitle(sectionKey, '自定义区块')}
           collapsed={Boolean(collapsed[sectionKey])}
@@ -525,6 +526,7 @@ const TimelineDetail: React.FC<TimelineDetailProps> = ({ entityId, embedded = fa
           )}
         >
           <CustomSubItemsEditor
+            compact
             title={getSectionTitle(sectionKey, '自定义区块') + ' / 子项目'}
             items={getSectionItems(sectionKey)}
             onChange={(items) => setSectionItems(sectionKey, items)}

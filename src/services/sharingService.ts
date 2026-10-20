@@ -1,9 +1,8 @@
 import {
   getCampaignConfig as getGeneratedCampaignConfig,
   listCampaignShares as listGeneratedCampaignShares,
-  listCampaignVersions as listGeneratedCampaignVersions,
 } from '../generated/api';
-import { CampaignConfig, GraphEntityType, SharedEntityRecord, SharedPermission, ShareScope, UserProfile, VersionRecord } from '../types';
+import { CampaignConfig, GraphEntityType, SharedEntityRecord, SharedPermission, ShareScope, UserProfile } from '../types';
 import { buildUserHeaders } from './apiClient';
 import {
   buildCollaborationHeaders,
@@ -112,29 +111,6 @@ class SharingService {
         messageFromPayload: this.messageFromPayload.bind(this),
       }));
     }
-  }
-
-  async listVersions(campaignId: string, user: UserProfile | null): Promise<VersionRecord[]> {
-    try {
-      return (unwrapGeneratedResponse(await listGeneratedCampaignVersions({
-        client: getGeneratedApiClient(),
-        headers: buildUserHeaders(user, { campaignId }),
-        path: { campaignId },
-      })) ?? []) as VersionRecord[];
-    } catch (error) {
-      rethrowGeneratedCollaborationError<SharedEntityRecord>(error, {
-        remoteFieldNames: ['remoteShare'],
-        messageFromPayload: this.messageFromPayload.bind(this),
-      });
-    }
-  }
-
-  async restoreVersionCopy(campaignId: string, versionId: string, user: UserProfile | null): Promise<{ createdId: string }> {
-    const response = await fetch(`/api/campaigns/${campaignId}/versions/${versionId}/restore-copy`, {
-      method: 'POST',
-      headers: buildCollaborationHeaders(user, campaignId),
-    });
-    return this.parseResponse<{ createdId: string }>(response);
   }
 
   async getCampaignConfig(campaignId: string, user: UserProfile | null): Promise<CampaignConfig> {

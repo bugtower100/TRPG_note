@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertCircle, ChevronDown, ChevronRight, ChevronUp, History, Plus, Trash2 } from 'lucide-react';
+import { AlertCircle, ChevronDown, ChevronRight, ChevronUp, Plus, Trash2 } from 'lucide-react';
 import { useCampaignSession } from '../context/CampaignContext';
 import CustomSubItemsEditor from '../components/common/CustomSubItemsEditor';
 import RichTextEditor from '../components/common/RichTextEditor';
@@ -63,15 +63,19 @@ const SharedContent: React.FC<SharedContentProps> = ({ embedded = false, shareId
   const sharesQueryKey = currentCampaignId
     ? queryKeys.campaigns.shares(currentCampaignId, 'received', user?.id)
     : ['campaigns', 'shares', 'received', 'shared-content-disabled'] as const;
+  const selectReceivedShares = useCallback(
+    (items: SharedEntityRecord[]) => items.filter((item) => item.targetUserId === user?.id && (!entityType || item.entityType === entityType)),
+    [entityType, user?.id]
+  );
   const sharesQuery = useQuery({
     queryKey: sharesQueryKey,
     queryFn: async () => {
       if (!currentCampaignId || !user) {
         return [] as SharedEntityRecord[];
       }
-      const items = await sharingService.listReceivedShares(currentCampaignId, user);
-      return items.filter((item) => item.targetUserId === user.id && (!entityType || item.entityType === entityType));
+      return sharingService.listReceivedShares(currentCampaignId, user);
     },
+    select: selectReceivedShares,
     enabled: Boolean(currentCampaignId && user),
     refetchInterval: editing ? false : 15_000,
   });
@@ -466,7 +470,7 @@ const SharedContent: React.FC<SharedContentProps> = ({ embedded = false, shareId
             )}
           </div>
           {(editing || (snapshot.details || '').trim()) && (
-            <section className="border border-theme rounded-lg p-4">
+            <section className="page-section">
               <div className="font-medium mb-3">概览内容</div>
               {editing ? (
                 <RichTextEditor
@@ -482,7 +486,7 @@ const SharedContent: React.FC<SharedContentProps> = ({ embedded = false, shareId
             </section>
           )}
           {share.entityType === 'timelines' && (snapshot.timelineEvents || []).length > 0 && (
-            <section className="border border-theme rounded-lg p-4">
+            <section className="page-section">
               <div className="font-medium mb-3">事件节点</div>
               <div className="space-y-4 relative before:absolute before:left-4 before:top-2 before:bottom-2 before:w-0.5 before:bg-gray-200">
                 {(editing ? draftTimelineEvents : (snapshot.timelineEvents || [])).map((event, index) => (
@@ -601,7 +605,7 @@ const SharedContent: React.FC<SharedContentProps> = ({ embedded = false, shareId
             </section>
           )}
           {(editing ? draftEntitySections : (snapshot.allSections || [])).map((section, sectionIndex) => (
-            <section key={section.key} className="border border-theme rounded-lg p-4">
+            <section key={section.key} className="page-section">
               <div className="font-medium mb-3">{section.title}</div>
               {editing ? (
                 <CustomSubItemsEditor
@@ -644,7 +648,7 @@ const SharedContent: React.FC<SharedContentProps> = ({ embedded = false, shareId
 
     if (snapshot.scope === 'section') {
       return (
-        <section className="border border-theme rounded-lg p-4">
+        <section className="page-section">
           <div className="flex items-center gap-2 flex-wrap mb-3">
             <div className="font-medium">{snapshot.sectionTitle || '共享区块'}</div>
             {share.permission === 'edit' && activeLeaseLabel && (
@@ -691,7 +695,7 @@ const SharedContent: React.FC<SharedContentProps> = ({ embedded = false, shareId
     }
 
     return (
-      <section className="border border-theme rounded-lg p-4">
+      <section className="page-section">
         <button
           type="button"
           onClick={() => !editing && toggleCollapsed('subitem:root')}
@@ -734,16 +738,16 @@ const SharedContent: React.FC<SharedContentProps> = ({ embedded = false, shareId
   };
 
   return (
-    <div className="space-y-6">
+    <div className="shared-content-page space-y-4">
       {!embedded && (
-        <section className="bg-theme-card border border-theme rounded-lg shadow-sm p-4">
+        <section className="page-section">
           <h2 className="text-xl sm:text-2xl font-bold">共享给我的内容</h2>
           <div className="text-sm theme-text-secondary mt-1">这里会显示 GM 分享给你的整张卡片、区块或单条内容。</div>
           {statusText && <div className="text-sm theme-text-secondary mt-2">{statusText}</div>}
         </section>
       )}
       {embedded ? (
-        <section className="bg-theme-card border border-theme rounded-lg shadow-sm p-4">
+        <section className="workspace-editor-pane">
           {selected ? (
             <div className="space-y-4">
               <div className="flex items-start justify-between gap-3 flex-wrap">
@@ -756,14 +760,6 @@ const SharedContent: React.FC<SharedContentProps> = ({ embedded = false, shareId
                     </span>
                   </div>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => navigate(`/versions?documentType=shared_entity&documentId=${selected.id}`)}
-                  className="px-3 py-2 rounded border border-theme hover:bg-primary-light flex items-center gap-2 text-sm"
-                >
-                  <History size={16} />
-                  历史版本
-                </button>
                 <button
                   type="button"
                   onClick={() => void handleDeleteShare()}
@@ -781,8 +777,8 @@ const SharedContent: React.FC<SharedContentProps> = ({ embedded = false, shareId
           )}
         </section>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-[320px_minmax(0,1fr)] gap-4">
-          <aside className="bg-theme-card border border-theme rounded-lg shadow-sm p-3">
+        <div className="workspace-split">
+          <aside className="workspace-list-pane">
             <div className="font-semibold mb-3">共享列表</div>
             <div className="space-y-2 max-h-[68vh] overflow-y-auto">
               {shares.map((share) => (
@@ -803,7 +799,7 @@ const SharedContent: React.FC<SharedContentProps> = ({ embedded = false, shareId
               {shares.length === 0 && <div className="text-sm theme-text-secondary p-2">当前还没有共享内容</div>}
             </div>
           </aside>
-          <section className="bg-theme-card border border-theme rounded-lg shadow-sm p-4">
+          <section className="workspace-editor-pane">
             {selected ? (
               <div className="space-y-4">
                 <div className="flex items-start justify-between gap-3 flex-wrap">
@@ -817,14 +813,6 @@ const SharedContent: React.FC<SharedContentProps> = ({ embedded = false, shareId
                     </div>
                   </div>
                   <div className="flex items-center gap-2 flex-wrap">
-                    <button
-                      type="button"
-                      onClick={() => navigate(`/versions?documentType=shared_entity&documentId=${selected.id}`)}
-                      className="px-3 py-2 rounded border border-theme hover:bg-primary-light flex items-center gap-2 text-sm"
-                    >
-                      <History size={16} />
-                      历史版本
-                    </button>
                     <button
                       type="button"
                       onClick={() => void handleDeleteShare()}

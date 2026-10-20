@@ -45,7 +45,7 @@ const ClueList: React.FC = () => {
         >
           线索列表
         </button>
-        <button
+        {canManageCampaignContent && <button
           type="button"
           onClick={() => setActiveTab('board')}
           className={`px-3 py-1.5 text-sm rounded border ${
@@ -53,9 +53,9 @@ const ClueList: React.FC = () => {
           }`}
         >
           线索板
-        </button>
+        </button>}
       </div>
-      {activeTab === 'list' ? (
+      {activeTab === 'list' || !canManageCampaignContent ? (
         <EntityListLayout
           title="线索列表"
           entities={visibleClues}
@@ -66,13 +66,7 @@ const ClueList: React.FC = () => {
         />
       ) : (
         <div data-tour="clue-board">
-          {canManageCampaignContent ? (
-            <ClueBoard />
-          ) : (
-            <div className="text-center py-12 theme-text-secondary bg-theme-card rounded-lg border border-dashed border-theme">
-              线索板仅对 GM / 副GM 开放，PL 请通过分享内容查看可见线索。
-            </div>
-          )}
+          <ClueBoard />
         </div>
       )}
     </div>

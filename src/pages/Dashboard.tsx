@@ -1,4 +1,6 @@
+import { getEntitySearchContent, getSearchExcerpt } from '../utils/entitySearch';
 import React, { useState, useEffect, useRef } from 'react';
+import { ArrowUpRight, Building2, FileText, MapPin, Search, Skull, Users } from 'lucide-react';
 import { useCampaignData, useCampaignSession } from '../context/CampaignContext';
 import { useGuide } from '../components/common/InteractiveGuide';
 import { useReceivedShares } from '../hooks/useReceivedShares';
@@ -16,6 +18,8 @@ type SearchEntry = {
   updatedAt: number;
 };
 
+const emptyEntities: never[] = [];
+
 const Dashboard: React.FC = () => {
   const { campaignData, setCampaignData } = useCampaignData();
   const { currentCampaignId, user, reloadCampaignList, reloadCurrentCampaign } = useCampaignSession();
@@ -30,13 +34,13 @@ const Dashboard: React.FC = () => {
   const [searchKeyword, setSearchKeyword] = useState('');
   const [searchEntries, setSearchEntries] = useState<SearchEntry[]>([]);
   const searchBuildVersionRef = useRef(0);
-  const visibleCharacters = canManageCampaignContent ? campaignData.characters : [];
-  const visibleMonsters = canManageCampaignContent ? campaignData.monsters : [];
-  const visibleLocations = canManageCampaignContent ? campaignData.locations : [];
-  const visibleOrganizations = canManageCampaignContent ? campaignData.organizations : [];
-  const visibleEvents = canManageCampaignContent ? campaignData.events : [];
-  const visibleClues = canManageCampaignContent ? campaignData.clues : [];
-  const visibleTimelines = canManageCampaignContent ? campaignData.timelines : [];
+  const visibleCharacters = canManageCampaignContent ? campaignData.characters : emptyEntities;
+  const visibleMonsters = canManageCampaignContent ? campaignData.monsters : emptyEntities;
+  const visibleLocations = canManageCampaignContent ? campaignData.locations : emptyEntities;
+  const visibleOrganizations = canManageCampaignContent ? campaignData.organizations : emptyEntities;
+  const visibleEvents = canManageCampaignContent ? campaignData.events : emptyEntities;
+  const visibleClues = canManageCampaignContent ? campaignData.clues : emptyEntities;
+  const visibleTimelines = canManageCampaignContent ? campaignData.timelines : emptyEntities;
 
   useEffect(() => {
     setNotes(campaignData.notes || '');
@@ -62,7 +66,7 @@ const Dashboard: React.FC = () => {
           entityType: '角色',
           entityName: item.name,
           route: `/characters/${item.id}`,
-          content: [item.name, item.details, item.identity, item.appearance, item.desireOrGoal, item.attributes, ...(item.tags || [])].join(' ').toLowerCase(),
+          content: getEntitySearchContent(item),
           updatedAt: item.updatedAt,
         })),
         ...visibleMonsters.map((item) => ({
@@ -70,7 +74,7 @@ const Dashboard: React.FC = () => {
           entityType: '怪物',
           entityName: item.name,
           route: `/monsters/${item.id}`,
-          content: [item.name, item.details, item.type, item.stats, item.abilities, item.drops, ...(item.tags || [])].join(' ').toLowerCase(),
+          content: getEntitySearchContent(item),
           updatedAt: item.updatedAt,
         })),
         ...visibleLocations.map((item) => ({
@@ -78,7 +82,7 @@ const Dashboard: React.FC = () => {
           entityType: '地点',
           entityName: item.name,
           route: `/locations/${item.id}`,
-          content: [item.name, item.details, item.environment, ...(item.tags || [])].join(' ').toLowerCase(),
+          content: getEntitySearchContent(item),
           updatedAt: item.updatedAt,
         })),
         ...visibleOrganizations.map((item) => ({
@@ -86,7 +90,7 @@ const Dashboard: React.FC = () => {
           entityType: '组织',
           entityName: item.name,
           route: `/organizations/${item.id}`,
-          content: [item.name, item.details, item.notes, ...(item.tags || [])].join(' ').toLowerCase(),
+          content: getEntitySearchContent(item),
           updatedAt: item.updatedAt,
         })),
         ...visibleEvents.map((item) => ({
@@ -94,7 +98,7 @@ const Dashboard: React.FC = () => {
           entityType: '事件',
           entityName: item.name,
           route: `/events/${item.id}`,
-          content: [item.name, item.details, item.time, ...(item.tags || [])].join(' ').toLowerCase(),
+          content: getEntitySearchContent(item),
           updatedAt: item.updatedAt,
         })),
         ...visibleClues.map((item) => ({
@@ -102,7 +106,7 @@ const Dashboard: React.FC = () => {
           entityType: '线索',
           entityName: item.name,
           route: `/clues/${item.id}`,
-          content: [item.name, item.details, item.type, item.revealTarget || '', ...(item.tags || [])].join(' ').toLowerCase(),
+          content: getEntitySearchContent(item),
           updatedAt: item.updatedAt,
         })),
         ...visibleTimelines.map((item) => ({
@@ -110,7 +114,7 @@ const Dashboard: React.FC = () => {
           entityType: '时间线',
           entityName: item.name,
           route: `/timelines/${item.id}`,
-          content: [item.name, item.details, ...(item.tags || []), ...(item.timelineEvents || []).map((event) => `${event.time} ${event.content}`)].join(' ').toLowerCase(),
+          content: getEntitySearchContent(item),
           updatedAt: item.updatedAt,
         })),
       ];
@@ -136,11 +140,10 @@ const Dashboard: React.FC = () => {
 
   const matchedEntries = React.useMemo(() => {
     const normalized = searchKeyword.trim().toLowerCase();
-    if (!normalized) return [];
     return searchEntries
-      .filter((entry) => entry.content.includes(normalized))
+      .filter((entry) => !normalized || entry.content.includes(normalized))
       .sort((a, b) => b.updatedAt - a.updatedAt)
-      .slice(0, 30);
+      .slice(0, normalized ? 30 : 6);
   }, [searchEntries, searchKeyword]);
 
   const handleNotesChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -169,87 +172,98 @@ const Dashboard: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6">
-      <div data-tour="dashboard-header" className="flex justify-between items-center">
-        <h2 className="flex min-w-0 items-center gap-2 text-2xl font-bold text-gray-800">
+    <div className="dashboard-page">
+      <section className="dashboard-summary">
+      <div data-tour="dashboard-header" className="flex flex-wrap justify-between items-center gap-3">
+        <h2 className="flex min-w-0 items-center gap-3 text-2xl font-semibold">
           <CampaignNameEditor
             name={campaignData.meta.projectName}
             canEdit={canManageCampaignContent}
             onSave={handleRenameCampaign}
             nameClassName="break-words"
           />
-          <span className="shrink-0 text-gray-400 text-sm font-normal">概览</span>
+          <span className="shrink-0 theme-text-secondary text-xs font-normal">模组概览</span>
         </h2>
+        <button type="button" onClick={() => navigate('/play')} className="inline-flex items-center gap-2 rounded-md bg-primary px-3 py-2 text-sm text-white hover:bg-primary-dark">进入跑团工作台 <ArrowUpRight size={16} /></button>
       </div>
+      <p className="mt-2 text-xs theme-text-secondary">最后更新于 {new Date(campaignData.meta.lastModified).toLocaleString()}</p>
 
-      <div data-tour="dashboard-stat-grid" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
-        <div className="bg-theme-card p-6 rounded-lg shadow-sm border border-theme">
-          <h3 className="theme-text-secondary text-sm font-medium uppercase">角色</h3>
-          <p className="text-3xl font-bold mt-2">{visibleCharacters.length + sharedCharacters.length}</p>
-        </div>
-        <div className="bg-theme-card p-6 rounded-lg shadow-sm border border-theme">
-          <h3 className="theme-text-secondary text-sm font-medium uppercase">怪物</h3>
-          <p className="text-3xl font-bold mt-2">{visibleMonsters.length + sharedMonsters.length}</p>
-        </div>
-        <div className="bg-theme-card p-6 rounded-lg shadow-sm border border-theme">
-          <h3 className="theme-text-secondary text-sm font-medium uppercase">地点</h3>
-          <p className="text-3xl font-bold mt-2">{visibleLocations.length + sharedLocations.length}</p>
-        </div>
-        <div className="bg-theme-card p-6 rounded-lg shadow-sm border border-theme">
-          <h3 className="theme-text-secondary text-sm font-medium uppercase">组织</h3>
-          <p className="text-3xl font-bold mt-2">{visibleOrganizations.length + sharedOrganizations.length}</p>
-        </div>
-        <div className="bg-theme-card p-6 rounded-lg shadow-sm border border-theme">
-            <h3 className="theme-text-secondary text-sm font-medium uppercase">最后更新</h3>
-            <p className="text-sm font-bold mt-4">
-                {new Date(campaignData.meta.lastModified).toLocaleString()}
-            </p>
-        </div>
-      </div>
+      <nav aria-label="资料统计与入口" data-tour="dashboard-stat-grid" className="dashboard-stats">
+        {[
+          { label: '角色', count: visibleCharacters.length + sharedCharacters.length, path: '/characters', Icon: Users },
+          { label: '怪物', count: visibleMonsters.length + sharedMonsters.length, path: '/monsters', Icon: Skull },
+          { label: '地点', count: visibleLocations.length + sharedLocations.length, path: '/locations', Icon: MapPin },
+          { label: '组织', count: visibleOrganizations.length + sharedOrganizations.length, path: '/organizations', Icon: Building2 },
+        ].map(({ label, count, path, Icon }) => (
+          <button key={path} type="button" onClick={() => navigate(path)} className="dashboard-stat">
+            <Icon size={19} className="text-primary" />
+            <span className="text-sm theme-text-secondary">{label}</span>
+            <span className="ml-auto text-2xl font-semibold tabular-nums">{count}</span>
+          </button>
+        ))}
+      </nav>
+      </section>
 
-      <div data-tour="dashboard-search" className="bg-theme-card p-6 rounded-lg shadow-sm border border-theme">
-        <h3 className="text-lg font-bold mb-3">全局检索</h3>
+      <div className="dashboard-content">
+      <section data-tour="dashboard-search" className="dashboard-search">
+        <h3 className="text-base font-semibold mb-4">模组资料</h3>
+        <label className="relative block">
+        <Search size={17} className="absolute left-3 top-3 theme-text-secondary" aria-hidden="true" />
         <input
           type="text"
           value={searchKeyword}
           onChange={(event) => setSearchKeyword(event.target.value)}
           onKeyDown={handleSearchEnter}
-          placeholder="搜索角色、怪物、线索、时间线（回车进入首个匹配）"
-          className="w-full px-3 py-2 border border-theme rounded-md bg-transparent"
+          placeholder="搜索名称、标签或正文…"
+          aria-label="搜索模组资料"
+          className="w-full pl-9 pr-3 py-2 border border-theme rounded-md bg-transparent text-sm"
         />
-        {searchKeyword.trim() && (
-          <div data-tour="dashboard-search-results" className="mt-3 border border-theme rounded-lg divide-y divide-theme max-h-72 overflow-auto">
+        </label>
+        <div className="mt-5 mb-2 text-xs theme-text-secondary">{searchKeyword.trim() ? '匹配资料' : '最近编辑'}</div>
+          <div data-tour="dashboard-search-results" className="dashboard-recent">
             {matchedEntries.length > 0 ? (
               matchedEntries.map((entry) => (
                 <button
                   key={`${entry.entityType}-${entry.id}`}
                   type="button"
                   onClick={() => navigate(entry.route)}
-                  className="w-full text-left px-3 py-2 hover:bg-primary-light/50"
+                  className="dashboard-recent__row"
                 >
-                  <div className="font-medium">{entry.entityName}</div>
-                  <div className="text-xs theme-text-secondary">
-                    {entry.entityType} · 更新于 {new Date(entry.updatedAt).toLocaleString()}
-                  </div>
+                  <FileText size={17} className="text-primary shrink-0" />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-medium">{entry.entityName}</span>
+                    {searchKeyword.trim() && <span className="block mt-1 text-xs theme-text-secondary line-clamp-2">{getSearchExcerpt(entry.content, searchKeyword)}</span>}
+                    <span className="block mt-1 text-xs theme-text-secondary">{entry.entityType} · {new Date(entry.updatedAt).toLocaleDateString()}</span>
+                  </span>
+                  <ArrowUpRight size={15} className="theme-text-secondary shrink-0" />
                 </button>
               ))
             ) : (
-              <div className="px-3 py-4 text-sm theme-text-secondary">没有找到匹配项</div>
+              <div className="dashboard-empty">
+                <FileText size={24} className="text-primary" />
+                <p>{searchKeyword.trim() ? '没有找到匹配资料' : canManageCampaignContent ? '从一份角色或线索开始整理模组' : '在共享资料中查看主持人分享的内容'}</p>
+                {!searchKeyword.trim() && <button type="button" onClick={() => navigate(canManageCampaignContent ? '/characters' : '/shared-content')} className="text-primary hover:underline">{canManageCampaignContent ? '前往角色资料' : '打开共享资料'} →</button>}
+              </div>
             )}
           </div>
-        )}
-      </div>
+      </section>
 
-      {/* Campaign Notes Section */}
-      <div data-tour="dashboard-notes" className="bg-theme-card p-6 rounded-lg shadow-sm border border-theme">
-        <h3 className="text-lg font-bold mb-4">模组笔记 / 备忘录</h3>
+      <section data-tour="dashboard-notes" className="dashboard-notes">
+        <div className="flex items-center justify-between gap-2 mb-4">
+          <h3 className="text-base font-semibold">模组备忘录</h3>
+          <span className="text-xs theme-text-secondary">主持人私有</span>
+        </div>
+        {canManageCampaignContent ? (
         <textarea
             value={notes}
             onChange={handleNotesChange}
-            disabled={!canManageCampaignContent}
-            className="w-full h-64 p-4 border border-theme rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 resize-y bg-transparent"
-            placeholder={canManageCampaignContent ? '在这里记录模组的大纲、待办事项或灵感...' : 'PL 不显示 GM 侧模组笔记'}
+            rows={10}
+            aria-label="模组备忘录"
+            className="dashboard-notes__input w-full p-3 border border-theme rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50 resize-y bg-transparent text-sm leading-7"
+            placeholder="记下大纲、待办或灵感…"
         />
+        ) : <p className="text-sm theme-text-secondary">此备忘录仅主持人可见。跑团记录请前往工作台的“笔记”。</p>}
+      </section>
       </div>
     </div>
   );

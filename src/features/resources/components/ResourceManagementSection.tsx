@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Trash2, RefreshCw, FolderPlus, MoveRight, Pencil, FolderX, Upload, ChevronDown, ChevronRight } from 'lucide-react';
 import ResourceTreeView from '../../../components/common/ResourceTreeView';
+import { useCampaignSession } from '../../../context/CampaignContext';
 import {
   buildResourceTree,
   filterResourceItems,
@@ -13,6 +14,8 @@ import {
 } from '../../../services/resourceService';
 
 const ResourceManagementSection: React.FC = () => {
+  const { hasUnsavedChanges, isCampaignSaving } = useCampaignSession();
+  const [status, setStatus] = useState('');
   const resourceInputRef = useRef<HTMLInputElement>(null);
   const [resources, setResources] = useState<ResourceItem[]>([]);
   const [resourceFolders, setResourceFolders] = useState<ResourceFolder[]>([]);
@@ -29,9 +32,8 @@ const ResourceManagementSection: React.FC = () => {
       const result = await resourceService.list();
       setResources(result.items);
       setResourceFolders(result.folders);
-    } catch {
-      setResources([]);
-      setResourceFolders([]);
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : '资源读取失败');
     }
   };
 
@@ -94,12 +96,22 @@ const ResourceManagementSection: React.FC = () => {
 
   const handleDeleteSelected = async () => {
     if (selectedRefs.length === 0) return;
+    if (hasUnsavedChanges || isCampaignSaving) {
+      setStatus('请先保存当前修改，再删除资源，以便检查最新引用。');
+      return;
+    }
     if (!window.confirm(`确定删除选中的 ${selectedRefs.length} 个资源吗？`)) return;
     setResourceBusy(true);
     try {
-      await resourceService.deleteMany(selectedRefs);
-      setSelectedRefs([]);
+      const result = await resourceService.deleteMany(selectedRefs);
+      const remaining = [...result.failed, ...result.blocked];
+      setSelectedRefs(remaining);
+      setStatus(remaining.length
+        ? `以下资源未删除（被引用或删除失败）：${remaining.join('、')}`
+        : '所选资源已删除。');
       await loadResources();
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : '资源删除失败');
     } finally {
       setResourceBusy(false);
     }
@@ -142,6 +154,10 @@ const ResourceManagementSection: React.FC = () => {
 
   const handleDeleteFolder = async () => {
     if (selectedFolderPath === RESOURCE_ROOT_PATH) return;
+    if (hasUnsavedChanges || isCampaignSaving) {
+      setStatus('请先保存当前修改，再删除分类，以便检查最新引用。');
+      return;
+    }
     if (!window.confirm(`确定删除分类「${resourceFolderDisplayName(selectedFolderPath)}」吗？分类下的子分类和图片也会一起删除。`)) {
       return;
     }
@@ -152,7 +168,10 @@ const ResourceManagementSection: React.FC = () => {
       setMoveTargetFolderPath(RESOURCE_ROOT_PATH);
       setExpandedFolderPaths((prev) => prev.filter((item) => item !== selectedFolderPath));
       setSelectedRefs((prev) => prev.filter((ref) => !ref.startsWith(`${selectedFolderPath}/`)));
+      setStatus('分类已删除。');
       await loadResources();
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : '分类删除失败');
     } finally {
       setResourceBusy(false);
     }
@@ -162,9 +181,12 @@ const ResourceManagementSection: React.FC = () => {
     if (selectedRefs.length === 0) return;
     setResourceBusy(true);
     try {
-      await resourceService.moveMany(selectedRefs, moveTargetFolderPath);
-      setSelectedRefs([]);
+      const result = await resourceService.moveMany(selectedRefs, moveTargetFolderPath);
+      setSelectedRefs(result.failed);
+      setStatus(result.failed.length ? `以下资源移动失败：${result.failed.join('、')}` : '所选资源已移动。');
       await loadResources();
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : '资源移动失败');
     } finally {
       setResourceBusy(false);
     }
@@ -172,6 +194,7 @@ const ResourceManagementSection: React.FC = () => {
 
   return (
     <section className="bg-theme-card p-4 sm:p-6 rounded-lg shadow-sm border border-theme">
+      {status && <p role="status" className="mb-3 text-sm theme-text-secondary break-words">{status}</p>}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
         <button
           type="button"

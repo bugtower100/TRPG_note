@@ -458,7 +458,7 @@ const MindMapWorkspace = () => {
   ]);
 
   return (
-    <div className="mind-map-workspace flex min-h-[70vh] flex-col gap-3 md:-mt-6 md:h-[calc(100vh-5rem)] md:min-h-0">
+    <div className="mind-map-workspace canvas-workspace flex min-h-[70vh] flex-col gap-3">
       <div className="flex shrink-0 flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
         <div>
           <h2 className="flex items-center gap-2 text-xl font-bold md:text-2xl">
@@ -516,7 +516,7 @@ const MindMapWorkspace = () => {
 
       {activeMindMap ? (
         <>
-          <div className="mind-map-main-toolbar flex shrink-0 flex-wrap items-center gap-2 rounded-lg border border-theme bg-theme-card p-2">
+          <div className="mind-map-main-toolbar page-section flex shrink-0 flex-wrap items-center gap-2">
             <span className="px-1 text-xs font-medium theme-text-secondary">自动布局</span>
             <button
               type="button"

@@ -42,6 +42,13 @@ export interface Character extends BaseEntity {
   relations: Relation[];
 }
 
+export interface EntityTemplate {
+  id: string;
+  name: string;
+  entityType: GraphEntityType;
+  structure: Pick<BaseEntity, 'customSubItems' | 'sectionSubItems' | 'sectionTitles' | 'sectionOrder' | 'sectionVisibility' | 'sectionLinkEnabled' | 'customSections'>;
+}
+
 export interface Location extends BaseEntity {
   environment: string;
   relations: Relation[];
@@ -142,20 +149,6 @@ export interface SharedEntityRecord {
   version: number;
   activeLease?: TeamNoteLease | null;
   snapshot: SharedEntitySnapshot;
-}
-
-export interface VersionRecord {
-  id: string;
-  campaignId: string;
-  documentType: 'team_note' | 'shared_entity' | 'campaign_config' | 'task_board';
-  documentId: string;
-  action: 'create' | 'update' | 'delete' | 'restore_copy';
-  summary: string;
-  operatorUserId: string;
-  operatorUsername: string;
-  createdAt: number;
-  snapshot: Record<string, unknown>;
-  previousSnapshot?: Record<string, unknown> | null;
 }
 
 export interface RelationGraphNode {
@@ -406,6 +399,7 @@ export interface CampaignData {
     formatVersion: string;
     schemaVersion?: number;
     projectName: string;
+    entityTemplates?: EntityTemplate[];
     lastModified: number;
     description?: string; // Brief description
   };

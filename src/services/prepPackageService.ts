@@ -1,7 +1,7 @@
 import type { UserProfile } from '../types';
 import { buildUserHeaders, readApiPayload } from './apiClient';
 
-export interface PrepPackageCatalogItem { id: string; name: string }
+export interface PrepPackageCatalogItem { id: string; name: string; dependencies?: Array<{ key: string; id: string }> }
 export interface PrepPackageCatalogCategory { key: string; label: string; items: PrepPackageCatalogItem[] }
 const readDownloadFileName = (response: Response) => {
   const disposition = response.headers.get('Content-Disposition') || '';

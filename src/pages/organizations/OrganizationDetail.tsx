@@ -43,7 +43,7 @@ const OrganizationDetail: React.FC<OrganizationDetailProps> = ({ entityId }) => 
     items: canManageCampaignContent ? campaignData.organizations : [],
     navigate,
     listPath: '/organizations',
-    initialCollapsed: { detail: true },
+    initialCollapsed: { detail: false },
     sectionDefs,
     updateItem: (item) => updateEntity('organizations', item),
     deleteItem: (itemId) => deleteEntity('organizations', itemId),
@@ -52,7 +52,7 @@ const OrganizationDetail: React.FC<OrganizationDetailProps> = ({ entityId }) => 
   if (!organization) return <div>加载中...</div>;
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6 pb-12 px-2 sm:px-0">
+    <div className="entity-detail-page">
       <EntityDetailHeader
         entity={organization}
         entityType="organizations"

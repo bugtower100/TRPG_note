@@ -77,17 +77,23 @@ const SectionedEntityContent = <T extends BaseEntity>({
   };
 
   return (
-    <div className="space-y-6">
-      <EntityTagEditor tags={entity.tags} onChange={onTagsChange} />
+    <div className="entity-sections">
+        <details className="entity-tags">
+          <summary className="cursor-pointer text-sm">标签 <span className="ml-2 text-xs theme-text-secondary">{entity.tags?.join(' · ') || '未设置'} · 点击管理</span></summary>
+          <div className="pt-3"><EntityTagEditor tags={entity.tags} onChange={onTagsChange} hideLabel /></div>
+        </details>
+      <div className="entity-section-tools">
       <SectionAddBar
         hiddenSections={sectionDefs.filter((section) => !isSectionVisible(section.key))}
         onAddSection={(key) => setSectionVisible(key, true)}
         onAddCustomSection={addCustomSection}
       />
+      </div>
 
       {visibleSections.map((section, index) => (
         <CollapsibleSection
           key={section.key}
+          compact
           title={getSectionTitle(section.key, section.title)}
           collapsed={Boolean(collapsed[section.key])}
           onToggle={() => setCollapsed((prev) => ({ ...prev, [section.key]: !prev[section.key] }))}
@@ -112,7 +118,8 @@ const SectionedEntityContent = <T extends BaseEntity>({
           )}
         >
           <CustomSubItemsEditor
-            title={getSectionTitle(section.key, section.title) + ' / 子项目'}
+            title="内容"
+            compact
             items={getSectionItems(section.key)}
             onChange={(items) => onSectionItemsChange(section.key, items)}
             ensureOneItem

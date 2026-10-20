@@ -1,8 +1,7 @@
 import React, { lazy, Suspense, useMemo, useState } from 'react';
 import { useCampaignSession, useCampaignTheme } from '../context/CampaignContext';
 import { CampaignTheme } from '../types';
-import { Monitor, Scroll, Archive, ChevronDown, ChevronRight, Upload, Download, Trash2 } from 'lucide-react';
-import { APP_VERSION } from '../constants/appVersion';
+import { Monitor, Scroll, Archive, Upload, Download, Trash2 } from 'lucide-react';
 import { backupService } from '../services/backupService';
 import BackupExportDialog from '../components/common/BackupExportDialog';
 import ResourceManagementSection from '../features/resources/components/ResourceManagementSection';
@@ -15,7 +14,7 @@ import { useDirectContentEditPreference } from '../hooks/useDirectContentEditPre
 
 const ImportAssistant = lazy(() => import('./ImportAssistant'));
 const PrepPackageManager = lazy(() => import('../features/prep-packages/components/PrepPackageManager'));
-const VersionHistory = lazy(() => import('./VersionHistory'));
+const RecycleBin = lazy(() => import('./RecycleBin'));
 const ReleaseUpdatePanel = lazy(() => import('../components/common/ReleaseUpdatePanel'));
 
 const sectionFallback = (
@@ -34,8 +33,7 @@ const Settings: React.FC = () => {
     removeCustomTheme,
     selectCustomTheme,
   } = useCampaignTheme();
-  const [importCollapsed, setImportCollapsed] = useState(true);
-  const [versionCollapsed, setVersionCollapsed] = useState(true);
+  const [activeSection, setActiveSection] = useState('general');
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
   const [themeStatus, setThemeStatus] = useState('');
   const { directContentEdit, setDirectContentEdit } = useDirectContentEditPreference();
@@ -70,36 +68,46 @@ const Settings: React.FC = () => {
   };
 
   return (
-    <div className="space-y-8 max-w-4xl mx-auto px-2 sm:px-0">
-      <h2 className="text-xl sm:text-2xl font-bold">数据与设置</h2>
+    <div className="settings-page settings-flat">
+      <h2 className="settings-wide mb-1 text-xl sm:text-2xl font-semibold">数据与设置</h2>
+      <nav className="content-tabs" aria-label="设置分类" data-tour="settings-navigation">
+        {[
+          ['general', '基本设置'], ['data', '备份与导入'],
+          ['resources', '资源管理'], ['recycle', '回收站'], ['updates', '版本与更新'],
+        ].map(([id, label]) => <button key={id} type="button" data-tour={`settings-${id}-tab`} aria-pressed={activeSection === id} className={activeSection === id ? 'is-active' : ''} onClick={() => setActiveSection(id)}>{label}</button>)}
+      </nav>
 
       {/* Theme Selection */}
-      <section data-tour="settings-theme-section" className="bg-theme-card p-4 sm:p-6 rounded-lg shadow-sm border border-theme">
-        <h3 className="text-lg font-medium mb-4">界面风格</h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+      <section hidden={activeSection !== 'general'} data-tour="settings-theme-section" className="settings-section settings-form-row">
+        <h3 className="font-semibold">主题与样式</h3>
+        <div className="min-w-0">
+        <div className="settings-theme-options">
             {themes.map((t) => (
                 <button
                     key={t.id}
                     onClick={() => setTheme(t.id)}
-                    className={`flex flex-col items-center p-4 border rounded-lg transition-all ${
+                    aria-pressed={theme === t.id}
+                    className={`settings-theme-option border rounded-md transition-colors ${
                         theme === t.id 
                             ? 'border-primary bg-primary-light text-primary shadow-sm' 
                             : 'border-theme hover:bg-primary-light'
                     }`}
                 >
-                    <div className="mb-2">{t.icon}</div>
-                    <div className="font-medium">{t.label}</div>
-                    <div className="text-xs text-center mt-1 theme-text-secondary">{t.desc}</div>
+                    <span className="shrink-0">{t.icon}</span>
+                    <span className="min-w-0">
+                      <span className="block text-sm font-medium">{t.label}</span>
+                      <span className="block text-xs mt-1 theme-text-secondary">{t.desc}</span>
+                    </span>
                 </button>
             ))}
         </div>
-        <div className="mt-4 rounded-lg border border-theme p-4 space-y-3">
-          <div>
-            <div className="font-medium">自定义主题库</div>
-            <div className="text-sm theme-text-secondary mt-1">
-              上传的主题会按 `name` 保存到本地。你可以保留多份主题，并通过下拉框切换当前使用的主题。
-            </div>
-          </div>
+        <details className="mt-3 border-t border-theme pt-3">
+          <summary className="cursor-pointer text-sm font-medium">
+            自定义主题库
+            <span className="ml-2 text-xs font-normal theme-text-secondary">{customThemes.length} 个已保存</span>
+          </summary>
+          <div className="mt-3 space-y-3">
+          <p className="text-xs theme-text-secondary">主题保存在本机，可上传、切换或删除。</p>
           <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_auto] gap-3 items-start">
             <div className="space-y-2">
               <label className="text-sm theme-text-secondary">当前自定义主题</label>
@@ -182,15 +190,17 @@ const Settings: React.FC = () => {
             </div>
           )}
           {themeStatus && <div className="text-sm theme-text-secondary">{themeStatus}</div>}
+          </div>
+        </details>
         </div>
       </section>
 
-      <section className="bg-theme-card p-4 sm:p-6 rounded-lg shadow-sm border border-theme">
-        <h3 className="text-lg font-medium">编辑偏好</h3>
-        <label className="mt-4 flex items-start justify-between gap-4 rounded-lg border border-theme p-4 cursor-pointer hover:bg-primary-light/30">
+      <section hidden={activeSection !== 'general'} className="settings-section settings-form-row">
+        <h3 className="font-semibold">编辑偏好</h3>
+        <label className="mt-3 flex items-start justify-between gap-3 cursor-pointer">
           <span>
-            <span className="block font-medium">点击内容直接进入编辑</span>
-            <span className="mt-1 block text-sm theme-text-secondary">
+            <span className="block text-sm font-medium">双击内容直接进入编辑</span>
+            <span className="mt-1 block text-xs leading-5 theme-text-secondary">
               开启后，双击普通资料页的正文内容即可进入编辑模式，双击编辑器外部即可结束编辑；关闭后需要点击“开始编辑”。
             </span>
           </span>
@@ -203,30 +213,27 @@ const Settings: React.FC = () => {
         </label>
       </section>
 
-      <section className="bg-theme-card p-4 sm:p-6 rounded-lg shadow-sm border border-theme">
-        <h3 className="text-lg font-medium mb-2">关于应用</h3>
-        <div className="text-sm theme-text-secondary space-y-1">
-          <div>当前版本：{APP_VERSION}</div>
-        </div>
+      <section hidden={activeSection !== 'updates'} className="settings-section">
+        <h3 className="font-semibold mb-3">关于应用</h3>
         <Suspense fallback={sectionFallback}>
-          <ReleaseUpdatePanel className="mt-4" />
+          <ReleaseUpdatePanel compact className="settings-update-panel" />
         </Suspense>
       </section>
 
       {/* Data Management */}
-      <section data-tour="settings-import-assistant" className="bg-theme-card p-4 sm:p-6 rounded-lg shadow-sm border border-theme">
-        <h3 className="text-lg font-medium mb-4">数据管理</h3>
-        <div className="space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 border border-theme rounded">
+      <section hidden={activeSection !== 'data'} className="settings-section settings-wide">
+        <h3 className="font-semibold mb-3">数据管理</h3>
+        <div className="space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h4 className="font-medium">新版备份包</h4>
-              <p className="text-sm theme-text-secondary">这里保留当前模组备份导出；数据包导入请使用下方导入助手，导出所有模组请到主页操作。</p>
+              <h4 className="text-sm font-medium">模组备份</h4>
+              <p className="mt-1 text-xs theme-text-secondary">导入请使用下方助手；导出所有模组请到主页操作。</p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <button
                 onClick={() => setExportDialogOpen(true)}
                 disabled={!currentCampaignId}
-                className="px-4 py-2 bg-theme-card border border-theme rounded hover:bg-primary-light disabled:opacity-50 flex items-center gap-2"
+                className="px-3 py-1.5 border border-theme rounded hover:bg-primary-light disabled:opacity-50 flex items-center gap-2 text-sm"
               >
                 <Archive size={16} />
                 导出当前模组
@@ -240,22 +247,12 @@ const Settings: React.FC = () => {
         </div>
       </section>
 
-      <section data-tour="settings-version-history" className="bg-theme-card p-4 sm:p-6 rounded-lg shadow-sm border border-theme">
-        <button
-          type="button"
-          onClick={() => setImportCollapsed((prev) => !prev)}
-          className="text-lg font-medium flex items-center gap-2 text-left"
-        >
-          {importCollapsed ? <ChevronRight size={18} /> : <ChevronDown size={18} />}
-          导入助手
-        </button>
-        {!importCollapsed && (
+      <section hidden={activeSection !== 'data'} data-tour="settings-import-assistant" className="settings-section settings-wide">
           <Suspense fallback={sectionFallback}>
             <div className="mt-4">
               <ImportAssistant />
             </div>
           </Suspense>
-        )}
       </section>
 
       <BackupExportDialog
@@ -269,25 +266,17 @@ const Settings: React.FC = () => {
         onCancel={() => setExportDialogOpen(false)}
       />
 
-      <ResourceManagementSection />
-
-      <section className="bg-theme-card p-4 sm:p-6 rounded-lg shadow-sm border border-theme">
-        <button
-          type="button"
-          onClick={() => setVersionCollapsed((prev) => !prev)}
-          className="text-lg font-medium flex items-center gap-2 text-left"
-        >
-          {versionCollapsed ? <ChevronRight size={18} /> : <ChevronDown size={18} />}
-          版本记录
-        </button>
-        {!versionCollapsed && (
+      <section hidden={activeSection !== 'recycle'} data-tour="settings-recycle-bin" className="settings-section settings-wide">
+        <h3 className="font-semibold">回收站</h3>
           <Suspense fallback={sectionFallback}>
             <div className="mt-4">
-              <VersionHistory />
+              <RecycleBin />
             </div>
           </Suspense>
-        )}
       </section>
+      <div hidden={activeSection !== 'resources'} className="settings-wide settings-resources">
+        <ResourceManagementSection />
+      </div>
     </div>
   );
 };

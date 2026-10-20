@@ -233,6 +233,37 @@ cd server && GOOS=linux GOARCH=amd64 go build -tags headless -o release/trpg-not
 - 默认保存在 `server/data/storage.db`（SQLite）
 - 建议定期导出 zip 做额外备份
 
+### 数据库检查与简单修复
+
+Windows 普通用户不需要更新主程序。把独立的 `数据库检查工具.exe` 放到现有 `TRPG模组笔记.exe` 同一目录，先从系统托盘彻底退出应用，再双击检查工具。它会自动寻找 `data/storage.db`，显示文件位置、大小和更新时间，先执行只读检查，再引导用户决定是否修复；不需要理解命令行或自行寻找路径。
+
+开发者也可以在项目根目录执行只读检查：
+
+```bash
+npm run db:check
+```
+
+检查会显示实际数据库绝对路径、文件大小、各表记录数，并检查 SQLite 完整性、迁移元数据、JSON 内容、孤立记录以及模组所有者关系。若要修复可安全自动处理的问题：
+
+```bash
+npm run db:repair
+```
+
+修复前会先在数据库旁的 `database-doctor-backups` 目录创建一致性备份，然后补回缺失的模组所有者成员关系、修正所有者角色、重建索引并优化数据库。无效 JSON、孤立记录和迁移失败不会被自动删除或覆盖，需把检查输出交给开发者判断。
+
+只构建独立工具（不会改动主程序 EXE）：
+
+```bash
+npm run db:doctor:build
+```
+
+也可以让独立工具检查其他数据库：
+
+```bash
+数据库检查工具.exe --database-path "D:\path\to\storage.db"
+数据库检查工具.exe --database-path "D:\path\to\storage.db" --repair --yes
+```
+
 ### Q4：如何迁移到新电脑？
 0. 直接把data目录和server.exe拷贝到新电脑
 1. 在旧电脑导出 zip

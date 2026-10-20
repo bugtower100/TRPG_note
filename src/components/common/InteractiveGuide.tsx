@@ -5,6 +5,7 @@ import { HelpCircle } from 'lucide-react';
 export type GuideId =
   | 'landing'
   | 'dashboard'
+  | 'workspace'
   | 'clues'
   | 'entity-list'
   | 'entity-detail'
@@ -20,12 +21,26 @@ interface GuideContextValue {
 }
 
 const GUIDE_STEPS: Record<GuideId, Step[]> = {
+  workspace: [
+    {
+      target: '[data-tour="play-workspace"]',
+      skipBeacon: true,
+      placement: 'bottom',
+      content: '工作台集中显示线索、任务、笔记和场次。通过上方栏目继续处理内容，单人使用无需添加成员；玩家仅看到已授权资料。',
+    },
+    {
+      target: '[data-tour="sidebar-nav"]',
+      skipBeacon: true,
+      placement: 'right',
+      content: '侧边栏按用途分组。工作台负责跑团推进，资料区用于查阅，主持人的关系图、思维导图和时间线放在整理工具中。',
+    },
+  ],
   landing: [
     {
       target: '[data-tour="landing-create-campaign"]',
       skipBeacon: true,
       placement: 'right',
-      content: '从这里创建新模组。现在创建卡片更紧凑，创建后会直接进入模组内部继续整理内容。',
+      content: '点击工具栏中的“新建模组”开始整理。已有导出包可从右上角“工具与备份”中导入。',
     },
     {
       target: '[data-tour="landing-campaign-card"]',
@@ -34,16 +49,10 @@ const GUIDE_STEPS: Record<GuideId, Step[]> = {
       content: '这里是模组卡片。卡片会显示简介、公开/私密状态，以及当前在线成员概览。',
     },
     {
-      target: '[data-tour="landing-campaign-members"]',
+      target: '[data-tour="landing-campaign-manage"]',
       skipBeacon: true,
       placement: 'bottom',
-      content: '这里是成员列表占位区。现阶段会显示成员与在线人数，后续会继续扩展成完整的团队协作入口。',
-    },
-    {
-      target: '[data-tour="landing-campaign-access"]',
-      skipBeacon: true,
-      placement: 'left',
-      content: '模组公开/私密已经移到主页卡片上管理。以后多人协作时，会优先从这里配置访问控制。',
+      content: '展开后查看成员和备份操作；主持人可管理公开状态、进入密码及成员权限，创建者可删除模组。',
     },
   ],
   dashboard: [
@@ -122,34 +131,34 @@ const GUIDE_STEPS: Record<GuideId, Step[]> = {
   ],
   settings: [
     {
-      target: '[data-tour="settings-theme-section"]',
+      target: '[data-tour="settings-general-tab"]',
       skipBeacon: true,
       placement: 'bottom',
-      content: '这里可以切换模组主题风格，不同主题会同时影响页面、编辑器和展示区的整体观感。',
+      content: '在“基本设置”中切换配色、管理自定义主题或调整编辑偏好。',
     },
     {
-      target: '[data-tour="settings-resource-upload"]',
+      target: '[data-tour="settings-resources-tab"]',
       skipBeacon: true,
       placement: 'bottom',
-      content: '这里可以批量上传图片资源。上传后的资源能在关系图和富文本图片插入中复用。',
+      content: '在“资源管理”中上传图片、整理目录和处理引用中的资源。',
     },
     {
-      target: '[data-tour="settings-resource-list"]',
+      target: '[data-tour="settings-general-tab"]',
       skipBeacon: true,
       placement: 'top',
-      content: '这里是资源列表，可以查看、筛选和删除当前模组已经上传的图片资源。',
+      content: '在“基本设置”中调整正文的编辑方式。',
     },
     {
-      target: '[data-tour="settings-import-assistant"]',
+      target: '[data-tour="settings-data-tab"]',
       skipBeacon: true,
       placement: 'top',
-      content: '导入助手已收纳进设置页并默认折叠，需要时展开即可执行映射预览与导入。',
+      content: '在“备份与导入”中导出完整模组或备团包，也可以预览并导入数据包。',
     },
     {
-      target: '[data-tour="settings-version-history"]',
+      target: '[data-tour="settings-recycle-tab"]',
       skipBeacon: true,
       placement: 'top',
-      content: '版本记录已放到设置页最底部并默认折叠，可按需展开查看历史与差异。',
+      content: '在“回收站”中恢复误删资料。默认保留 3 天，也可以调整保留天数。',
     },
   ],
   'relation-graphs': [

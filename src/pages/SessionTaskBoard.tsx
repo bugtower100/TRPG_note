@@ -8,8 +8,8 @@ import { teamNotesService } from '../services/teamNotesService';
 import { sessionTaskBoardService } from '../services/sessionTaskBoardService';
 import { VersionConflictError } from '../services/conflictError';
 import ConflictResolveDialog from '../components/common/ConflictResolveDialog';
-import { Lock, Unlock, History, AlertCircle, GripVertical } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { Lock, Unlock, AlertCircle, GripVertical } from 'lucide-react';
+import { useWorkspaceLeaveGuard } from '../hooks/useWorkspaceLeaveGuard';
 import EntityTagEditor from '../components/common/EntityTagEditor';
 import { getCampaignRoleLabel, isCampaignManagerRole } from '../utils/campaignRoles';
 
@@ -44,7 +44,6 @@ type TaskDropTarget = {
 const SessionTaskBoard: React.FC = () => {
   const { campaignData, setCampaignData } = useCampaignData();
   const { currentCampaignId, user } = useCampaignSession();
-  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [config, setConfig] = useState<CampaignConfig | null>(null);
   const [boardDoc, setBoardDoc] = useState<SessionTaskBoardDocument | null>(null);
@@ -398,6 +397,8 @@ const SessionTaskBoard: React.FC = () => {
     }
   };
 
+  useWorkspaceLeaveGuard(editing ? handleStopEdit : null);
+
   const handleToggleEdit = async () => {
     if (editing) {
       await handleStopEdit();
@@ -515,10 +516,10 @@ const SessionTaskBoard: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="bg-theme-card p-4 rounded-lg border border-theme shadow-sm">
-        <h2 className="text-2xl font-bold">跑团任务看板</h2>
-        <p className="text-sm theme-text-secondary mt-1">GM 主导协作：统一编辑锁、版本冲突保护、成员协作记录。</p>
+    <div className="task-board-page space-y-4">
+      <div className="page-section">
+        <h2 className="text-2xl font-bold">任务看板</h2>
+        <p className="text-sm theme-text-secondary mt-1">安排备团事项或跟进团队任务，按进度和标签整理。</p>
         <div data-tour="task-board-header" className="text-sm theme-text-secondary mt-2">
           当前身份：{getCampaignRoleLabel(memberRole)}
           {boardDoc ? ` · 版本：${boardDoc.version}` : ''}
@@ -558,14 +559,6 @@ const SessionTaskBoard: React.FC = () => {
           )}
           <button
             type="button"
-            onClick={() => navigate('/versions?documentType=task_board&documentId=session_tasks')}
-            className="px-3 py-2 rounded border border-theme hover:bg-primary-light flex items-center gap-2 text-sm"
-          >
-            <History size={16} />
-            历史版本
-          </button>
-          <button
-            type="button"
             onClick={() => void handleToggleEdit()}
             disabled={!editing && !canEditBoard}
             title={!editing && !canEditBoard ? 'GM 已设置你不可编辑任务看板' : undefined}
@@ -586,7 +579,7 @@ const SessionTaskBoard: React.FC = () => {
       {canViewBoard && (
         <>
 
-      <div data-tour="task-board-create" className="bg-theme-card border border-theme rounded-lg p-4 grid grid-cols-1 md:grid-cols-3 gap-2">
+      <div data-tour="task-board-create" className="page-section grid grid-cols-1 md:grid-cols-3 gap-2">
         <input
           type="text"
           value={titleDraft}
@@ -637,9 +630,9 @@ const SessionTaskBoard: React.FC = () => {
         )}
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+      <div className="workspace-task-columns">
         {statusOrder.map((status) => (
-          <section key={status} className="bg-theme-card border border-theme rounded-lg p-4 space-y-3">
+          <section key={status} className="board-lane space-y-3">
             <div className="flex items-center justify-between">
               <h3 className="font-semibold">{statusLabel[status]}</h3>
               <span className="text-xs theme-text-secondary">{tasksByStatus[status].length} 条</span>
@@ -708,7 +701,7 @@ const SessionTaskBoard: React.FC = () => {
                           clearTaskDragState();
                         }}
                         onDragEnd={() => clearTaskDragState()}
-                        className={`border border-theme rounded p-3 space-y-2 ${
+                        className={`board-card border border-theme rounded p-3 space-y-2 ${
                           draggingTaskId === task.id ? 'opacity-50' : ''
                         }`}
                       >

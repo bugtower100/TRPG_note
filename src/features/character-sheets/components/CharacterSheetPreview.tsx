@@ -176,7 +176,7 @@ const CharacterSheetPreview: React.FC<CharacterSheetPreviewProps> = ({
 
   return (
     <div className="space-y-5">
-      <div className="rounded-2xl border border-theme bg-theme-card/80 p-5 shadow-sm">
+      <div className="page-section">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="flex items-start gap-4 min-w-0">
             {avatarPath ? (
@@ -212,7 +212,7 @@ const CharacterSheetPreview: React.FC<CharacterSheetPreviewProps> = ({
                 )}
               </div>
               <div>
-                <h1 className="text-3xl font-bold tracking-tight">{sheet.name}</h1>
+                <h1 className="text-2xl font-semibold">{sheet.name}</h1>
                 {sheet.payload.base.title && (
                   <div className="mt-1 text-base theme-text-secondary">{sheet.payload.base.title}</div>
                 )}
@@ -262,7 +262,7 @@ const CharacterSheetPreview: React.FC<CharacterSheetPreviewProps> = ({
 
       <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.3fr)_340px] gap-5">
         <div className="space-y-5 min-w-0">
-          <section className="rounded-2xl border border-theme p-4">
+          <section className="page-section">
             <div className="text-sm font-medium mb-3">属性卡面</div>
             <div className={`grid gap-3 ${sheet.system === 'dnd5e' ? 'grid-cols-2 md:grid-cols-3 xl:grid-cols-6' : 'grid-cols-2 md:grid-cols-4'}`}>
               {statGrid.map(([label, value]) => (
@@ -279,7 +279,7 @@ const CharacterSheetPreview: React.FC<CharacterSheetPreviewProps> = ({
             </div>
           </section>
 
-          <section className="rounded-2xl border border-theme p-4">
+          <section className="page-section">
             <div className="text-sm font-medium mb-3">{sheet.system === 'dnd5e' ? '技能' : '技能列表'}</div>
             {skillCards.length > 0 ? (
               <div className={`grid gap-3 ${sheet.system === 'dnd5e' ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-2 md:grid-cols-3'}`}>
@@ -302,7 +302,7 @@ const CharacterSheetPreview: React.FC<CharacterSheetPreviewProps> = ({
             )}
           </section>
 
-          <section className="rounded-2xl border border-theme p-4">
+          <section className="page-section">
             <div className="text-sm font-medium mb-3">补充信息</div>
             <div className="grid grid-cols-1 gap-3 text-sm">
               {extraDetails.map((line) => (
@@ -313,7 +313,7 @@ const CharacterSheetPreview: React.FC<CharacterSheetPreviewProps> = ({
             </div>
           </section>
 
-          <section className="rounded-2xl border border-theme p-4">
+          <section className="page-section">
             <div className="text-sm font-medium mb-3">人物信息</div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
               <div className="rounded-xl border border-theme px-3 py-3 bg-theme-card/60">年龄：{sheet.payload.base.age || '未填写'}</div>
@@ -323,7 +323,7 @@ const CharacterSheetPreview: React.FC<CharacterSheetPreviewProps> = ({
             </div>
           </section>
 
-          <section className="rounded-2xl border border-theme p-4">
+          <section className="page-section">
             <div className="text-sm font-medium mb-3">备注</div>
             <div className="rounded-xl border border-theme px-3 py-3 bg-theme-card/60 whitespace-pre-wrap text-sm min-h-28">
               {sheet.payload.base.notes || '暂无备注'}
@@ -332,7 +332,7 @@ const CharacterSheetPreview: React.FC<CharacterSheetPreviewProps> = ({
         </div>
 
         <aside className="space-y-5">
-          <section className="rounded-2xl border border-theme p-4">
+          <section className="page-section">
             <div className="text-sm font-medium mb-3">标签</div>
             <div className="flex flex-wrap gap-2">
               {tags.length > 0 ? tags.map((tag) => (
@@ -345,7 +345,7 @@ const CharacterSheetPreview: React.FC<CharacterSheetPreviewProps> = ({
             </div>
           </section>
 
-          <section className="rounded-2xl border border-theme p-4">
+          <section className="page-section">
             <div className="text-sm font-medium mb-3">协作信息</div>
             <div className="space-y-2 text-sm">
               <div>最后更新：{sheet.updatedByName || '未知'}</div>
@@ -354,7 +354,7 @@ const CharacterSheetPreview: React.FC<CharacterSheetPreviewProps> = ({
             </div>
           </section>
 
-          <section className="rounded-2xl border border-theme p-4">
+          <section className="page-section">
             <div className="text-sm font-medium mb-3">成员授权</div>
             <div className="space-y-2">
               {assignedMembers.length > 0 ? assignedMembers.map((member) => (

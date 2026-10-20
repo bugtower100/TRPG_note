@@ -58,6 +58,7 @@ type backupCampaignBundle struct {
 	Config             *CampaignConfigDoc   `json:"config,omitempty"`
 	TeamNotes          []TeamNoteDoc        `json:"teamNotes,omitempty"`
 	TaskBoard          *SessionTaskBoardDoc `json:"taskBoard,omitempty"`
+	RecycleBin         *RecycleBinDocument  `json:"recycleBin,omitempty"`
 }
 
 type backupBundle struct {
@@ -275,12 +276,18 @@ func buildBackupCampaignBundle(db *gorm.DB, userID, campaignID string) (backupCa
 	if err != nil {
 		return backupCampaignBundle{}, err
 	}
+	recycleBin, err := loadRecycleBin(db, campaignID)
+	if err != nil {
+		return backupCampaignBundle{}, err
+	}
+	pruneRecycleBin(&recycleBin)
 	return backupCampaignBundle{
 		OriginalCampaignID: campaignID,
 		CampaignData:       campaignData,
 		Config:             config,
 		TeamNotes:          teamNotes,
 		TaskBoard:          taskBoard,
+		RecycleBin:         &recycleBin,
 	}, nil
 }
 
@@ -427,7 +434,11 @@ func writeTextZipEntry(zw *zip.Writer, name string, content string) error {
 }
 
 func writeAssetZipEntry(zw *zip.Writer, assetBaseDir string, ref string) (bool, error) {
-	fullPath := resourceRefToFullPath(assetBaseDir, ref)
+	resolved, found := resolveResourceRef(assetBaseDir, ref)
+	if !found {
+		return false, nil
+	}
+	fullPath := resourceRefToFullPath(assetBaseDir, resolved)
 	content, err := os.ReadFile(fullPath)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -1380,6 +1391,20 @@ func registerBackupRoutes(group *gin.RouterGroup, db *gorm.DB, cfg Config) {
 				if err := saveCampaignConfigDoc(tx, importedConfig); err != nil {
 					return err
 				}
+				if item.RecycleBin != nil {
+					recycleBin, err := remapResourceRefsForTypedValue(*item.RecycleBin, refMap)
+					if err != nil {
+						return fmt.Errorf("invalid_recycle_bin")
+					}
+					if recycleBin.RetentionDays < 1 || recycleBin.RetentionDays > 3650 {
+						recycleBin.RetentionDays = 3
+					}
+					recycleBin.Version = 0
+					pruneRecycleBin(&recycleBin)
+					if err := saveRecycleBin(tx, targetCampaignID, &recycleBin); err != nil {
+						return err
+					}
+				}
 				for _, note := range item.TeamNotes {
 					remappedNote, err := remapResourceRefsForTypedValue(note, refMap)
 					if err != nil {
@@ -1422,7 +1447,7 @@ func registerBackupRoutes(group *gin.RouterGroup, db *gorm.DB, cfg Config) {
 				return nil
 			}); err != nil {
 				switch err.Error() {
-				case "invalid_team_note", "invalid_task_board":
+				case "invalid_team_note", "invalid_task_board", "invalid_recycle_bin":
 					c.JSON(400, gin.H{"error": err.Error()})
 				default:
 					c.JSON(500, gin.H{"error": "database_error"})

@@ -8,7 +8,7 @@ interface PublicCampaignCardProps {
 
 const PublicCampaignCard: React.FC<PublicCampaignCardProps> = ({ campaign, onEnter }) => {
   return (
-    <div className="flex flex-col p-4 rounded-lg border shadow-sm transition-shadow theme-card border-theme hover:shadow-md">
+    <div className="landing-campaign">
       <div className="flex-1">
         <div className="flex justify-between items-start mb-1 gap-2">
           <h3 className="pr-2 text-lg font-bold break-words">{campaign.name || '未命名公开模组'}</h3>
@@ -28,10 +28,10 @@ const PublicCampaignCard: React.FC<PublicCampaignCardProps> = ({ campaign, onEnt
         </div>
         <div className="mt-3 text-xs theme-text-secondary">拥有者：{campaign.ownerUsername || campaign.ownerId}</div>
       </div>
-      <div className="pt-3 mt-4 border-t border-theme">
+      <div className="landing-campaign__footer justify-end">
         <button
           onClick={() => onEnter(campaign)}
-          className="w-full py-2 text-sm font-medium text-white rounded transition-colors bg-primary hover:bg-primary-dark"
+          className="px-4 py-2 text-sm font-medium text-white rounded-md bg-primary hover:bg-primary-dark"
         >
           进入公开模组
         </button>

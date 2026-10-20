@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Archive, ChevronDown, ChevronRight, Download, X } from 'lucide-react';
 import { useCampaignSession } from '../../../context/CampaignContext';
 import { prepPackageService, type PrepPackageCatalogCategory } from '../../../services/prepPackageService';
@@ -6,7 +6,7 @@ import { prepPackageService, type PrepPackageCatalogCategory } from '../../../se
 type SelectionState = Record<string, string[]>;
 
 const PrepPackageManager: React.FC = () => {
-  const { currentCampaignId, user } = useCampaignSession();
+  const { currentCampaignId, user, hasUnsavedChanges, isCampaignSaving } = useCampaignSession();
   const [catalog, setCatalog] = useState<PrepPackageCatalogCategory[]>([]);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [selections, setSelections] = useState<SelectionState>({});
@@ -16,8 +16,41 @@ const PrepPackageManager: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState('');
 
+  const missingDependencies = useMemo(() => {
+    const entries = new Map<string, PrepPackageCatalogCategory['items'][number] & { key: string; label: string }>(
+      catalog.flatMap((category) => category.items.map((item) => [`${category.key}:${item.id}`, { ...item, key: category.key, label: category.label }] as const))
+    );
+    const selected = new Set(Object.entries(selections).flatMap(([key, ids]) => ids.map((id) => `${key}:${id}`)));
+    const queue = [...selected];
+    const visited = new Set(queue);
+    const missing: Array<{ key: string; id: string; name: string; source: string; exists: boolean }> = [];
+    for (let i = 0; i < queue.length; i++) {
+      const source = entries.get(queue[i]);
+      for (const ref of source?.dependencies || []) {
+        const key = `${ref.key}:${ref.id}`;
+        if (visited.has(key)) continue;
+        visited.add(key);
+        const target = entries.get(key);
+        missing.push({ ...ref, name: target ? `${target.label}：${target.name}` : `已失效的关联：${ref.key}/${ref.id}`, source: source!.name, exists: Boolean(target) });
+        if (target) queue.push(key);
+      }
+    }
+    return missing;
+  }, [catalog, selections]);
+
+  const includeDependencies = () => {
+    setSelections((current) => {
+      const next = { ...current };
+      for (const ref of missingDependencies.filter((item) => item.exists)) {
+        next[ref.key] = [...new Set([...(next[ref.key] || []), ref.id])];
+      }
+      return next;
+    });
+  };
+
   const loadCatalog = async () => {
     if (!currentCampaignId) return;
+    if (hasUnsavedChanges || isCampaignSaving) { setStatus('请先保存当前修改，再读取导出清单。'); return; }
     setLoading(true);
     try {
       setCatalog(await prepPackageService.getCatalog(currentCampaignId, user));
@@ -44,6 +77,8 @@ const PrepPackageManager: React.FC = () => {
 
   const handleExport = async () => {
     if (!currentCampaignId || selectedCount === 0) return;
+    if (hasUnsavedChanges || isCampaignSaving) { setStatus('请先保存当前修改，再导出备团包。'); return; }
+    if (missingDependencies.length && !window.confirm(`还有 ${missingDependencies.length} 项关联资料未选或已失效，继续导出会丢失相关关联。确定继续？`)) return;
     setBusy(true);
     setStatus('');
     try {
@@ -56,7 +91,7 @@ const PrepPackageManager: React.FC = () => {
   };
 
   return (
-    <div className="space-y-4 rounded border border-theme p-4">
+    <div className="prep-package-section space-y-4 rounded border border-theme p-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h4 className="flex items-center gap-2 font-medium"><Archive size={17} />备团包</h4>
@@ -76,8 +111,13 @@ const PrepPackageManager: React.FC = () => {
             </div>
             <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-5">
               <input value={packageName} onChange={(event) => setPackageName(event.target.value)} placeholder="备团包名称（留空则使用模组名）" className="w-full rounded border border-theme bg-transparent px-3 py-2 text-sm" />
-              <p className="text-xs theme-text-secondary">团队笔记、任务看板、成员权限和版本记录不会导出。图片资源会自动随包导出；未选条目的关联关系和地图点位不会保留。</p>
-              {!loading && catalog.length === 0 && status ? <div className="rounded border border-theme px-3 py-2 text-sm theme-text-secondary">{status}</div> : null}
+              <p className="text-xs theme-text-secondary">团队笔记、任务看板、成员权限、回收站和区块模板不会导出。图片资源会自动随包导出；未选条目的关联关系和地图点位不会保留。</p>
+              {missingDependencies.length > 0 && <div className="rounded border border-amber-400 p-3 space-y-2 text-sm">
+                <p className="font-medium">需要留意的关联资料（{missingDependencies.length}）</p>
+                <ul className="max-h-40 overflow-auto space-y-1">{missingDependencies.map((item) => <li key={`${item.key}:${item.id}`}>{item.name} <span className="theme-text-secondary">← {item.source}</span></li>)}</ul>
+                <button type="button" onClick={includeDependencies} disabled={busy || !missingDependencies.some((item) => item.exists)} className="rounded border border-theme px-3 py-1.5 disabled:opacity-50">补选全部可用关联资料</button>
+              </div>}
+              {status && <p role="status" className="text-sm theme-text-secondary">{status}</p>}
               {loading ? <div className="py-8 text-center text-sm theme-text-secondary">正在读取可导出内容…</div> : (
                 <div className="space-y-2">
                   {catalog.map((category) => {

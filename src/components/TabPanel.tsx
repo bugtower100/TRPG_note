@@ -124,7 +124,7 @@ const TabPanel: React.FC<TabPanelProps> = ({
   return (
     <div
       ref={panelRef}
-      className={`relative border-l border-theme bg-theme-card flex flex-col h-screen shadow-xl z-20 ${
+      className={`detail-panel relative border-l border-theme bg-theme-card flex flex-col h-full min-h-0 z-20 ${
         mobileMode ? 'fixed top-0 right-0 w-full max-w-full' : `${maximized ? 'w-full' : 'flex-none'}`
       }`}
       style={!mobileMode && !maximized ? {
@@ -154,7 +154,7 @@ const TabPanel: React.FC<TabPanelProps> = ({
         </div>
       ) : null}
       {/* Tab Headers */}
-      <div className="flex overflow-x-auto border-b border-theme bg-transparent">
+      <div className="detail-panel__tabs flex shrink-0 overflow-x-auto border-b border-theme bg-transparent">
         <div className="flex items-center px-3 border-r border-theme">
           {mobileMode && (
             <button
@@ -197,7 +197,7 @@ const TabPanel: React.FC<TabPanelProps> = ({
       </div>
 
       {/* Tab Content */}
-      <div ref={contentRef} className="flex-1 overflow-y-auto p-6 bg-theme-card">
+      <div ref={contentRef} className="detail-panel__content flex-1 min-h-0 overflow-y-auto bg-theme-card">
         {activeTab && renderContent(activeTab)}
       </div>
     </div>

@@ -1103,6 +1103,15 @@ func main() {
 	automaticBackupManager.registerRoutes(backupAPI)
 	automaticBackupManager.start()
 	registerLocationMapRoutes(campaignAPI, db)
+	registerRecycleBinRoutes(campaignAPI, db)
+	go func() {
+		cleanupRecycleBins(db)
+		ticker := time.NewTicker(time.Hour)
+		defer ticker.Stop()
+		for range ticker.C {
+			cleanupRecycleBins(db)
+		}
+	}()
 	registerLocationMapDrawingRoutes(campaignAPI, db)
 
 	systemAPI.GET("/migration/status", func(c *gin.Context) {
@@ -3351,6 +3360,17 @@ func main() {
 			return
 		}
 		full := resourceRefToFullPath(filepath.Dir(cfg.DBPath), folderPath)
+		used, err := referencedResourcePaths(db, filepath.Dir(cfg.DBPath))
+		if err != nil {
+			c.JSON(500, gin.H{"error": "无法检查资源引用，未执行删除"})
+			return
+		}
+		for ref := range used {
+			if strings.HasPrefix(ref, folderPath+"/") {
+				c.JSON(409, gin.H{"error": "分类中仍有被资料引用的图片，请先移除引用"})
+				return
+			}
+		}
 		if !strings.HasPrefix(filepath.Clean(full), filepath.Clean(filepath.Dir(cfg.DBPath))) {
 			c.JSON(403, gin.H{"error": "forbidden"})
 			return
@@ -3384,21 +3404,12 @@ func main() {
 		failed := make([]string, 0)
 		moved := make([]gin.H, 0, len(body.Refs))
 		for _, raw := range body.Refs {
-			ref, ok := normalizeResourceRef(raw)
+			ref, ok := resolveResourceRef(filepath.Dir(cfg.DBPath), raw)
 			if !ok {
 				failed = append(failed, raw)
 				continue
 			}
 			sourceFull := resourceRefToFullPath(filepath.Dir(cfg.DBPath), ref)
-			if _, err := os.Stat(sourceFull); err != nil {
-				if altRef, found := findResourceRefByBaseName(assetDir, filepath.Base(ref)); found {
-					ref = altRef
-					sourceFull = resourceRefToFullPath(filepath.Dir(cfg.DBPath), ref)
-				} else {
-					failed = append(failed, raw)
-					continue
-				}
-			}
 			if resourceParentPath(ref) == targetFolder {
 				moved = append(moved, gin.H{"from": raw, "to": ref})
 				continue
@@ -3436,6 +3447,18 @@ func main() {
 			c.JSON(400, gin.H{"error": "invalid_ref"})
 			return
 		}
+		if resolved, found := resolveResourceRef(filepath.Dir(cfg.DBPath), ref); found {
+			ref = resolved
+		}
+		used, err := referencedResourcePaths(db, filepath.Dir(cfg.DBPath))
+		if err != nil {
+			c.JSON(500, gin.H{"error": "无法检查资源引用，未执行删除"})
+			return
+		}
+		if used[ref] {
+			c.JSON(409, gin.H{"error": "图片仍被资料引用，请先移除引用"})
+			return
+		}
 		full := filepath.Join(filepath.Dir(cfg.DBPath), ref)
 		if !strings.HasPrefix(filepath.Clean(full), filepath.Clean(filepath.Dir(cfg.DBPath))) {
 			c.JSON(403, gin.H{"error": "forbidden"})
@@ -3460,11 +3483,24 @@ func main() {
 			c.JSON(400, gin.H{"error": "invalid_payload"})
 			return
 		}
+		used, err := referencedResourcePaths(db, filepath.Dir(cfg.DBPath))
+		if err != nil {
+			c.JSON(500, gin.H{"error": "无法检查资源引用，未执行删除"})
+			return
+		}
 		failed := make([]string, 0)
+		blocked := make([]string, 0)
 		for _, raw := range body.Refs {
 			ref, ok := normalizeResourceRef(raw)
 			if !ok {
 				failed = append(failed, raw)
+				continue
+			}
+			if resolved, found := resolveResourceRef(filepath.Dir(cfg.DBPath), ref); found {
+				ref = resolved
+			}
+			if used[ref] {
+				blocked = append(blocked, raw)
 				continue
 			}
 			full := filepath.Join(filepath.Dir(cfg.DBPath), ref)
@@ -3476,8 +3512,8 @@ func main() {
 				failed = append(failed, raw)
 			}
 		}
-		if len(failed) > 0 {
-			c.JSON(207, gin.H{"failed": failed})
+		if len(failed) > 0 || len(blocked) > 0 {
+			c.JSON(207, gin.H{"failed": failed, "blocked": blocked})
 			return
 		}
 		c.Status(204)
@@ -3490,18 +3526,15 @@ func main() {
 			c.Status(404)
 			return
 		}
-		full := filepath.Join(filepath.Dir(cfg.DBPath), p)
+		resolved, found := resolveResourceRef(filepath.Dir(cfg.DBPath), p)
+		if !found {
+			c.Status(404)
+			return
+		}
+		full := resourceRefToFullPath(filepath.Dir(cfg.DBPath), resolved)
 		if !strings.HasPrefix(filepath.Clean(full), filepath.Clean(filepath.Dir(cfg.DBPath))) {
 			c.Status(403)
 			return
-		}
-		if _, err := os.Stat(full); err != nil {
-			if altRef, found := findResourceRefByBaseName(assetDir, filepath.Base(p)); found {
-				full = resourceRefToFullPath(filepath.Dir(cfg.DBPath), altRef)
-			} else {
-				c.Status(404)
-				return
-			}
 		}
 		c.Header("Cache-Control", "public, max-age=31536000")
 		c.File(full)

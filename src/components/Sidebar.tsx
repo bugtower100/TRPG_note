@@ -1,12 +1,12 @@
 import React, { useEffect, useRef } from 'react';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useLocation } from 'react-router-dom';
 import { useCampaignData, useCampaignSession } from '../context/CampaignContext';
 import { APP_VERSION } from '../constants/appVersion';
 import { useCampaignMemberRole } from '../hooks/useCampaignMemberRole';
 import { isCampaignManagerRole } from '../utils/campaignRoles';
 import { 
-  LayoutDashboard, Users, MapPin, Building, Calendar, CalendarDays,
-  Search, Clock, Settings, LogOut, Skull, Home, Share2, NotebookPen, Kanban, ScrollText, BrainCircuit, Map
+  LayoutDashboard, Users, MapPin, Building, Calendar,
+  Clock, Settings, LogOut, Skull, Home, Share2, Kanban, ScrollText, BrainCircuit, Map
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -19,6 +19,8 @@ const Sidebar: React.FC<SidebarProps> = ({ className = '', onNavigate }) => {
   const { logout, exitCampaign, reloadCurrentCampaign } = useCampaignSession();
   const { canManageCampaignContent, memberRole, configQuery } = useCampaignMemberRole();
   const previousRoleRef = useRef<string | null>(null);
+  const { pathname } = useLocation();
+  const workspaceActive = /^\/(play|clues|clue-board|session-tasks|team-notes|sessions)(\/|$)/.test(pathname);
 
   useEffect(() => {
     if (!configQuery.data) return;
@@ -31,115 +33,93 @@ const Sidebar: React.FC<SidebarProps> = ({ className = '', onNavigate }) => {
 
   const navGroups = [
     {
+      label: '跑团',
       items: [
-        { to: '/', icon: <LayoutDashboard size={20} />, label: '概览' },
-        {
-          to: '/characters',
-          icon: <Users size={20} />,
-          label: '角色',
-          children: [
-            { to: '/characters/sheets', icon: <ScrollText size={16} />, label: '角色卡' },
-          ],
-        },
-        { to: '/monsters', icon: <Skull size={20} />, label: '怪物' },
-        { to: '/relation-graphs', icon: <Share2 size={20} />, label: '关系图' },
-        {
-          to: '/mind-maps',
-          icon: <BrainCircuit size={20} />,
-          label: '思维导图',
-          managerOnly: true,
-        },
-        { to: '/team-notes', icon: <NotebookPen size={20} />, label: '团队笔记' },
-        {
-          to: '/locations',
-          icon: <MapPin size={20} />,
-          label: '地点',
-          children: [
-            { to: '/locations/maps', icon: <Map size={16} />, label: '地图地点' },
-          ],
-        },
-        { to: '/organizations', icon: <Building size={20} />, label: '组织' },
-        { to: '/events', icon: <Calendar size={20} />, label: '事件' },
-        { to: '/clues', icon: <Search size={20} />, label: '线索' },
-        { to: '/session-tasks', icon: <Kanban size={20} />, label: '任务看板' },
-        { to: '/sessions', icon: <CalendarDays size={20} />, label: '场次中心' },
-        { to: '/timelines', icon: <Clock size={20} />, label: '时间线' },
-        { to: '/settings', icon: <Settings size={20} />, label: '设置' },
+        { to: '/overview', icon: <LayoutDashboard size={20} />, label: '模组概览' },
+        { to: '/play', icon: <Kanban size={20} />, label: '跑团工作台' },
       ],
     },
+    {
+      label: canManageCampaignContent ? '模组资料' : '可用资料',
+      items: [
+        ...(canManageCampaignContent ? [
+          { to: '/characters', icon: <Users size={20} />, label: '角色' },
+          { to: '/monsters', icon: <Skull size={20} />, label: '怪物' },
+          { to: '/locations', icon: <MapPin size={20} />, label: '地点' },
+          { to: '/organizations', icon: <Building size={20} />, label: '组织' },
+          { to: '/events', icon: <Calendar size={20} />, label: '事件' },
+        ] : [{ to: '/shared-content', icon: <Share2 size={20} />, label: '共享资料' }]),
+        { to: '/characters/sheets', icon: <ScrollText size={20} />, label: '角色卡' },
+        { to: '/locations/maps', icon: <Map size={20} />, label: '地图' },
+      ],
+    },
+    {
+      label: '整理工具',
+      items: canManageCampaignContent ? [
+        { to: '/relation-graphs', icon: <Share2 size={20} />, label: '关系图' },
+        { to: '/mind-maps', icon: <BrainCircuit size={20} />, label: '思维导图' },
+        { to: '/timelines', icon: <Clock size={20} />, label: '时间线' },
+      ] : [],
+    },
+    { label: '管理', items: [{ to: '/settings', icon: <Settings size={20} />, label: '设置' }] },
   ];
 
   return (
-    <div className={`w-56 bg-theme-card border-r border-theme h-screen flex flex-col z-10 ${className}`}>
-      <div className="p-4 border-b border-theme">
-        <h1 className="text-lg font-bold truncate" title={campaignData.meta.projectName}>
+    <div className={`app-sidebar ui-glass ${className}`}>
+      <div className="app-sidebar__brand">
+        <span className="app-sidebar__mark" aria-hidden="true"><ScrollText size={20} /></span>
+        <div className="min-w-0">
+          <p className="text-xs theme-text-secondary mb-1">当前模组</p>
+          <h1 className="text-sm font-semibold truncate" title={campaignData.meta.projectName}>
             {campaignData.meta.projectName}
-        </h1>
-        <p className="text-xs theme-text-secondary mt-1">TRPG 备团工具 {APP_VERSION}</p>
+          </h1>
+        </div>
       </div>
       
-      <nav className="flex-1 p-3 space-y-1 overflow-y-auto" data-tour="sidebar-nav">
-        {navGroups.map((group, groupIndex) => (
-          <div key={groupIndex} className="space-y-1">
-            {group.items
-              .filter((item) => !item.managerOnly || canManageCampaignContent)
-              .map((item) => (
+      <nav className="app-sidebar__nav" data-tour="sidebar-nav">
+        {navGroups.filter((group) => group.items.length > 0).map((group) => (
+          <div key={group.label} className="space-y-1">
+            <p className="app-sidebar__group">{group.label}</p>
+            {group.items.map((item) => (
               <div key={item.to} className="space-y-1">
                 <NavLink
                   to={item.to}
+                  aria-current={item.to === '/play' && workspaceActive ? 'page' : undefined}
                   onClick={onNavigate}
                   data-tour={
                     item.to === '/characters'
                       ? 'sidebar-characters'
                       : item.to === '/relation-graphs'
                         ? 'sidebar-relation-graphs'
-                        : item.to === '/team-notes'
-                          ? 'sidebar-team-notes'
+                        : item.to === '/play'
+                          ? 'sidebar-workspace'
                         : item.to === '/settings'
                           ? 'sidebar-settings'
                           : undefined
                   }
-                  className={({ isActive }) =>
-                    `flex items-center gap-2.5 px-3 py-2 rounded-md transition-colors text-sm ${
-                      isActive
-                        ? 'bg-primary text-white shadow-sm'
-                        : 'theme-text-secondary hover:bg-primary-light hover:text-primary'
-                    }`
-                  }
+                  className={({ isActive }) => {
+                    const active = item.to === '/play' ? workspaceActive : isActive
+                      && !(item.to === '/characters' && pathname.startsWith('/characters/sheets'))
+                      && !(item.to === '/locations' && pathname.startsWith('/locations/maps'));
+                    return `app-sidebar__link ${active ? 'is-active' : ''}`;
+                  }}
                 >
                   {item.icon}
                   <span>{item.label}</span>
                 </NavLink>
-                {item.children?.map((child) => (
-                  <NavLink
-                    key={child.to}
-                    to={child.to}
-                    onClick={onNavigate}
-                    className={({ isActive }) =>
-                      `ml-7 flex items-center gap-2 px-3 py-1.5 rounded-md transition-colors text-sm ${
-                        isActive
-                          ? 'theme-card text-primary border border-theme shadow-sm'
-                          : 'theme-text-secondary hover:bg-primary-light hover:text-primary'
-                      }`
-                    }
-                  >
-                    {child.icon}
-                    <span>{child.label}</span>
-                  </NavLink>
-                ))}
               </div>
               ))}
           </div>
         ))}
       </nav>
 
-      <div className="p-3 border-t border-theme">
+      <div className="app-sidebar__footer">
         <button
           onClick={() => {
             onNavigate?.();
             exitCampaign();
           }}
-          className="flex items-center gap-2.5 px-3 py-2 w-full text-left theme-text-secondary hover:bg-primary-light hover:text-primary rounded-md transition-colors text-sm"
+          className="app-sidebar__link w-full"
         >
           <Home size={20} />
           <span>返回主页</span>
@@ -149,11 +129,12 @@ const Sidebar: React.FC<SidebarProps> = ({ className = '', onNavigate }) => {
             onNavigate?.();
             logout();
           }}
-          className="flex items-center gap-2.5 px-3 py-2 w-full text-left text-red-500 hover:bg-red-50 rounded-md transition-colors text-sm"
+          className="app-sidebar__link w-full text-red-500"
         >
           <LogOut size={20} />
           <span>退出登录</span>
         </button>
+        <p className="px-3 pt-3 text-xs theme-text-secondary">TRPG 备团工具 · {APP_VERSION}</p>
       </div>
     </div>
   );

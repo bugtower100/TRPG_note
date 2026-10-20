@@ -1,0 +1,1 @@
+import{a as t}from"./editor-BUkf7YeR.js";const n=t.createContext(null);function s(r){const e=t.useContext(n);t.useEffect(()=>{if(e)return e.current=r,()=>{e.current=null}},[r,e])}export{n as W,s as u};

@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Image as ImageIcon, Link, Bold, Italic, List, Eye, Edit, Underline, Palette, Highlighter } from 'lucide-react';
-import { Editor, defaultValueCtx, editorViewCtx, rootCtx } from '@milkdown/core';
+import { Editor, defaultValueCtx, editorViewCtx, remarkStringifyOptionsCtx, rootCtx } from '@milkdown/core';
 import { commonmark, insertImageCommand, toggleEmphasisCommand, toggleLinkCommand, toggleStrongCommand, wrapInBulletListCommand } from '@milkdown/preset-commonmark';
 import { gfm } from '@milkdown/preset-gfm';
 import { history } from '@milkdown/plugin-history';
@@ -405,6 +405,12 @@ const MilkdownEditorInner: React.FC<MilkdownEditorInnerProps> = ({
         .config((ctx) => {
           ctx.set(rootCtx, root);
           ctx.set(defaultValueCtx, value);
+          ctx.update(remarkStringifyOptionsCtx, (options) => {
+            const handlers = { ...options.handlers };
+            // Use the standard serializer to preserve bold next to punctuation and text.
+            delete handlers.strong;
+            return { ...options, handlers };
+          });
           ctx.get(listenerCtx).markdownUpdated((_, markdown) => {
             if (isSyncingRef.current) return;
             if (markdown === latestValueRef.current) return;

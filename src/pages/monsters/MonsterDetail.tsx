@@ -44,7 +44,7 @@ const MonsterDetail: React.FC<MonsterDetailProps> = ({ entityId }) => {
     items: canManageCampaignContent ? campaignData.monsters : [],
     navigate,
     listPath: '/monsters',
-    initialCollapsed: { basic: true, combat: true },
+    initialCollapsed: { basic: false, combat: true },
     sectionDefs,
     updateItem: (item) => updateEntity('monsters', item),
     deleteItem: (itemId) => deleteEntity('monsters', itemId),
@@ -53,7 +53,7 @@ const MonsterDetail: React.FC<MonsterDetailProps> = ({ entityId }) => {
   if (!monster) return <div>加载中...</div>;
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6 pb-12 px-2 sm:px-0">
+    <div className="entity-detail-page">
       <EntityDetailHeader
         entity={monster}
         entityType="monsters"

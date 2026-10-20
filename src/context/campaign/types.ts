@@ -15,7 +15,7 @@ export interface CampaignDataContextValue {
   campaignData: CampaignData;
   setCampaignData: Dispatch<SetStateAction<CampaignData>>;
   updateEntity: (collection: keyof CampaignData, item: any) => void;
-  deleteEntity: (collection: keyof CampaignData, id: string) => void;
+  deleteEntity: (collection: keyof CampaignData, id: string) => Promise<boolean>;
   addEntity: (collection: keyof CampaignData, item: any) => void;
   reorderEntities: (collection: keyof CampaignData, orderedIds: string[]) => void;
 }
@@ -31,13 +31,15 @@ export interface CampaignSessionContextValue {
   isSessionBootstrapping: boolean;
   isCampaignLoading: boolean;
   isCampaignSaving: boolean;
+  lastSavedAt: number | null;
+  lastSaveError: string | null;
   showSavingNotice: boolean;
   hasUnsavedChanges: boolean;
   showUnsavedWarning: boolean;
   sessionError: string | null;
   clearSessionError: () => void;
   reloadCampaignList: () => Promise<void>;
-  reloadCurrentCampaign: () => Promise<void>;
+  reloadCurrentCampaign: (options?: { discardUnsavedChanges?: boolean }) => Promise<void>;
   switchCampaign: (id: string) => Promise<void>;
   createNewCampaign: (name: string, description: string) => Promise<void>;
   deleteCampaign: (id: string) => Promise<void>;

@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArrowDown, ArrowUp } from 'lucide-react';
+import { ArrowDown, ArrowUp, ChevronDown, ChevronRight } from 'lucide-react';
 import ConfirmDialog from './ConfirmDialog';
 
 interface CollapsibleSectionProps {
@@ -18,6 +18,7 @@ interface CollapsibleSectionProps {
   canMoveDown?: boolean;
   onMoveUp?: () => void;
   onMoveDown?: () => void;
+  compact?: boolean;
 }
 
 const CollapsibleSection: React.FC<CollapsibleSectionProps> = ({
@@ -36,6 +37,7 @@ const CollapsibleSection: React.FC<CollapsibleSectionProps> = ({
   canMoveDown = false,
   onMoveUp,
   onMoveDown,
+  compact = false,
 }) => {
   const [showDeleteConfirm, setShowDeleteConfirm] = React.useState(false);
 
@@ -52,15 +54,8 @@ const CollapsibleSection: React.FC<CollapsibleSectionProps> = ({
     setShowDeleteConfirm(true);
   };
 
-  return (
-    <section
-      data-section-title={sectionTitleLower || title.toLowerCase()}
-      data-collapsed={collapsed ? 'true' : 'false'}
-      className={`p-3 rounded-lg shadow-sm border theme-card ${className}`}
-    >
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-2">
+  const actions = (
         <div className="flex items-center gap-2 flex-wrap">
-          <h3 className="text-base font-medium">{title}</h3>
           {onMoveUp && onMoveDown ? (
             <div className="flex items-center" aria-label="调整区块顺序">
               <button
@@ -94,16 +89,6 @@ const CollapsibleSection: React.FC<CollapsibleSectionProps> = ({
               改名
             </button>
           )}
-          <button
-            type="button"
-            onClick={onToggle}
-            data-role="section-toggle"
-            className="text-xs font-semibold text-primary hover:text-primary-dark px-2 py-1 border-2 border-primary/30 rounded hover:bg-primary/10"
-          >
-            {collapsed ? '展开内容 ▼' : '收起内容 ▲'}
-          </button>
-        </div>
-        <div className="flex items-center gap-3 flex-wrap">
           {headerActions}
           {removable && onRemove && (
             <button
@@ -115,8 +100,23 @@ const CollapsibleSection: React.FC<CollapsibleSectionProps> = ({
             </button>
           )}
         </div>
+  );
+
+  return (
+    <section
+      data-section-title={sectionTitleLower || title.toLowerCase()}
+      data-collapsed={collapsed ? 'true' : 'false'}
+      className={compact ? `entity-section-flat ${className}` : `p-3 rounded-lg shadow-sm border theme-card ${className}`}
+    >
+      <div className={`flex flex-wrap items-center justify-between gap-2 ${compact ? 'entity-section-heading' : 'mb-2'}`}>
+        <h3>
+          <button type="button" onClick={onToggle} data-role="section-toggle" aria-expanded={!collapsed} className="inline-flex items-center gap-2 text-sm font-semibold py-1">
+            {collapsed ? <ChevronRight size={16} /> : <ChevronDown size={16} />}{title}
+          </button>
+        </h3>
+        {compact ? <details className="compact-actions"><summary aria-label={`${title}区块操作`}>操作</summary><div className="compact-actions__menu">{actions}</div></details> : actions}
       </div>
-      {!collapsed && children}
+      {!collapsed && (compact ? <div className="entity-section-body">{children}</div> : children)}
       <ConfirmDialog
         open={showDeleteConfirm}
         title="确认删除区块"

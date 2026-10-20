@@ -293,7 +293,7 @@ const CharacterSheets: React.FC = () => {
 
   return (
     <>
-    <div className="grid grid-cols-1 xl:grid-cols-[300px_minmax(0,1fr)] gap-6">
+    <div className="character-sheet-page workspace-split">
       <CharacterSheetListPanel
         memberRole={memberRole}
         createName={createName}
@@ -320,7 +320,7 @@ const CharacterSheets: React.FC = () => {
         onSelectSheet={(nextSheetId) => navigate(`/characters/sheets/${nextSheetId}`)}
       />
 
-      <section className="theme-card border border-theme rounded-xl p-5 space-y-4 min-w-0 shadow-sm">
+      <section className="workspace-editor-pane space-y-4 min-w-0">
         {compareMode ? (
           <CharacterSheetComparePanel
             sheets={compareSheets}

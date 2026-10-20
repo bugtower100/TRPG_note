@@ -75,8 +75,55 @@ type prepPackageContent struct {
 }
 
 type prepCatalogItem struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
+	ID           string           `json:"id"`
+	Name         string           `json:"name"`
+	Dependencies []prepDependency `json:"dependencies"`
+}
+
+type prepDependency struct {
+	Key string `json:"key"`
+	ID  string `json:"id"`
+}
+
+func prepItemDependencies(value any) []prepDependency {
+	payload, err := json.Marshal(value)
+	if err != nil {
+		return nil
+	}
+	var root any
+	if json.Unmarshal(payload, &root) != nil {
+		return nil
+	}
+	result := []prepDependency{}
+	seen := map[string]bool{}
+	add := func(key, id string) {
+		key = singularToCollection(key)
+		if prepCollectionLabels[key] == "" || id == "" || seen[key+":"+id] {
+			return
+		}
+		seen[key+":"+id] = true
+		result = append(result, prepDependency{Key: key, ID: id})
+	}
+	var visit func(any)
+	visit = func(node any) {
+		switch item := node.(type) {
+		case map[string]any:
+			add(stringFromAny(item["targetType"]), stringFromAny(item["id"]))
+			add(stringFromAny(item["entityType"]), stringFromAny(item["entityId"]))
+			add(stringFromAny(item["linkedEntityType"]), stringFromAny(item["linkedEntityId"]))
+			add("locations", stringFromAny(item["locationId"]))
+			for _, child := range item {
+				visit(child)
+			}
+		case []any:
+			for _, child := range item {
+				visit(child)
+			}
+		}
+	}
+	visit(root)
+	sort.Slice(result, func(i, j int) bool { return result[i].Key+result[i].ID < result[j].Key+result[j].ID })
+	return result
 }
 
 type prepCatalogCategory struct {
@@ -127,7 +174,10 @@ func prepMapItems(items []map[string]any) []prepCatalogItem {
 		if name == "" {
 			name = "未命名条目"
 		}
-		result = append(result, prepCatalogItem{ID: id, Name: name})
+		if title := stringFromAny(item["title"]); name == "未命名条目" && title != "" {
+			name = title
+		}
+		result = append(result, prepCatalogItem{ID: id, Name: name, Dependencies: prepItemDependencies(item)})
 	}
 	return result
 }
@@ -153,10 +203,10 @@ func buildPrepCatalog(db *gorm.DB, campaignID, userID, username string) ([]prepC
 		"relationGraphs": prepMapItems(bundle.Bundle.RelationGraphs), "mindMaps": prepMapItems(bundle.Bundle.MindMaps),
 	}
 	for _, sheet := range sheets {
-		itemsByKey["characterSheets"] = append(itemsByKey["characterSheets"], prepCatalogItem{ID: sheet.ID, Name: sheet.Name})
+		itemsByKey["characterSheets"] = append(itemsByKey["characterSheets"], prepCatalogItem{ID: sheet.ID, Name: sheet.Name, Dependencies: prepItemDependencies(sheet)})
 	}
 	for _, item := range maps.Maps {
-		itemsByKey["locationMaps"] = append(itemsByKey["locationMaps"], prepCatalogItem{ID: item.ID, Name: item.Name})
+		itemsByKey["locationMaps"] = append(itemsByKey["locationMaps"], prepCatalogItem{ID: item.ID, Name: item.Name, Dependencies: prepItemDependencies(item)})
 	}
 	result := make([]prepCatalogCategory, 0, len(prepCollectionOrder))
 	for _, key := range prepCollectionOrder {

@@ -16,7 +16,7 @@ interface UseSectionedEntityDetailOptions<T extends BaseEntity> {
   initialCollapsed: Record<string, boolean>;
   sectionDefs: DetailSectionDef[];
   updateItem: (item: T) => void;
-  deleteItem: (id: string) => void;
+  deleteItem: (id: string) => Promise<boolean>;
 }
 
 export const useSectionedEntityDetail = <T extends BaseEntity>({
@@ -58,10 +58,10 @@ export const useSectionedEntityDetail = <T extends BaseEntity>({
     });
   }, [updateItem]);
 
-  const handleDeleteAndNavigate = useCallback(() => {
-    if (!id) return;
-    deleteItem(id);
+  const handleDeleteAndNavigate = useCallback(async () => {
+    if (!id || !(await deleteItem(id))) return false;
     navigate(listPath);
+    return true;
   }, [deleteItem, id, listPath, navigate]);
 
   const getSectionItems = useCallback((key: string): CustomSubItem[] => (

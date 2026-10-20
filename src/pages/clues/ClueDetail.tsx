@@ -43,7 +43,7 @@ const ClueDetail: React.FC<ClueDetailProps> = ({ entityId }) => {
     items: canManageCampaignContent ? campaignData.clues : [],
     navigate,
     listPath: '/clues',
-    initialCollapsed: { detail: true },
+    initialCollapsed: { detail: false },
     sectionDefs,
     updateItem: (item) => updateEntity('clues', item),
     deleteItem: (itemId) => deleteEntity('clues', itemId),
@@ -52,7 +52,7 @@ const ClueDetail: React.FC<ClueDetailProps> = ({ entityId }) => {
   if (!clue) return <div>加载中...</div>;
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6 pb-12 px-2 sm:px-0">
+    <div className="entity-detail-page">
       <EntityDetailHeader
         entity={clue}
         entityType="clues"

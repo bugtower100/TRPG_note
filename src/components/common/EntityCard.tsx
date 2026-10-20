@@ -53,7 +53,7 @@ const EntityCard: React.FC<EntityCardProps> = ({
       onDrop={onDrop}
       onDragEnd={onDragEnd}
       onClick={() => navigate(`/${type}/${entity.id}`)}
-      className={`p-4 rounded-lg shadow-sm border theme-card hover:shadow-md transition-all cursor-pointer relative group ${
+      className={`p-4 rounded-lg border border-theme theme-card hover:border-primary transition-colors cursor-pointer relative group ${
         isDragging ? 'opacity-45 scale-[0.98]' : ''
       } ${isDropTarget ? 'ring-2 ring-primary/35 border-primary' : ''}`}
     >
@@ -68,7 +68,7 @@ const EntityCard: React.FC<EntityCardProps> = ({
               <GripVertical size={16} />
             </span>
           )}
-          <h3 className="text-lg font-bold truncate" style={{ color: entity.titleColor || '#111827' }}>{entity.name}</h3>
+          <h3 className="text-base font-semibold truncate" style={{ color: entity.titleColor || '#111827' }}>{entity.name}</h3>
         </div>
         <button
           data-tour="entity-card-split"

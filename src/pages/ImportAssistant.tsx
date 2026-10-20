@@ -81,16 +81,16 @@ const ImportAssistant: React.FC = () => {
   };
 
   return (
-    <div className="max-w-5xl space-y-5">
-      <div><h2 className="text-2xl font-bold">导入助手</h2><p className="mt-1 text-sm theme-text-secondary">统一导入完整备份或选择性模组导出包。</p></div>
-      <section className="space-y-3 rounded-lg border border-theme bg-theme-card p-4">
+    <div className="space-y-4">
+      <div><h2 className="text-lg font-semibold">导入助手</h2><p className="mt-1 text-sm theme-text-secondary">统一导入完整备份或选择性模组导出包。</p></div>
+      <section className="page-section space-y-3">
         <input ref={fileInputRef} type="file" accept=".zip,.trpgzip,application/zip" onChange={(event) => void handlePickFile(event)} className="hidden" />
         <div className="flex flex-wrap items-center gap-2">
           <button type="button" onClick={() => fileInputRef.current?.click()} disabled={busy} className="rounded border border-theme px-3 py-2 hover:bg-primary-light disabled:opacity-50">选择 `.trpgzip` 导出包</button>
           <span className="text-sm theme-text-secondary">{selectedFile?.name || '尚未选择文件'}</span>
         </div>
       </section>
-      {preview && <section className="space-y-4 rounded-lg border border-theme bg-theme-card p-4">
+      {preview && <section className="page-section space-y-4">
         <div className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-3">
           <div className="rounded border border-theme p-3"><div className="text-xs theme-text-secondary">导出类型</div><div className="mt-1">{preview.packageType === 'selective' ? '选择性模组导出' : preview.manifest.exportType === 'all' ? '所有模组完整备份' : '单模组完整备份'}</div></div>
           <div className="rounded border border-theme p-3"><div className="text-xs theme-text-secondary">{preview.packageType === 'selective' ? '条目数量' : '模组数量'}</div><div className="mt-1">{preview.packageType === 'selective' ? Object.values(preview.campaigns[0]?.collectionCounts || {}).reduce((total, count) => total + count, 0) : preview.manifest.campaignCount}</div></div>
@@ -122,7 +122,7 @@ const ImportAssistant: React.FC = () => {
           <div className="font-medium">{campaign.name}</div><div className="mt-1 text-xs theme-text-secondary">资料条目 {Object.values(campaign.collectionCounts).reduce((total, count) => total + count, 0)} · 图片资源 {campaign.assetCount}</div>
         </div>)}</div>
       </section>}
-      <section className="rounded-lg border border-theme bg-theme-card p-4">
+      <section className="page-section">
         <h3 className="mb-3 font-semibold">作业状态</h3>
         {jobs.length === 0 ? <div className="text-sm theme-text-secondary">暂无导入作业。</div> : <div className="space-y-2">{jobs.map((job) => <div key={job.id} className="rounded border border-theme px-3 py-2 text-sm">
           <div className="flex justify-between gap-3"><span className="font-medium">{job.fileName}</span><span className={job.status === 'failed' ? 'text-red-600' : job.status === 'success' ? 'text-green-600' : 'theme-text-secondary'}>{job.status === 'running' ? '运行中' : job.status === 'success' ? '成功' : '失败'}</span></div>

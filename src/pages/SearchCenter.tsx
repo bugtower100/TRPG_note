@@ -1,3 +1,4 @@
+import { getEntitySearchContent, getSearchExcerpt } from '../utils/entitySearch';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCampaignData } from '../context/CampaignContext';
@@ -31,7 +32,7 @@ const SearchCenter: React.FC = () => {
           entityType: '角色',
           entityName: item.name,
           route: `/characters/${item.id}`,
-          content: [item.name, item.details, item.identity, item.appearance, item.desireOrGoal, item.attributes, ...(item.tags || [])].join(' ').toLowerCase(),
+          content: getEntitySearchContent(item),
           updatedAt: item.updatedAt,
         })),
         ...campaignData.monsters.map((item) => ({
@@ -39,7 +40,7 @@ const SearchCenter: React.FC = () => {
           entityType: '怪物',
           entityName: item.name,
           route: `/monsters/${item.id}`,
-          content: [item.name, item.details, item.type, item.stats, item.abilities, item.drops, ...(item.tags || [])].join(' ').toLowerCase(),
+          content: getEntitySearchContent(item),
           updatedAt: item.updatedAt,
         })),
         ...campaignData.locations.map((item) => ({
@@ -47,7 +48,7 @@ const SearchCenter: React.FC = () => {
           entityType: '地点',
           entityName: item.name,
           route: `/locations/${item.id}`,
-          content: [item.name, item.details, item.environment, ...(item.tags || [])].join(' ').toLowerCase(),
+          content: getEntitySearchContent(item),
           updatedAt: item.updatedAt,
         })),
         ...campaignData.organizations.map((item) => ({
@@ -55,7 +56,7 @@ const SearchCenter: React.FC = () => {
           entityType: '组织',
           entityName: item.name,
           route: `/organizations/${item.id}`,
-          content: [item.name, item.details, item.notes, ...(item.tags || [])].join(' ').toLowerCase(),
+          content: getEntitySearchContent(item),
           updatedAt: item.updatedAt,
         })),
         ...campaignData.events.map((item) => ({
@@ -63,7 +64,7 @@ const SearchCenter: React.FC = () => {
           entityType: '事件',
           entityName: item.name,
           route: `/events/${item.id}`,
-          content: [item.name, item.details, item.time, ...(item.tags || [])].join(' ').toLowerCase(),
+          content: getEntitySearchContent(item),
           updatedAt: item.updatedAt,
         })),
         ...campaignData.clues.map((item) => ({
@@ -71,7 +72,7 @@ const SearchCenter: React.FC = () => {
           entityType: '线索',
           entityName: item.name,
           route: `/clues/${item.id}`,
-          content: [item.name, item.details, item.type, item.revealTarget || '', ...(item.tags || [])].join(' ').toLowerCase(),
+          content: getEntitySearchContent(item),
           updatedAt: item.updatedAt,
         })),
         ...campaignData.timelines.map((item) => ({
@@ -79,7 +80,7 @@ const SearchCenter: React.FC = () => {
           entityType: '时间线',
           entityName: item.name,
           route: `/timelines/${item.id}`,
-          content: [item.name, item.details, ...(item.tags || []), ...(item.timelineEvents || []).map((event) => `${event.time} ${event.content}`)].join(' ').toLowerCase(),
+          content: getEntitySearchContent(item),
           updatedAt: item.updatedAt,
         })),
       ];
@@ -135,6 +136,7 @@ const SearchCenter: React.FC = () => {
                 className="w-full text-left border border-theme rounded px-3 py-2 hover:bg-primary-light"
               >
                 <div className="text-sm font-medium">{entry.entityName}</div>
+                <p className="text-xs theme-text-secondary mt-1 break-words">{getSearchExcerpt(entry.content, query)}</p>
                 <div className="text-xs theme-text-secondary mt-1">
                   {entry.entityType} · 最近更新：{new Date(entry.updatedAt).toLocaleString()}
                 </div>

@@ -36,11 +36,11 @@ const SharedEntityCard: React.FC<{ share: SharedEntityRecord }> = ({ share }) =>
     <div
       data-tour="entity-card"
       onClick={() => navigate(`/${share.entityType}/shared/${share.id}`)}
-      className="p-4 rounded-lg shadow-sm border theme-card hover:shadow-md transition-shadow cursor-pointer relative group border-dashed"
+      className="p-4 rounded-lg border border-theme theme-card hover:border-primary transition-colors cursor-pointer relative group border-dashed"
     >
       <div className="flex justify-between items-start gap-2">
         <div className="min-w-0">
-          <h3 className="text-lg font-bold truncate">{share.entityName}</h3>
+          <h3 className="text-base font-semibold truncate">{share.entityName}</h3>
           <div className="text-xs theme-text-secondary mt-1 truncate">（{metaText}）</div>
         </div>
         <button

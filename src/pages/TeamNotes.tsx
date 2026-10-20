@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertCircle, FilePlus2, GripVertical, History, Lock, Trash2, Unlock } from 'lucide-react';
+import { AlertCircle, FilePlus2, GripVertical, Lock, Trash2, Unlock } from 'lucide-react';
 import RichTextEditor from '../components/common/RichTextEditor';
 import RichTextDisplay from '../components/common/RichTextDisplay';
 import ConfirmDialog from '../components/common/ConfirmDialog';
@@ -10,8 +10,9 @@ import { queryKeys } from '../query/queryKeys';
 import { CampaignConfig, TeamNoteDocument } from '../types';
 import { teamNotesService } from '../services/teamNotesService';
 import { VersionConflictError } from '../services/conflictError';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { getCampaignRoleLabel } from '../utils/campaignRoles';
+import { useWorkspaceLeaveGuard } from '../hooks/useWorkspaceLeaveGuard';
 
 const mergeSavedNote = (notes: TeamNoteDocument[], saved: TeamNoteDocument) => {
   if (saved.sortLocked) {
@@ -22,7 +23,6 @@ const mergeSavedNote = (notes: TeamNoteDocument[], saved: TeamNoteDocument) => {
 
 const TeamNotes: React.FC = () => {
   const { currentCampaignId, user } = useCampaignSession();
-  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
   const [config, setConfig] = useState<CampaignConfig | null>(null);
@@ -332,6 +332,8 @@ const TeamNotes: React.FC = () => {
     return true;
   };
 
+  useWorkspaceLeaveGuard(editing ? handleStopEdit : null);
+
   const handleToggleEdit = async () => {
     if (editing) {
       await handleStopEdit();
@@ -484,11 +486,11 @@ const TeamNotes: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6">
-      <section className="bg-theme-card p-4 rounded-lg border border-theme shadow-sm">
+    <div className="notes-page space-y-4">
+      <section className="page-section">
         <div className="flex flex-col lg:flex-row lg:items-end gap-4 lg:justify-between">
           <div>
-            <h2 className="text-xl sm:text-2xl font-bold">团队笔记</h2>
+            <h2 className="text-xl sm:text-2xl font-bold">跑团笔记</h2>
             <div className="text-sm theme-text-secondary mt-1">
               当前身份：{getCampaignRoleLabel(memberRole)} · 模组可见性：{config?.visibility === 'public' ? '公开' : '私密'}
             </div>
@@ -498,8 +500,8 @@ const TeamNotes: React.FC = () => {
         {statusText && <div className="mt-3 text-sm theme-text-secondary">{statusText}</div>}
       </section>
 
-      <div className="grid grid-cols-1 lg:grid-cols-[280px_minmax(0,1fr)] gap-4">
-        <aside data-tour="team-notes-list" className="bg-theme-card border border-theme rounded-lg shadow-sm p-3">
+      <div className="workspace-notes-grid">
+        <aside data-tour="team-notes-list" className="workspace-list-pane">
           <div className="flex items-center justify-between gap-2 mb-3">
             <div className="font-semibold">笔记列表</div>
             <button
@@ -579,7 +581,7 @@ const TeamNotes: React.FC = () => {
           </div>
         </aside>
 
-        <section className="bg-theme-card border border-theme rounded-lg shadow-sm p-4 min-h-[520px]">
+        <section className="workspace-editor-pane">
           {selectedNote ? (
             <div className="space-y-3">
               <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:justify-between">
@@ -603,14 +605,6 @@ const TeamNotes: React.FC = () => {
                       {leaseLabel}
                     </span>
                   )}
-                  <button
-                    type="button"
-                    onClick={() => navigate(`/versions?documentType=team_note${selectedNote ? `&documentId=${selectedNote.id}` : ''}`)}
-                    className="px-3 py-2 rounded border border-theme hover:bg-primary-light flex items-center gap-2 text-sm"
-                  >
-                    <History size={16} />
-                    历史版本
-                  </button>
                   <button
                     type="button"
                     onClick={handleToggleEdit}
@@ -645,7 +639,7 @@ const TeamNotes: React.FC = () => {
                   />
                 </div>
               ) : (
-                <div data-tour="team-notes-editor-body" className="min-h-[420px] border border-theme rounded p-4 overflow-y-auto">
+                <div data-tour="team-notes-editor-body" className="min-h-[280px] py-3 overflow-y-auto">
                   <RichTextDisplay content={selectedNote.content} />
                 </div>
               )}

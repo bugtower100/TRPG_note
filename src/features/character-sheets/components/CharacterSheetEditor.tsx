@@ -357,7 +357,7 @@ const CharacterSheetEditor: React.FC<CharacterSheetEditorProps> = ({
         </label>
       </div>
 
-      <div className="border border-theme rounded-lg p-4 space-y-3">
+      <div className="page-section space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="text-sm font-medium">归属与成员权限</div>
           {!canManageAccess && (

@@ -121,10 +121,10 @@ function SessionList({ sessions, canEdit, playerView = false, onCreate, onOpen }
   const hasActiveFilter = Boolean(searchQuery.trim()) || (!playerView && statusFilter !== 'all');
 
   return (
-    <div className="space-y-6">
+    <div className="session-list space-y-4">
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-2xl font-bold">{playerView ? '场次回顾' : '场次中心'}</h2>
+          <h2 className="text-lg font-semibold">{playerView ? '场次回顾' : '场次列表'}</h2>
           <p className="mt-1 text-sm theme-text-secondary">{playerView ? '查看 GM 已发布的往期场次回顾。' : '按一次跑团集中准备资料、记录现场进展并完成复盘。'}</p>
         </div>
         {canEdit ? (
@@ -145,7 +145,7 @@ function SessionList({ sessions, canEdit, playerView = false, onCreate, onOpen }
             key={status}
             type="button"
             onClick={() => setStatusFilter(status)}
-            className={`rounded-full border px-3 py-1.5 text-sm ${statusFilter === status ? 'bg-primary text-white border-transparent' : 'border-theme hover:bg-primary-light'}`}
+            className={`rounded-md px-3 py-1.5 text-sm ${statusFilter === status ? 'bg-primary-light text-primary' : 'theme-text-secondary hover:bg-primary-light'}`}
           >
             {status === 'all' ? '全部' : STATUS_LABELS[status]}
           </button>
@@ -161,20 +161,20 @@ function SessionList({ sessions, canEdit, playerView = false, onCreate, onOpen }
           <p>{sessions.length === 0 ? (playerView ? 'GM 还没有发布场次回顾。' : '还没有场次，先为下一次跑团建立准备页。') : '没有符合当前搜索或筛选条件的场次。'}</p>
         </div>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <div className="session-rows">
           {visibleSessions.map((session) => {
             const completedGoals = session.goals.filter((goal) => goal.status === 'completed').length;
             return (
-              <button key={session.id} type="button" onClick={() => onOpen(session.id)} className="theme-card rounded-xl border border-theme p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+              <button key={session.id} type="button" onClick={() => onOpen(session.id)} className="session-row">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <div className="text-xs theme-text-secondary">第 {session.sessionNumber} 次</div>
-                    <h3 className="mt-1 truncate text-lg font-semibold">{session.title}</h3>
+                    <h3 className="mt-1 truncate text-base font-semibold">{session.title}</h3>
                   </div>
                   <span className="shrink-0 rounded-full border border-theme px-2 py-1 text-xs">{STATUS_LABELS[session.status]}</span>
                 </div>
-                <p className="mt-3 line-clamp-2 min-h-10 text-sm theme-text-secondary">{playerView ? session.playerRecap : (session.summary || '尚未填写场次简介。')}</p>
-                <div className="mt-4 flex flex-wrap gap-x-4 gap-y-1 text-xs theme-text-secondary">
+                {(playerView ? session.playerRecap : session.summary) && <p className="mt-2 line-clamp-1 text-sm theme-text-secondary">{playerView ? session.playerRecap : session.summary}</p>}
+                <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs theme-text-secondary">
                   <span>{session.scheduledAt ? new Date(session.scheduledAt).toLocaleString() : '时间待定'}</span>
                   {playerView ? <span>发布于 {formatDateTime(session.playerRecapPublishedAt)}</span> : <><span>目标 {completedGoals}/{session.goals.length}</span><span>资料 {session.resourceRefs.length}</span></>}
                 </div>
@@ -199,7 +199,7 @@ function PlayerSessionDetail({ session }: { session: GameSession }) {
           <Download size={16} />导出玩家回顾
         </button>
       </div>
-      <article className="theme-card rounded-xl border border-theme p-6 shadow-sm">
+      <article className="session-detail">
         <div className="flex flex-wrap items-start justify-between gap-3 border-b border-theme pb-4">
           <div>
             <div className="text-sm theme-text-secondary">第 {session.sessionNumber} 次</div>
@@ -234,6 +234,7 @@ function SessionDetail({ session, canEdit, campaignData, members, onChange, onDe
   const [newAgendaTitle, setNewAgendaTitle] = useState('');
   const [resourceType, setResourceType] = useState<GraphEntityType>('characters');
   const [resourceId, setResourceId] = useState('');
+  const [activeTab, setActiveTab] = useState<'prepare' | 'live' | 'recap'>(() => session.status === 'completed' ? 'recap' : session.status === 'active' ? 'live' : 'prepare');
 
   const resourceCollections = useMemo(() => ({
     characters: campaignData.characters,
@@ -284,6 +285,9 @@ function SessionDetail({ session, canEdit, campaignData, members, onChange, onDe
       completedAt: status === 'completed' ? now : undefined,
       playerRecapPublishedAt: status === 'completed' ? session.playerRecapPublishedAt : undefined,
     });
+    if (status === 'active') setActiveTab('live');
+    else if (status === 'completed') setActiveTab('recap');
+    else setActiveTab('prepare');
   };
 
   const incompleteTaskIds = session.taskIds.filter((taskId) => campaignData.sessionTasks.find((task) => task.id === taskId)?.status !== 'done');
@@ -292,41 +296,58 @@ function SessionDetail({ session, canEdit, campaignData, members, onChange, onDe
   const plannedAgendaMinutes = session.agenda.reduce((total, item) => total + (item.plannedMinutes ?? 0), 0);
 
   return (
-    <div className="space-y-5">
+    <div className="session-detail">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <button type="button" onClick={() => navigate('/sessions')} className="inline-flex items-center gap-1 rounded-md border border-theme px-3 py-2 text-sm hover:bg-primary-light">
           <ChevronLeft size={17} />场次列表
         </button>
         {canEdit ? (
           <div className="flex flex-wrap gap-2">
-            <button type="button" onClick={() => downloadSessionMarkdown(buildGMSessionMarkdown(session, campaignData, members), gameSessionMarkdownFileName(session, false))} className="inline-flex items-center gap-2 rounded-md border border-theme px-3 py-2 text-sm hover:bg-primary-light"><Download size={16} />导出 Markdown</button>
-            <button type="button" onClick={onReusePreparation} className="inline-flex items-center gap-2 rounded-md border border-theme px-3 py-2 text-sm hover:bg-primary-light"><Copy size={16} />复用准备结构</button>
-            {session.status !== 'active' ? <button type="button" onClick={() => setStatus('active')} className="rounded-md border border-theme px-3 py-2 text-sm hover:bg-primary-light">开始场次</button> : null}
-            {session.status !== 'completed' ? <button type="button" onClick={() => setStatus('completed')} className="rounded-md bg-primary px-3 py-2 text-sm text-white hover:bg-primary-dark">结束场次</button> : null}
+            {session.status === 'preparing' ? <button type="button" onClick={() => setStatus('active')} className="rounded-md bg-primary text-white px-3 py-1.5 text-sm hover:bg-primary-dark">开始场次</button> : null}
+            {session.status === 'active' ? <button type="button" onClick={() => setStatus('completed')} className="rounded-md bg-primary px-3 py-1.5 text-sm text-white hover:bg-primary-dark">结束场次</button> : null}
             {session.status === 'completed' ? <button type="button" onClick={onCreateNext} className="rounded-md border border-theme px-3 py-2 text-sm hover:bg-primary-light">创建下一场</button> : null}
+            <details className="compact-actions">
+              <summary>更多操作</summary>
+              <div className="compact-actions__menu">
+                <button type="button" onClick={() => downloadSessionMarkdown(buildGMSessionMarkdown(session, campaignData, members), gameSessionMarkdownFileName(session, false))}><Download size={15} />导出 Markdown</button>
+                <button type="button" onClick={onReusePreparation}><Copy size={15} />复用准备结构</button>
+                {session.status === 'completed' && <button type="button" onClick={() => setStatus('active')}>重新开始场次</button>}
+                <button type="button" onClick={onDelete} className="text-red-600"><Trash2 size={15} />删除场次</button>
+              </div>
+            </details>
           </div>
         ) : null}
       </header>
 
-      <section className="theme-card space-y-4 rounded-xl border border-theme p-5 shadow-sm">
-        <div className="grid gap-4 md:grid-cols-[120px_minmax(0,1fr)_180px]">
+      <section className="session-heading">
+        <div className="flex flex-wrap items-center gap-3">
+          <input aria-label="场次名称" disabled={!canEdit} value={session.title} onChange={(event) => update({ title: event.target.value })} className="min-w-0 flex-1 bg-transparent text-xl font-semibold border-b border-transparent focus:border-primary focus:outline-none" />
+          <span className="text-xs theme-text-secondary">第 {session.sessionNumber} 场 · {STATUS_LABELS[session.status]}</span>
+        </div>
+        <details className="session-info">
+          <summary className="cursor-pointer text-xs theme-text-secondary">场次信息与简介 · {session.scheduledAt ? new Date(session.scheduledAt).toLocaleString() : '时间待定'}{session.inWorldDate ? ` · ${session.inWorldDate}` : ''}</summary>
+        <div className="grid gap-3 mt-3 sm:grid-cols-2">
           <label className="text-sm">场次序号<input disabled={!canEdit} type="number" min={1} value={session.sessionNumber} onChange={(event) => update({ sessionNumber: Math.max(1, Number(event.target.value) || 1) })} className="mt-1 w-full rounded-md border border-theme bg-transparent px-3 py-2" /></label>
-          <label className="text-sm">场次名称<input disabled={!canEdit} value={session.title} onChange={(event) => update({ title: event.target.value })} className="mt-1 w-full rounded-md border border-theme bg-transparent px-3 py-2" /></label>
           <label className="text-sm">状态<select disabled={!canEdit} value={session.status} onChange={(event) => setStatus(event.target.value as GameSessionStatus)} className="mt-1 w-full rounded-md border border-theme bg-theme-card px-3 py-2">{Object.entries(STATUS_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
         </div>
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-3 mt-3 sm:grid-cols-2">
           <label className="text-sm">现实时间<input disabled={!canEdit} type="datetime-local" value={session.scheduledAt} onChange={(event) => update({ scheduledAt: event.target.value })} className="mt-1 w-full rounded-md border border-theme bg-transparent px-3 py-2" /></label>
           <label className="text-sm">世界内日期<input disabled={!canEdit} value={session.inWorldDate} onChange={(event) => update({ inWorldDate: event.target.value })} placeholder="例如：霜月 12 日" className="mt-1 w-full rounded-md border border-theme bg-transparent px-3 py-2" /></label>
-          <div className="text-sm theme-text-secondary"><div>开始：{formatDateTime(session.startedAt)}</div><div className="mt-2">结束：{formatDateTime(session.completedAt)}</div></div>
+          <div className="text-xs theme-text-secondary sm:col-span-2">开始：{formatDateTime(session.startedAt)} · 结束：{formatDateTime(session.completedAt)}</div>
         </div>
-        <label className="block text-sm">场次简介<textarea disabled={!canEdit} value={session.summary} onChange={(event) => update({ summary: event.target.value })} rows={3} className="mt-1 w-full resize-y rounded-md border border-theme bg-transparent px-3 py-2" /></label>
+        <label className="block mt-3 text-sm">场次简介<textarea disabled={!canEdit} value={session.summary} onChange={(event) => update({ summary: event.target.value })} rows={2} className="mt-1 w-full resize-y rounded-md border border-theme bg-transparent px-3 py-2" /></label>
+        </details>
       </section>
 
-      <div className="grid gap-5 xl:grid-cols-2">
+      <nav aria-label="场次工作区" className="content-tabs">
+        {([{ id: 'prepare', label: '准备' }, { id: 'live', label: '现场' }, { id: 'recap', label: '复盘' }] as const).map((tab) => <button key={tab.id} type="button" aria-pressed={activeTab === tab.id} className={activeTab === tab.id ? 'is-active' : ''} onClick={() => setActiveTab(tab.id)}>{tab.label}</button>)}
+      </nav>
+      <div hidden={activeTab !== 'prepare'} className="session-tab-content">
+      <div className="session-columns">
         <section className="theme-card space-y-3 rounded-xl border border-theme p-5">
           <div className="flex items-center justify-between"><h3 className="font-semibold">本场目标</h3><span className="text-xs theme-text-secondary">未完成 {unfinishedGoalCount}</span></div>
           {session.goals.map((goal, index) => (
-            <div key={goal.id} className="grid gap-2 rounded-lg border border-theme p-3 sm:grid-cols-[140px_minmax(0,1fr)_auto]">
+            <div key={goal.id} className="grid gap-2 border-b border-theme py-3 sm:grid-cols-[110px_minmax(0,1fr)_auto]">
               <select disabled={!canEdit} value={goal.status} onChange={(event) => update({ goals: session.goals.map((item) => item.id === goal.id ? { ...item, status: event.target.value as GameSessionGoalStatus } : item) })} className="rounded-md border border-theme bg-theme-card px-2 py-2 text-sm">{Object.entries(GOAL_STATUS_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
               <input disabled={!canEdit} value={goal.title} onChange={(event) => update({ goals: session.goals.map((item) => item.id === goal.id ? { ...item, title: event.target.value } : item) })} className="rounded-md border border-theme bg-transparent px-3 py-2 text-sm" />
               {canEdit ? <div className="flex items-center justify-end gap-1">
@@ -342,7 +363,7 @@ function SessionDetail({ session, canEdit, campaignData, members, onChange, onDe
         <section className="theme-card space-y-3 rounded-xl border border-theme p-5">
           <div className="flex flex-wrap items-center justify-between gap-2"><h3 className="font-semibold">流程提纲</h3><span className="text-xs theme-text-secondary">预计 {formatDuration(plannedAgendaMinutes)} · 待处理 {unfinishedAgendaCount}</span></div>
           {session.agenda.map((agenda, index) => (
-            <div key={agenda.id} className="space-y-2 rounded-lg border border-theme p-3">
+            <div key={agenda.id} className="session-agenda-row space-y-2">
               <div className="flex gap-2">
                 <select disabled={!canEdit} value={agenda.status} onChange={(event) => update({ agenda: session.agenda.map((item) => item.id === agenda.id ? { ...item, status: event.target.value as GameSessionAgendaStatus } : item) })} className="w-32 rounded-md border border-theme bg-theme-card px-2 py-2 text-sm">{Object.entries(AGENDA_STATUS_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
                 <input disabled={!canEdit} value={agenda.title} onChange={(event) => update({ agenda: session.agenda.map((item) => item.id === agenda.id ? { ...item, title: event.target.value } : item) })} className="min-w-0 flex-1 rounded-md border border-theme bg-transparent px-3 py-2 text-sm" />
@@ -380,7 +401,7 @@ function SessionDetail({ session, canEdit, campaignData, members, onChange, onDe
         ) : null}
         <div className="grid gap-3 md:grid-cols-2">
           {session.resourceRefs.map((ref) => (
-            <div key={`${ref.entityType}:${ref.entityId}`} className="rounded-lg border border-theme p-3">
+            <div key={`${ref.entityType}:${ref.entityId}`} className="session-resource-row">
               <div className="flex items-center gap-2">
                 <button type="button" onClick={() => navigate(routeForResource(ref))} className="min-w-0 flex-1 text-left font-medium hover:text-primary"><span className="text-xs theme-text-secondary">{RESOURCE_TYPE_LABELS[ref.entityType]} · </span>{resourceNameMaps[ref.entityType].get(ref.entityId) || '资料已删除'} <ExternalLink className="inline" size={13} /></button>
                 {canEdit ? <button type="button" onClick={() => update({ resourceRefs: session.resourceRefs.map((item) => item === ref ? { ...item, pinned: !item.pinned } : item) })} className={`rounded p-2 ${ref.pinned ? 'text-primary bg-primary-light' : 'theme-text-secondary hover:bg-primary-light'}`} aria-label={ref.pinned ? '取消置顶' : '置顶'}><Pin size={15} /></button> : null}
@@ -414,15 +435,19 @@ function SessionDetail({ session, canEdit, campaignData, members, onChange, onDe
           })}
         </div>
       </section>
-
-      <div className="grid gap-5 xl:grid-cols-2">
-        <label className="theme-card block rounded-xl border border-theme p-5 text-sm"><span className="font-semibold">现场记录</span><textarea disabled={!canEdit} value={session.liveNotes} onChange={(event) => update({ liveNotes: event.target.value })} rows={14} placeholder="记录玩家决定、实际发生内容和临时信息……" className="mt-3 w-full resize-y rounded-md border border-theme bg-transparent px-3 py-2 leading-7" /></label>
-        <label className="theme-card block rounded-xl border border-theme p-5 text-sm"><span className="font-semibold">未解决问题</span><textarea disabled={!canEdit} value={session.unresolvedItems} onChange={(event) => update({ unresolvedItems: event.target.value })} rows={14} placeholder="每行记录一个需要带到下一场或稍后处理的问题……" className="mt-3 w-full resize-y rounded-md border border-theme bg-transparent px-3 py-2 leading-7" /></label>
       </div>
 
+      <div hidden={activeTab !== 'live'} className="session-tab-content">
+      <div className="session-columns">
+        <label className="session-editor"><span className="font-semibold">现场记录</span><textarea disabled={!canEdit} value={session.liveNotes} onChange={(event) => update({ liveNotes: event.target.value })} rows={10} placeholder="记录玩家决定、实际发生内容和临时信息……" className="mt-3 w-full resize-y rounded-md border border-theme bg-transparent px-3 py-2 leading-7" /></label>
+        <label className="session-editor"><span className="font-semibold">未解决问题</span><textarea disabled={!canEdit} value={session.unresolvedItems} onChange={(event) => update({ unresolvedItems: event.target.value })} rows={10} placeholder="每行记录一个需要带到下一场或稍后处理的问题……" className="mt-3 w-full resize-y rounded-md border border-theme bg-transparent px-3 py-2 leading-7" /></label>
+      </div>
+      </div>
+
+      <div hidden={activeTab !== 'recap'} className="session-tab-content">
       <section className="theme-card space-y-4 rounded-xl border border-theme p-5">
         <div className="flex flex-wrap items-center justify-between gap-2"><h3 className="font-semibold">结束与复盘</h3><div className="text-xs theme-text-secondary">未完成目标 {unfinishedGoalCount} · 待处理流程 {unfinishedAgendaCount} · 未完成任务 {incompleteTaskIds.length}</div></div>
-        <div className="grid gap-5 xl:grid-cols-2">
+        <div className="session-columns">
           <label className="block text-sm">GM 私有总结<textarea disabled={!canEdit} value={session.gmSummary} onChange={(event) => update({ gmSummary: event.target.value })} rows={8} className="mt-2 w-full resize-y rounded-md border border-theme bg-transparent px-3 py-2" /></label>
           <div className="space-y-2 text-sm">
             <div className="flex flex-wrap items-center justify-between gap-2">
@@ -444,12 +469,7 @@ function SessionDetail({ session, canEdit, campaignData, members, onChange, onDe
           </div>
         </div>
       </section>
-
-      {canEdit ? (
-        <div className="flex justify-end">
-          <button type="button" onClick={onDelete} className="inline-flex items-center gap-2 rounded-md border border-red-300 px-3 py-2 text-sm text-red-600 hover:bg-red-50"><Trash2 size={16} />删除场次</button>
-        </div>
-      ) : null}
+      </div>
     </div>
   );
 }
@@ -513,5 +533,5 @@ export default function GameSessions() {
 
   if (!canManageCampaignContent) return <PlayerSessionDetail session={session} />;
 
-  return <SessionDetail session={session} canEdit={canManageCampaignContent} campaignData={campaignData} members={config?.members ?? []} onChange={updateSession} onDelete={deleteSession} onCreateNext={() => createSession(session)} onReusePreparation={reusePreparation} />;
+  return <SessionDetail key={session.id} session={session} canEdit={canManageCampaignContent} campaignData={campaignData} members={config?.members ?? []} onChange={updateSession} onDelete={deleteSession} onCreateNext={() => createSession(session)} onReusePreparation={reusePreparation} />;
 }

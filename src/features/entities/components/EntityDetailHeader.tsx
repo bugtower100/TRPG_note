@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import EntityShareActions from '../../../components/common/EntityShareActions';
 import { BaseEntity, GraphEntityType } from '../../../types';
 import EntityKeywordEditor from './EntityKeywordEditor';
+import EntityReuseActions from './EntityReuseActions';
 
 interface EntityDetailHeaderProps<T extends BaseEntity> {
   entity: T;
@@ -30,6 +31,18 @@ const EntityDetailHeader = <T extends BaseEntity>({
   onDelete,
 }: EntityDetailHeaderProps<T>) => {
   const navigate = useNavigate();
+  const secondaryActions = (
+    <>
+      <EntityKeywordEditor entityName={entity.name} keywords={entity.keywords} onChange={(keywords) => onChange('keywords' as keyof T, keywords as T[keyof T])} />
+      <label className="inline-flex items-center gap-2 text-sm">
+        <span>标题颜色</span>
+        <input type="color" value={entity.titleColor || '#111827'} onChange={(e) => onChange('titleColor' as keyof T, e.target.value as T[keyof T])} className="w-8 h-8 rounded border border-theme bg-transparent shrink-0" title="标题颜色" />
+      </label>
+      <EntityReuseActions entity={entity} entityType={entityType} />
+      <EntityShareActions entityType={entityType} entity={entity} scope="entity" label="分享整张卡片" />
+      <button type="button" onClick={onDelete} className="text-red-500 hover:text-red-700 text-sm px-3 py-1.5 rounded hover:bg-red-50">{deleteLabel}</button>
+    </>
+  );
 
   return (
     <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 border-b pb-3">
@@ -50,21 +63,9 @@ const EntityDetailHeader = <T extends BaseEntity>({
           className="flex-1 min-w-0 text-xl sm:text-2xl font-bold border-b border-transparent hover:border-gray-300 focus:border-primary focus:outline-none bg-transparent"
           style={{ color: entity.titleColor || '#111827' }}
         />
-        <EntityKeywordEditor
-          entityName={entity.name}
-          keywords={entity.keywords}
-          onChange={(keywords) => onChange('keywords' as keyof T, keywords as T[keyof T])}
-        />
-        <input
-          type="color"
-          value={entity.titleColor || '#111827'}
-          onChange={(e) => onChange('titleColor' as keyof T, e.target.value as T[keyof T])}
-          className="w-10 h-10 rounded border border-theme bg-transparent shrink-0"
-          title="标题颜色"
-        />
       </div>
 
-      <div className="flex items-center gap-2 sm:gap-3">
+      <div className="flex flex-wrap items-center gap-2 sm:gap-3">
         <button
           type="button"
           onClick={onToggleAll}
@@ -72,20 +73,13 @@ const EntityDetailHeader = <T extends BaseEntity>({
         >
           {allVisibleExpanded ? '收起全部' : '展开全部'}
         </button>
-        <EntityShareActions entityType={entityType} entity={entity} scope="entity" label="分享整张卡片" />
         <button
           onClick={onSave}
           className="px-3 py-1.5 bg-green-600 text-white rounded hover:bg-green-700 text-sm flex items-center gap-1"
         >
           保存
         </button>
-        <div className="w-px h-6 bg-gray-300 mx-1"></div>
-        <button
-          onClick={onDelete}
-          className="text-red-500 hover:text-red-700 text-sm px-3 py-1.5 rounded hover:bg-red-50"
-        >
-          {deleteLabel}
-        </button>
+        <details className="compact-actions"><summary>更多操作</summary><div className="compact-actions__menu">{secondaryActions}</div></details>
       </div>
     </div>
   );

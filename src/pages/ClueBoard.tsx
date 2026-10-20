@@ -103,10 +103,10 @@ const ClueBoard: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
         <div>
-          <h2 className="text-2xl font-bold">线索板与揭秘流</h2>
+          <h2 className="text-lg font-semibold">线索板与揭秘流</h2>
           <p className="text-sm theme-text-secondary mt-1">按状态推进线索，并记录每次“揭秘给谁、何时揭秘”。</p>
         </div>
       </div>
@@ -151,9 +151,9 @@ const ClueBoard: React.FC = () => {
           暂无线索，先去“线索列表”创建条目。
         </div>
       ) : (
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+        <div className="workspace-task-columns">
           {statusOrder.map((status) => (
-            <section key={status} className="bg-theme-card border border-theme rounded-lg p-4 space-y-3">
+            <section key={status} className="board-lane space-y-3">
               <div className="flex items-center justify-between">
                 <h3 className="font-semibold">{statusLabel[status]}</h3>
                 <span className="text-xs theme-text-secondary">{cluesByStatus[status].length} 条</span>
@@ -164,7 +164,7 @@ const ClueBoard: React.FC = () => {
                 </div>
               ) : (
                 cluesByStatus[status].map((clue) => (
-                  <article key={clue.id} className="border border-theme rounded p-3 space-y-3">
+                  <article key={clue.id} className="board-card border border-theme rounded p-3 space-y-3">
                     <div>
                       <div className="flex items-center justify-between gap-2">
                         <button

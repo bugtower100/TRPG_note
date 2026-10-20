@@ -249,13 +249,13 @@ const LandingPage: React.FC = () => {
   }
 
   return (
-    <div className="p-8 min-h-screen theme-page">
+    <div className="landing-page p-4 sm:p-8 min-h-screen theme-page">
       <div className="mx-auto max-w-6xl">
-        <div className="flex flex-col gap-4 justify-between items-start mb-8 md:flex-row md:items-center">
+        <div className="landing-header flex flex-col gap-4 justify-between items-start md:flex-row md:items-center">
           <div>
-            <h1 className="text-3xl font-bold text-theme-primary">欢迎, {user.username}</h1>
-            <p className="mt-1 theme-text-secondary">
-                准备好开启新的冒险了吗？
+            <h1 className="text-2xl font-semibold text-theme-primary">TRPG备团笔记·主页</h1>
+            <p className="mt-2 text-sm theme-text-secondary">
+                {user.username}，选择模组以继续准备冒险。
             </p>
             {sessionError && (
               <div className="mt-3 rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700 max-w-xl">
@@ -271,11 +271,14 @@ const LandingPage: React.FC = () => {
             )}
           </div>
           <div className="flex flex-wrap gap-3 items-center">
-             <ReleaseUpdateButton />
              <GuideHelpButton guideId="landing" />
+            <details className="compact-actions landing-tools">
+              <summary>工具与备份</summary>
+              <div className="compact-actions__menu">
+             <ReleaseUpdateButton />
             <button 
                 onClick={() => setImportAssistantOpen(true)}
-                className="flex gap-2 items-center px-4 py-2 rounded border border-theme theme-card theme-text-secondary shadow-sm hover:bg-primary-light"
+                className="flex gap-2 items-center text-sm theme-text-secondary"
                 title="导入模组或备份包"
             >
                 <Upload size={18} />
@@ -283,7 +286,7 @@ const LandingPage: React.FC = () => {
             </button>
             <button
                 onClick={() => setAutomaticBackupOpen(true)}
-                className="flex gap-2 items-center px-4 py-2 rounded border border-theme theme-card theme-text-secondary shadow-sm hover:bg-primary-light"
+                className="flex gap-2 items-center text-sm theme-text-secondary"
                 title="设置数据库自动备份"
             >
                 <HardDrive size={18} />
@@ -291,7 +294,7 @@ const LandingPage: React.FC = () => {
             </button>
             <button
                 onClick={() => setExportDialogTarget({ type: 'all' })}
-                className="flex gap-2 items-center px-4 py-2 rounded border border-theme theme-card theme-text-secondary shadow-sm hover:bg-primary-light"
+                className="flex gap-2 items-center text-sm theme-text-secondary"
                 title="导出当前账号下的所有模组备份包"
             >
                 <Download size={18} />
@@ -303,6 +306,8 @@ const LandingPage: React.FC = () => {
             >
                 退出登录
             </button>
+              </div>
+            </details>
             {(isCampaignLoading || isCampaignSaving) && (
               <span className="text-sm theme-text-secondary">
                 {isCampaignLoading ? '正在加载模组...' : '正在保存模组...'}
@@ -312,7 +317,9 @@ const LandingPage: React.FC = () => {
         </div>
 
         {/* Theme Selection for Landing Page */}
-        <div className="flex flex-wrap gap-2 justify-end mb-6">
+        <div className="landing-toolbar">
+          <h2 className="text-base font-semibold">我的模组 <span className="ml-2 text-sm font-normal theme-text-secondary">{campaignList.length}</span></h2>
+          <div className="flex flex-wrap items-center gap-2">
             <div className="relative" ref={passwordMenuRef}>
                 <button
                     type="button"
@@ -326,7 +333,7 @@ const LandingPage: React.FC = () => {
                     <ChevronDown size={16} className={`transition-transform ${passwordMenuOpen ? 'rotate-180' : ''}`} />
                 </button>
                 {passwordMenuOpen && (
-                    <div className="absolute right-0 z-20 mt-2 w-[300px] rounded-lg border border-theme theme-card shadow-lg p-3">
+                    <div className="absolute right-0 z-40 mt-2 w-[300px] max-w-[calc(100vw-32px)] rounded-lg border border-theme theme-card shadow-lg p-3">
                         <div className="mb-2">
                             <div className="text-sm font-semibold">登录密码</div>
                             <div className="text-[11px] theme-text-secondary">
@@ -363,15 +370,19 @@ const LandingPage: React.FC = () => {
                     </div>
                 )}
             </div>
+            <details className="compact-actions landing-appearance">
+              <summary>外观</summary>
+              <div className="compact-actions__menu">
             {BUILTIN_THEME_OPTIONS.filter((item) => item.id !== 'custom').map((t) => (
                 <button
                     key={t.id}
+                    aria-pressed={currentTheme === t.id}
                     onClick={() => {
                         setTheme(t.id);
                     }}
                     className={`px-3 py-1 text-sm border rounded ${
                         currentTheme === t.id 
-                            ? 'bg-primary text-white border-primary' 
+                            ? 'bg-primary-light text-primary border-primary' 
                             : 'theme-card theme-text-secondary border-theme hover:bg-primary-light'
                     }`}
                 >
@@ -399,23 +410,25 @@ const LandingPage: React.FC = () => {
                     ))}
                 </select>
             )}
+              </div>
+            </details>
+            <button
+              type="button"
+              data-tour="landing-create-campaign"
+              onClick={() => setIsCreating(true)}
+              className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-2 text-sm text-white hover:bg-primary-dark"
+            >
+              <Plus size={16} /> 新建模组
+            </button>
+          </div>
         </div>
 
         {/* Campaign List */}
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3" data-tour="landing-campaign-list">
-          {/* Create New Card */}
-          <div
-               data-tour="landing-create-campaign"
-               className="rounded-lg border-2 border-dashed border-theme p-5 flex flex-col items-center justify-center text-center hover:border-primary bg-theme-card transition-colors cursor-pointer min-h-[180px]"
-               onClick={() => setIsCreating(true)}
-          >
-            <div className="flex justify-center items-center mb-4 w-12 h-12 rounded-full bg-primary-light text-primary">
-              <Plus size={24} />
-            </div>
-            <h3 className="text-lg font-medium">创建新模组</h3>
-            <p className="mt-2 text-sm theme-text-secondary">开始一个新的故事</p>
-          </div>
-
+        {campaignList.length === 0 && <div className="landing-empty">
+          <p className="font-medium">还没有模组</p>
+          <p className="mt-2 text-sm theme-text-secondary">点击“新建模组”开始，或从“工具与备份”导入已有模组。</p>
+        </div>}
+        <div className="landing-campaign-grid" data-tour="landing-campaign-list">
           {/* Existing Campaigns */}
           {campaignList.map(campaign => (
             (() => {
@@ -464,7 +477,7 @@ const LandingPage: React.FC = () => {
               <h3 className="text-lg font-semibold">公开模组</h3>
               <p className="text-sm theme-text-secondary">这里显示其他用户公开出来的模组，你可以直接进入并加入协作。</p>
             </div>
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <div className="landing-campaign-grid">
               {publicCampaigns.map((campaign) => (
                 <PublicCampaignCard
                   key={campaign.id}

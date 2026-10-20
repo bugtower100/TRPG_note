@@ -7,6 +7,7 @@ import ConfirmDialog from './ConfirmDialog';
 import { CustomSubItem } from '../../types';
 
 interface CustomSubItemsEditorProps {
+  compact?: boolean;
   items: CustomSubItem[];
   onChange: (items: CustomSubItem[]) => void;
   title?: string;
@@ -18,6 +19,7 @@ interface CustomSubItemsEditorProps {
 }
 
 const CustomSubItemsEditor: React.FC<CustomSubItemsEditorProps> = ({
+  compact = false,
   items,
   onChange,
   title = '子项目',
@@ -148,24 +150,24 @@ const CustomSubItemsEditor: React.FC<CustomSubItemsEditorProps> = ({
   const orderingEnabled = search.trim().length === 0;
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+    <div className={compact ? 'entity-subitems-flat' : 'space-y-4'}>
+      <div className="subitems-toolbar flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
-          <h3 className="text-base font-medium">{title}</h3>
+          <h3 className="text-sm font-medium">{title}</h3>
           <span className="text-xs theme-text-secondary">共 {items.length} 项</span>
         </div>
         <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
-          <input
+          {(!compact || items.length > 3 || search) && <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="搜索子项目..."
             className="px-2 py-1.5 text-sm border border-theme rounded bg-transparent min-w-[140px] flex-1 md:flex-none"
-          />
+          />}
           <button
             type="button"
             onClick={addItem}
-            className="px-3 py-1.5 bg-primary text-white rounded hover:bg-primary-dark text-sm w-full md:w-auto justify-center"
+            className="px-3 py-1.5 border border-theme rounded hover:bg-primary-light text-xs"
           >
             + 添加子项目
           </button>
@@ -195,7 +197,7 @@ const CustomSubItemsEditor: React.FC<CustomSubItemsEditorProps> = ({
             data-subitem-title={item.title.toLowerCase()}
             className="border border-theme rounded-lg p-3 bg-theme-card"
           >
-            <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 mb-2">
+            <div className="subitem-heading flex flex-wrap items-center gap-2 mb-2">
               <button
                 type="button"
                 onClick={() => toggleCollapse(item.id)}
@@ -231,11 +233,11 @@ const CustomSubItemsEditor: React.FC<CustomSubItemsEditorProps> = ({
                   value={item.title}
                   data-direct-content-editor-id={item.id}
                   onChange={(e) => updateItem(item.id, { title: e.target.value })}
-                  className="flex-1 min-w-[180px] p-2 border border-theme rounded focus:outline-none focus:border-primary bg-transparent"
+                  className="flex-1 min-w-0 p-2 border border-theme rounded focus:outline-none focus:border-primary bg-transparent"
                   placeholder="子项目标题"
                 />
               ) : (
-                <div className="flex-1 min-w-[180px] px-1 py-2 font-medium break-words">
+                <div className="flex-1 min-w-0 px-1 py-1 text-sm font-medium break-words">
                   {item.title || '未命名子项目'}
                 </div>
               )}
@@ -263,7 +265,7 @@ const CustomSubItemsEditor: React.FC<CustomSubItemsEditorProps> = ({
             </div>
             {!collapsed && (
               isEditing ? (
-                <div data-direct-content-editor-id={item.id}>
+                <div data-direct-content-editor-id={item.id} className={compact ? 'subitem-editor' : undefined}>
                   <RichTextEditor
                     value={item.content}
                     onChange={(val) => updateItem(item.id, { content: val })}
@@ -273,7 +275,7 @@ const CustomSubItemsEditor: React.FC<CustomSubItemsEditorProps> = ({
                 </div>
               ) : (
                 <div
-                  className={`border border-theme rounded-md bg-theme-card/60 px-3 py-3 min-h-[96px] ${
+                  className={`${compact ? 'subitem-reading' : 'border border-theme rounded-md bg-theme-card/60 px-3 py-3 min-h-[96px]'} ${
                     directEditOnContentClick ? 'cursor-text focus:outline-none focus:ring-2 focus:ring-primary' : ''
                   }`}
                   role={directEditOnContentClick ? 'button' : undefined}

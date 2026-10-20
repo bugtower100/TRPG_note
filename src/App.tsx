@@ -32,6 +32,8 @@ const SharedEntityDetailRoute = lazy(() => import('./pages/SharedEntityDetailRou
 const SessionTaskBoard = lazy(() => import('./pages/SessionTaskBoard'));
 const CharacterSheets = lazy(() => import('./pages/CharacterSheets'));
 const GameSessions = lazy(() => import('./pages/GameSessions'));
+const PlayWorkspace = lazy(() => import('./pages/PlayWorkspace'));
+const PlayOverview = lazy(() => import('./pages/PlayOverview'));
 
 function LegacyCharacterSheetRedirect() {
   const { id } = useParams<{ id: string }>();
@@ -62,7 +64,8 @@ function AppContent() {
         <Suspense fallback={routeFallback}>
           <Routes>
             <Route path="/" element={<Layout />}>
-              <Route index element={<Dashboard />} />
+              <Route index element={<Navigate to="/overview" replace />} />
+              <Route path="overview" element={<Dashboard />} />
               <Route path="characters" element={<CharacterList />} />
               <Route path="characters/:id" element={<CharacterDetail />} />
               <Route path="characters/shared/:shareId" element={<SharedEntityDetailRoute entityType="characters" />} />
@@ -79,20 +82,23 @@ function AppContent() {
               <Route path="events" element={<EventList />} />
               <Route path="events/:id" element={<EventDetail />} />
               <Route path="events/shared/:shareId" element={<SharedEntityDetailRoute entityType="events" />} />
-              <Route path="clues" element={<ClueList />} />
-              <Route path="clues/:id" element={<ClueDetail />} />
-              <Route path="clues/shared/:shareId" element={<SharedEntityDetailRoute entityType="clues" />} />
-              <Route path="clue-board" element={<Navigate to="/clues" replace />} />
-              <Route path="session-tasks" element={<SessionTaskBoard />} />
-              <Route path="sessions" element={<GameSessions />} />
-              <Route path="sessions/:id" element={<GameSessions />} />
+              <Route element={<PlayWorkspace />}>
+                <Route path="play" element={<PlayOverview />} />
+                <Route path="clues" element={<ClueList />} />
+                <Route path="clues/:id" element={<ClueDetail />} />
+                <Route path="clues/shared/:shareId" element={<SharedEntityDetailRoute entityType="clues" />} />
+                <Route path="clue-board" element={<Navigate to="/clues" replace />} />
+                <Route path="session-tasks" element={<SessionTaskBoard />} />
+                <Route path="team-notes" element={<TeamNotes />} />
+                <Route path="sessions" element={<GameSessions />} />
+                <Route path="sessions/:id" element={<GameSessions />} />
+              </Route>
               <Route path="timelines" element={<TimelineList />} />
               <Route path="timelines/workbench" element={<TimelineWorkbench />} />
               <Route path="timelines/:id" element={<TimelineList />} />
               <Route path="timelines/shared/:shareId" element={<SharedEntityDetailRoute entityType="timelines" />} />
               <Route path="relation-graphs" element={<RelationGraphs />} />
               <Route path="mind-maps" element={<MindMaps />} />
-              <Route path="team-notes" element={<TeamNotes />} />
               <Route path="characters/sheets" element={<CharacterSheets />} />
               <Route path="characters/sheets/:id" element={<CharacterSheets />} />
               <Route path="character-sheets" element={<LegacyCharacterSheetRedirect />} />

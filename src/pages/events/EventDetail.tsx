@@ -43,7 +43,7 @@ const EventDetail: React.FC<EventDetailProps> = ({ entityId }) => {
     items: canManageCampaignContent ? campaignData.events : [],
     navigate,
     listPath: '/events',
-    initialCollapsed: { detail: true },
+    initialCollapsed: { detail: false },
     sectionDefs,
     updateItem: (item) => updateEntity('events', item),
     deleteItem: (itemId) => deleteEntity('events', itemId),
@@ -52,7 +52,7 @@ const EventDetail: React.FC<EventDetailProps> = ({ entityId }) => {
   if (!event) return <div>加载中...</div>;
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6 pb-12 px-2 sm:px-0">
+    <div className="entity-detail-page">
       <EntityDetailHeader
         entity={event}
         entityType="events"

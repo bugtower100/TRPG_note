@@ -248,16 +248,17 @@ export const resourceService = {
 
   async deleteOne(ref: string): Promise<void> {
     const res = await fetch(buildResourceFileUrl(ref), { method: 'DELETE' });
-    if (!res.ok) throw new Error('delete_failed');
+    if (!res.ok) await parseJsonResponse(res, '资源删除失败');
   },
 
-  async deleteMany(refs: string[]): Promise<void> {
+  async deleteMany(refs: string[]): Promise<{ failed: string[]; blocked: string[] }> {
     const res = await fetch('/api/resources/delete-batch', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ refs }),
     });
-    if (!res.ok) throw new Error('delete_batch_failed');
+    if (res.status === 204) return { failed: [], blocked: [] };
+    return parseJsonResponse(res, '资源删除失败');
   },
 
   async createFolder(path: string): Promise<void> {
@@ -269,7 +270,7 @@ export const resourceService = {
     if (!res.ok) throw new Error('create_folder_failed');
   },
 
-  async moveMany(refs: string[], targetFolder: string): Promise<void> {
+  async moveMany(refs: string[], targetFolder: string): Promise<{ moved: Array<{ from: string; to: string }>; failed: string[] }> {
     const res = await fetch('/api/resources/move', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -278,7 +279,7 @@ export const resourceService = {
         targetFolder: normalizeFolderPath(targetFolder),
       }),
     });
-    if (!res.ok && res.status !== 207) throw new Error('move_failed');
+    return parseJsonResponse(res, '资源移动失败');
   },
 
   async renameFolder(path: string, newName: string): Promise<void> {
@@ -302,6 +303,6 @@ export const resourceService = {
     const res = await fetch(`/api/resources/folders/${target}`, {
       method: 'DELETE',
     });
-    if (!res.ok) throw new Error('delete_folder_failed');
+    if (!res.ok) await parseJsonResponse(res, '分类删除失败');
   },
 };

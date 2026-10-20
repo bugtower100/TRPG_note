@@ -537,7 +537,7 @@ const RelationGraphs: React.FC = () => {
   }
 
   return (
-    <div className="min-h-[60vh] md:h-[calc(100vh-3.75rem)] md:-mt-6 flex flex-col gap-2 overflow-hidden px-2 md:px-0">
+    <div className="canvas-workspace min-h-[60vh] flex flex-col gap-2 overflow-hidden">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 shrink-0">
         <h2 className="text-xl md:text-2xl font-bold">关系图</h2>
         <div className="flex flex-wrap items-center gap-2">
@@ -560,7 +560,7 @@ const RelationGraphs: React.FC = () => {
         </div>
       </div>
 
-      <div className="p-3 rounded-lg border border-theme theme-card shrink-0">
+      <div className="page-section shrink-0">
         <div className="text-sm font-medium mb-2">节点添加（仅人物/怪物）</div>
         <form onSubmit={createEntityAndAddNode} className="flex flex-col sm:flex-row gap-2 mb-2">
           <select
@@ -617,7 +617,7 @@ const RelationGraphs: React.FC = () => {
         </div>
       </div>
 
-      <div className="p-3 rounded-lg border border-theme theme-card flex-1 min-h-0 flex flex-col">
+      <div className="flex-1 min-h-0 flex flex-col">
         <div className="flex flex-wrap items-center gap-2 mb-3 shrink-0">
           <button
             onClick={() => setLinkingFromNodeId(selectedNodeIds[0] || null)}

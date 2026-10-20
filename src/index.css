@@ -469,32 +469,8 @@
     border-radius: 0.25rem;
   }
 
-  /* Mobile Topbar */
+  /* Mobile drawers */
   @media (max-width: 767px) {
-    .topbar-mobile {
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      height: 48px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 0 8px;
-      background: var(--bg-card);
-      border-bottom: 1px solid var(--border-color);
-      z-index: 60;
-    }
-    .topbar-mobile .hamburger {
-      width: 36px;
-      height: 36px;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      border: 1px solid var(--border-color);
-      border-radius: 8px;
-      background: var(--bg-page);
-    }
     .drawer-overlay {
       position: fixed;
       inset: 0;

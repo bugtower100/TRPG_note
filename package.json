@@ -15,6 +15,9 @@
     "export:openapi": "node scripts/export-openapi.mjs",
     "generate:api": "node scripts/generate-api-client.mjs",
     "sync:go-web": "node scripts/sync-go-web.mjs",
+    "db:check": "go -C server run ./cmd/database-doctor --database-path data/storage.db",
+    "db:repair": "go -C server run ./cmd/database-doctor --database-path data/storage.db --repair --yes",
+    "db:doctor:build": "go -C server build -o release/数据库检查工具.exe ./cmd/database-doctor",
     "clean:cache": "node scripts/maintenance.mjs --clean-cache",
     "clean:data": "node scripts/maintenance.mjs --clean-data"
   },

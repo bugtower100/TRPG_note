@@ -45,12 +45,12 @@ const LandingLoginView: React.FC<LandingLoginViewProps> = ({
 }) => {
   return (
     <div className="flex justify-center items-center min-h-screen theme-page px-4">
-      <div className="p-8 w-full max-w-md rounded-lg border shadow-md theme-card border-theme">
-        <h1 className="mb-2 text-3xl font-bold text-center text-theme-primary">TRPG 模组笔记</h1>
-        <p className="mb-2 text-center theme-text-secondary">{appVersion}</p>
-        <p className="mb-3 text-center theme-text-secondary">请登录以管理您的模组</p>
+      <div className="p-6 sm:p-8 w-full max-w-md rounded-lg border theme-card border-theme">
+        <h1 className="mb-2 text-2xl font-semibold text-theme-primary">TRPG 模组笔记</h1>
+        <p className="mb-2 text-xs theme-text-secondary">{appVersion}</p>
+        <p className="mb-6 text-sm theme-text-secondary">登录后继续整理模组与跑团记录</p>
 
-        <form onSubmit={onSubmit} className="space-y-6">
+        <form onSubmit={onSubmit} className="space-y-4">
           <div>
             <label className="block mb-1 text-sm font-medium text-theme-primary">用户名 / 昵称</label>
             <div className="relative" ref={historyRef}>
@@ -60,7 +60,7 @@ const LandingLoginView: React.FC<LandingLoginViewProps> = ({
                   value={username}
                   onChange={(event) => onUsernameChange(event.target.value)}
                   onFocus={onFocusUsername}
-                  className="px-4 py-2 flex-1 rounded-md border border-theme bg-transparent outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                  className="px-4 py-2 flex-1 min-w-0 rounded-md border border-theme bg-transparent outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
                   placeholder="请输入您的名字"
                   required
                 />
