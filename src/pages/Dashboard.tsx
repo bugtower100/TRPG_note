@@ -50,11 +50,11 @@ const Dashboard: React.FC = () => {
     const hasSeen = localStorage.getItem('trpg_has_seen_guide');
     if (hasSeen) return;
     const timer = window.setTimeout(() => {
-      startGuide('dashboard');
+      startGuide('dashboard', () => navigate('/settings?section=help'));
       localStorage.setItem('trpg_has_seen_guide', 'true');
     }, 180);
     return () => window.clearTimeout(timer);
-  }, [startGuide]);
+  }, [navigate, startGuide]);
 
   useEffect(() => {
     const buildVersion = searchBuildVersionRef.current + 1;

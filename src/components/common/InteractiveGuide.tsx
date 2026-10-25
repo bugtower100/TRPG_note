@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useMemo, useState } from 'react';
+import React, { createContext, useCallback, useContext, useMemo, useRef, useState } from 'react';
 import { ACTIONS, EVENTS, EventData, Joyride, STATUS, Step } from 'react-joyride';
 import { HelpCircle } from 'lucide-react';
 
@@ -17,7 +17,7 @@ export type GuideId =
 interface GuideContextValue {
   currentGuideId: GuideId | null;
   isGuideRunning: boolean;
-  startGuide: (guideId: GuideId) => void;
+  startGuide: (guideId: GuideId, onFinish?: () => void) => void;
 }
 
 const GUIDE_STEPS: Record<GuideId, Step[]> = {
@@ -230,17 +230,20 @@ export const GuideProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [steps, setSteps] = useState<Step[]>([]);
   const [run, setRun] = useState(false);
   const [stepIndex, setStepIndex] = useState(0);
+  const onFinishRef = useRef<(() => void) | null>(null);
 
   const stopGuide = useCallback(() => {
+    onFinishRef.current = null;
     setRun(false);
     setStepIndex(0);
     setCurrentGuideId(null);
     window.setTimeout(() => setSteps([]), 0);
   }, []);
 
-  const startGuide = useCallback((guideId: GuideId) => {
+  const startGuide = useCallback((guideId: GuideId, onFinish?: () => void) => {
     const nextSteps = GUIDE_STEPS[guideId];
     if (!nextSteps || nextSteps.length === 0) return;
+    onFinishRef.current = onFinish || null;
     setRun(false);
     setCurrentGuideId(guideId);
     setStepIndex(0);
@@ -252,7 +255,9 @@ export const GuideProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const { action, index, status, type } = data;
 
     if (status === STATUS.FINISHED || status === STATUS.SKIPPED) {
+      const onFinish = status === STATUS.FINISHED ? onFinishRef.current : null;
       stopGuide();
+      onFinish?.();
       return;
     }
 

@@ -11,17 +11,20 @@ import {
   parseCustomThemeFile,
 } from '../features/themes/themeService';
 import { useDirectContentEditPreference } from '../hooks/useDirectContentEditPreference';
+import { useSearchParams } from 'react-router-dom';
 
 const ImportAssistant = lazy(() => import('./ImportAssistant'));
 const PrepPackageManager = lazy(() => import('../features/prep-packages/components/PrepPackageManager'));
 const RecycleBin = lazy(() => import('./RecycleBin'));
 const ReleaseUpdatePanel = lazy(() => import('../components/common/ReleaseUpdatePanel'));
+const OfficialManual = lazy(() => import('../features/help/OfficialManual'));
 
 const sectionFallback = (
   <div className="py-6 text-sm theme-text-secondary">正在加载内容...</div>
 );
 
 const Settings: React.FC = () => {
+  const [searchParams] = useSearchParams();
   const { currentCampaignId, user } = useCampaignSession();
   const {
     theme,
@@ -33,7 +36,7 @@ const Settings: React.FC = () => {
     removeCustomTheme,
     selectCustomTheme,
   } = useCampaignTheme();
-  const [activeSection, setActiveSection] = useState('general');
+  const [activeSection, setActiveSection] = useState(searchParams.get('section') === 'help' ? 'help' : 'general');
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
   const [themeStatus, setThemeStatus] = useState('');
   const { directContentEdit, setDirectContentEdit } = useDirectContentEditPreference();
@@ -73,7 +76,7 @@ const Settings: React.FC = () => {
       <nav className="content-tabs" aria-label="设置分类" data-tour="settings-navigation">
         {[
           ['general', '基本设置'], ['data', '备份与导入'],
-          ['resources', '资源管理'], ['recycle', '回收站'], ['updates', '版本与更新'],
+          ['resources', '资源管理'], ['recycle', '回收站'], ['updates', '版本与更新'], ['help', '官方手册'],
         ].map(([id, label]) => <button key={id} type="button" data-tour={`settings-${id}-tab`} aria-pressed={activeSection === id} className={activeSection === id ? 'is-active' : ''} onClick={() => setActiveSection(id)}>{label}</button>)}
       </nav>
 
@@ -277,6 +280,11 @@ const Settings: React.FC = () => {
       <div hidden={activeSection !== 'resources'} className="settings-wide settings-resources">
         <ResourceManagementSection />
       </div>
+      <section hidden={activeSection !== 'help'} className="settings-section settings-wide">
+        <Suspense fallback={sectionFallback}>
+          <OfficialManual onOpenSettingsSection={setActiveSection} />
+        </Suspense>
+      </section>
     </div>
   );
 };
