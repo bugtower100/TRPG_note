@@ -161,6 +161,7 @@ export interface RelationGraphNode {
   note?: string;
   tokenImageRef?: string;
   tokenImage?: string;
+  isTemporary?: boolean;
 }
 
 export type RelationEdgeDirection = 'none' | 'forward' | 'backward' | 'bidirectional';
@@ -189,7 +190,13 @@ export interface RelationGraph {
 
 export interface LocationMapPoint {
   id: string;
+  kind?: 'location' | 'character' | 'monster';
   locationId?: string;
+  characterId?: string;
+  monsterId?: string;
+  avatarRef?: string;
+  tokenStyle?: 'circle' | 'square' | 'token' | 'avatar';
+  size?: number;
   name: string;
   introduction: string;
   iconId: number;

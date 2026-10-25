@@ -2,7 +2,7 @@ import React from 'react';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import type { LocationMapPoint } from '../../../types';
-import MapPointIcon from './MapPointIcon';
+import MapPointMarker from './MapPointMarker';
 
 interface LocationMapPointViewerProps {
   point: LocationMapPoint | null;
@@ -23,7 +23,7 @@ const LocationMapPointViewer: React.FC<LocationMapPointViewerProps> = ({ point, 
       >
         <div className="flex items-start justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3">
-            <MapPointIcon iconId={point.iconId} className="h-12 w-12 shrink-0" />
+            <MapPointMarker point={point} className="h-12 w-12 shrink-0" />
             <h3 className="truncate text-lg font-semibold">{point.name}</h3>
           </div>
           <button
@@ -36,7 +36,7 @@ const LocationMapPointViewer: React.FC<LocationMapPointViewerProps> = ({ point, 
           </button>
         </div>
         <div className="mt-4 whitespace-pre-wrap text-sm leading-6 theme-text-secondary">
-          {point.introduction.trim() || 'GM 暂未填写此地点的介绍。'}
+          {point.introduction.trim() || 'GM 暂未填写此点位的介绍。'}
         </div>
       </div>
     </div>,

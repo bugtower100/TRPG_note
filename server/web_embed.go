@@ -18,6 +18,9 @@ var (
 )
 
 func resolveRuntimeWebRoot() string {
+	if buildAppVersion != "" {
+		return ""
+	}
 	runtimeWebRootOnce.Do(func() {
 		candidates := make([]string, 0, 6)
 		if cwd, err := os.Getwd(); err == nil {

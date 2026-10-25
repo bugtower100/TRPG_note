@@ -30,7 +30,7 @@ const renderShape = (
     strokeLinejoin: 'round' as const,
     className: tool === 'eraser' ? 'cursor-crosshair hover:opacity-50' : undefined,
     onPointerDown: (event: React.PointerEvent<SVGElement>) => {
-      if (tool !== 'eraser') return;
+      if (event.button !== 0 || tool !== 'eraser') return;
       event.stopPropagation();
       onErase(shape.id);
     },
@@ -88,7 +88,7 @@ const LocationMapDrawingLayer: React.FC<LocationMapDrawingLayerProps> = ({
       preserveAspectRatio="none"
       className={`absolute inset-0 h-full w-full ${enabled ? 'z-30 touch-none cursor-crosshair' : 'pointer-events-none z-10'}`}
       onPointerDown={(event) => {
-        if (!enabled || tool === 'eraser') return;
+        if (event.button !== 0 || !enabled || tool === 'eraser') return;
         event.currentTarget.setPointerCapture(event.pointerId);
         onBegin(pointerPosition(event));
       }}

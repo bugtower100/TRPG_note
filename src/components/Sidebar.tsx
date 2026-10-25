@@ -12,9 +12,10 @@ import {
 interface SidebarProps {
   className?: string;
   onNavigate?: () => void;
+  collapsed?: boolean;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ className = '', onNavigate }) => {
+const Sidebar: React.FC<SidebarProps> = ({ className = '', onNavigate, collapsed = false }) => {
   const { campaignData } = useCampaignData();
   const { logout, exitCampaign, reloadCurrentCampaign } = useCampaignSession();
   const { canManageCampaignContent, memberRole, configQuery } = useCampaignMemberRole();
@@ -65,7 +66,7 @@ const Sidebar: React.FC<SidebarProps> = ({ className = '', onNavigate }) => {
   ];
 
   return (
-    <div className={`app-sidebar ui-glass ${className}`}>
+    <div className={`app-sidebar ui-glass ${collapsed ? 'is-collapsed' : ''} ${className}`}>
       <div className="app-sidebar__brand">
         <span className="app-sidebar__mark" aria-hidden="true"><ScrollText size={20} /></span>
         <div className="min-w-0">
@@ -84,6 +85,8 @@ const Sidebar: React.FC<SidebarProps> = ({ className = '', onNavigate }) => {
               <div key={item.to} className="space-y-1">
                 <NavLink
                   to={item.to}
+                  title={collapsed ? item.label : undefined}
+                  aria-label={collapsed ? item.label : undefined}
                   aria-current={item.to === '/play' && workspaceActive ? 'page' : undefined}
                   onClick={onNavigate}
                   data-tour={
@@ -115,6 +118,8 @@ const Sidebar: React.FC<SidebarProps> = ({ className = '', onNavigate }) => {
 
       <div className="app-sidebar__footer">
         <button
+          title={collapsed ? '返回主页' : undefined}
+          aria-label={collapsed ? '返回主页' : undefined}
           onClick={() => {
             onNavigate?.();
             exitCampaign();
@@ -125,6 +130,8 @@ const Sidebar: React.FC<SidebarProps> = ({ className = '', onNavigate }) => {
           <span>返回主页</span>
         </button>
         <button
+          title={collapsed ? '退出登录' : undefined}
+          aria-label={collapsed ? '退出登录' : undefined}
           onClick={() => {
             onNavigate?.();
             logout();

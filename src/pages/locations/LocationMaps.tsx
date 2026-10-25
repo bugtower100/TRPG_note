@@ -2,15 +2,20 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   FolderOpen,
+  GripVertical,
   ImagePlus,
   MapPinPlus,
   MapPlus,
+  Maximize2,
+  Minimize2,
   PanelLeftClose,
   PanelLeftOpen,
   RefreshCw,
   Save,
   Trash2,
   Upload,
+  ZoomIn,
+  ZoomOut,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { v4 as uuidv4 } from 'uuid';
@@ -25,13 +30,14 @@ import {
 import type { MapDrawingShape } from '../../features/location-maps/drawing/types';
 import LocationMapPointPanel from '../../features/location-maps/components/LocationMapPointPanel';
 import LocationMapPointViewer from '../../features/location-maps/components/LocationMapPointViewer';
-import MapPointIcon from '../../features/location-maps/components/MapPointIcon';
+import MapPointMarker from '../../features/location-maps/components/MapPointMarker';
 import { useCampaignData, useCampaignSession } from '../../context/CampaignContext';
 import { useCampaignMemberRole } from '../../hooks/useCampaignMemberRole';
 import { queryKeys } from '../../query/queryKeys';
 import { VersionConflictError } from '../../services/conflictError';
 import { locationMapService } from '../../services/locationMapService';
 import { locationMapDrawingService } from '../../services/locationMapDrawingService';
+import { dataService } from '../../services/dataService';
 import {
   buildResourceFileUrl,
   resourceService,
@@ -43,6 +49,9 @@ import type {
   LocationMapDrawingDocument,
   LocationMapDrawingOperation,
   LocationMapPoint,
+  Character,
+  Location,
+  Monster,
 } from '../../types';
 
 const EMPTY_MAPS: LocationMap[] = [];
@@ -62,7 +71,7 @@ const createLocationMap = (index: number): LocationMap => {
 const LocationMaps: React.FC = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { campaignData } = useCampaignData();
+  const { campaignData, setCampaignData } = useCampaignData();
   const { currentCampaignId, user } = useCampaignSession();
   const { canManageCampaignContent } = useCampaignMemberRole();
   const [activeMapId, setActiveMapId] = useState<string | null>(null);
@@ -73,6 +82,13 @@ const LocationMaps: React.FC = () => {
   const [resourceSelectedFolderPath, setResourceSelectedFolderPath] = useState(RESOURCE_ROOT_PATH);
   const [resourceExpandedFolders, setResourceExpandedFolders] = useState<string[]>([RESOURCE_ROOT_PATH]);
   const [selectedLocationId, setSelectedLocationId] = useState('');
+  const [pointSource, setPointSource] = useState<'location' | 'temporary-location' | 'new-location' | 'character' | 'temporary-character' | 'new-character' | 'monster' | 'temporary-monster' | 'new-monster'>('location');
+  const [selectedCharacterId, setSelectedCharacterId] = useState('');
+  const [selectedMonsterId, setSelectedMonsterId] = useState('');
+  const [newPointName, setNewPointName] = useState('');
+  const [mapZoom, setMapZoom] = useState(1);
+  const [mapPan, setMapPan] = useState({ x: 0, y: 0 });
+  const [mapImageSize, setMapImageSize] = useState<{ width: number; height: number } | null>(null);
   const [placingPoint, setPlacingPoint] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [drawingEnabled, setDrawingEnabled] = useState(false);
@@ -91,12 +107,25 @@ const LocationMaps: React.FC = () => {
     startClientY: number;
     moved: boolean;
   } | null>(null);
+  const [resizePreview, setResizePreview] = useState<{
+    pointId: string;
+    startX: number;
+    startY: number;
+    initialSize: number;
+    xDirection: number;
+    yDirection: number;
+    size: number;
+  } | null>(null);
+  const [highlightedPointId, setHighlightedPointId] = useState<string | null>(null);
   const [selectedPointId, setSelectedPointId] = useState<string | null>(null);
   const [pointEditorDirty, setPointEditorDirty] = useState(false);
   const [nameDirty, setNameDirty] = useState(false);
   const [imageLoadError, setImageLoadError] = useState('');
   const [remoteUpdateAvailable, setRemoteUpdateAvailable] = useState(false);
   const [mapListCollapsed, setMapListCollapsed] = useState(false);
+  const [toolPanel, setToolPanel] = useState<'points' | 'drawing' | null>(null);
+  const [mapFocused, setMapFocused] = useState(false);
+  const [toolbarPosition, setToolbarPosition] = useState({ x: 8, y: 8 });
   const [conflictDraft, setConflictDraft] = useState<{
     maps: LocationMap[];
     remote: LocationMapDocument;
@@ -104,6 +133,12 @@ const LocationMaps: React.FC = () => {
   const observedVersionRef = useRef<number | null>(null);
   const localSavedVersionRef = useRef<number | null>(null);
   const imageUploadInputRef = useRef<HTMLInputElement | null>(null);
+  const mapViewportRef = useRef<HTMLDivElement | null>(null);
+  const toolbarRef = useRef<HTMLDivElement | null>(null);
+  const toolbarDragRef = useRef<{ pointerId: number; offsetX: number; offsetY: number } | null>(null);
+  const rightPanRef = useRef<{ pointerId: number; x: number; y: number; panX: number; panY: number } | null>(null);
+  const mapNaturalSizeRef = useRef<{ width: number; height: number } | null>(null);
+  const lastDragAtRef = useRef(0);
   const attemptedDrawingMigrationsRef = useRef(new Set<string>());
 
   const mapQueryKey = currentCampaignId
@@ -117,7 +152,7 @@ const LocationMaps: React.FC = () => {
       return locationMapService.load(currentCampaignId, user);
     },
     enabled: Boolean(currentCampaignId && user),
-    refetchInterval: pointEditorDirty || nameDirty || placingPoint || drawingEnabled || Boolean(dragPreview)
+    refetchInterval: pointEditorDirty || nameDirty || placingPoint || drawingEnabled || Boolean(dragPreview) || Boolean(resizePreview)
       ? false
       : 15_000,
   });
@@ -237,7 +272,7 @@ const LocationMaps: React.FC = () => {
   const ownDrawingShapes = useMemo(() => (
     drawingQuery.data?.shapes.filter((shape) => shape.authorId === user?.id) ?? []
   ), [drawingQuery.data?.shapes, user?.id]);
-  const refreshPaused = pointEditorDirty || nameDirty || placingPoint || drawingEnabled || Boolean(dragPreview);
+  const refreshPaused = pointEditorDirty || nameDirty || placingPoint || drawingEnabled;
 
   useEffect(() => {
     if (maps.length === 0) {
@@ -342,6 +377,65 @@ const LocationMaps: React.FC = () => {
     }
   }, [campaignData.locations, selectedLocationId]);
 
+  useEffect(() => {
+    if (!selectedCharacterId || !campaignData.characters.some((character) => character.id === selectedCharacterId)) {
+      setSelectedCharacterId(campaignData.characters[0]?.id ?? '');
+    }
+  }, [campaignData.characters, selectedCharacterId]);
+
+  useEffect(() => {
+    if (!selectedMonsterId || !campaignData.monsters.some((monster) => monster.id === selectedMonsterId)) {
+      setSelectedMonsterId(campaignData.monsters[0]?.id ?? '');
+    }
+  }, [campaignData.monsters, selectedMonsterId]);
+
+  useEffect(() => {
+    setMapZoom(1);
+    setMapPan({ x: 0, y: 0 });
+    setMapImageSize(null);
+    mapNaturalSizeRef.current = null;
+  }, [activeMapId, activeMap?.imageRef]);
+
+  useEffect(() => {
+    const viewport = mapViewportRef.current;
+    if (!viewport || !activeMap?.imageRef) return;
+    const fitImage = () => {
+      const natural = mapNaturalSizeRef.current;
+      if (!natural) return;
+      const ratio = Math.min(1, (viewport.clientWidth - 24) / natural.width, (viewport.clientHeight - 24) / natural.height);
+      setMapImageSize({ width: natural.width * ratio, height: natural.height * ratio });
+    };
+    const observer = new ResizeObserver(fitImage);
+    observer.observe(viewport);
+    return () => observer.disconnect();
+  }, [activeMap?.imageRef]);
+
+  const changeMapZoom = (nextZoom: number, clientX?: number, clientY?: number) => {
+    const viewport = mapViewportRef.current;
+    if (!viewport || nextZoom === mapZoom) return;
+    const rect = viewport.getBoundingClientRect();
+    const offsetX = (clientX ?? rect.left + rect.width / 2) - (rect.left + rect.width / 2);
+    const offsetY = (clientY ?? rect.top + rect.height / 2) - (rect.top + rect.height / 2);
+    const ratio = nextZoom / mapZoom;
+    setMapPan((current) => ({
+      x: offsetX - (offsetX - current.x) * ratio,
+      y: offsetY - (offsetY - current.y) * ratio,
+    }));
+    setMapZoom(nextZoom);
+  };
+
+  useEffect(() => {
+    const viewport = mapViewportRef.current;
+    if (!viewport || !activeMap?.imageRef) return;
+    const handleWheel = (event: WheelEvent) => {
+      event.preventDefault();
+      const nextZoom = Math.max(0.25, Math.min(4, +(mapZoom * (event.deltaY < 0 ? 1.12 : 1 / 1.12)).toFixed(2)));
+      changeMapZoom(nextZoom, event.clientX, event.clientY);
+    };
+    viewport.addEventListener('wheel', handleWheel, { passive: false });
+    return () => viewport.removeEventListener('wheel', handleWheel);
+  }, [activeMap?.imageRef, mapZoom]);
+
   const saveMaps = async (
     nextMaps: LocationMap[],
     successText: string,
@@ -350,7 +444,7 @@ const LocationMaps: React.FC = () => {
     setStatusText('');
     try {
       await saveMutation.mutateAsync({ maps: nextMaps, expectedVersion });
-      setStatusText(successText);
+      if (successText) setStatusText(successText);
       return true;
     } catch (error) {
       if (error instanceof VersionConflictError && error.remote) {
@@ -451,18 +545,57 @@ const LocationMaps: React.FC = () => {
   };
 
   const handleMapClick = async (event: React.MouseEvent<HTMLDivElement>) => {
-    if (!placingPoint || !activeMap || !selectedLocationId || saveMutation.isPending) return;
-    const location = campaignData.locations.find((item) => item.id === selectedLocationId);
-    if (!location) {
-      setStatusText('请选择要关联的地点');
+    if (event.button === 0 && !placingPoint) setHighlightedPointId(null);
+    if (event.button !== 0 || !placingPoint || !activeMap || saveMutation.isPending) return;
+    const isCharacter = pointSource.includes('character');
+    const isMonster = pointSource.includes('monster');
+    const name = newPointName.trim();
+    const existingLocation = campaignData.locations.find((item) => item.id === selectedLocationId);
+    const existingCharacter = campaignData.characters.find((item) => item.id === selectedCharacterId);
+    const existingMonster = campaignData.monsters.find((item) => item.id === selectedMonsterId);
+    if ((pointSource === 'location' && !existingLocation) || (pointSource === 'character' && !existingCharacter) || (pointSource === 'monster' && !existingMonster)) return;
+    if ((pointSource.startsWith('temporary-') || pointSource.startsWith('new-')) && !name) return;
+    const matchedLocation = pointSource === 'new-location'
+      ? campaignData.locations.find((item) => item.name.trim().toLocaleLowerCase() === name.toLocaleLowerCase())
+      : null;
+    const matchedCharacter = pointSource === 'new-character'
+      ? campaignData.characters.find((item) => item.name.trim().toLocaleLowerCase() === name.toLocaleLowerCase())
+      : null;
+    const matchedMonster = pointSource === 'new-monster'
+      ? campaignData.monsters.find((item) => item.name.trim().toLocaleLowerCase() === name.toLocaleLowerCase())
+      : null;
+    if (matchedCharacter) {
+      setStatusText(`已存在同名角色“${name}”，请选择“已有角色”放置。`);
       return;
     }
+    if (matchedMonster) {
+      setStatusText(`已存在同名怪物“${name}”，请选择“已有怪物”放置。`);
+      return;
+    }
+    const createdLocation = pointSource === 'new-location' && !matchedLocation
+      ? dataService.createEntity<Location>({ name, details: '', relatedImages: [], environment: '', relations: [] })
+      : null;
+    const createdCharacter = pointSource === 'new-character' && !matchedCharacter
+      ? dataService.createEntity<Character>({ name, details: '', relatedImages: [], identity: '', appearance: '', desireOrGoal: '', attributes: '', relations: [] })
+      : null;
+    const createdMonster = pointSource === 'new-monster' && !matchedMonster
+      ? dataService.createEntity<Monster>({ name, details: '', relatedImages: [], type: '', stats: '', abilities: '', drops: '', relations: [] })
+      : null;
+    const location = pointSource === 'location' ? existingLocation : matchedLocation ?? createdLocation;
+    const character = pointSource === 'character' ? existingCharacter : matchedCharacter ?? createdCharacter;
+    const monster = pointSource === 'monster' ? existingMonster : matchedMonster ?? createdMonster;
     const rect = event.currentTarget.getBoundingClientRect();
     if (rect.width <= 0 || rect.height <= 0) return;
     const point: LocationMapPoint = {
       id: uuidv4(),
-      locationId: location.id,
-      name: location.name,
+      kind: isCharacter ? 'character' : isMonster ? 'monster' : 'location',
+      locationId: location?.id,
+      characterId: character?.id,
+      monsterId: monster?.id,
+      avatarRef: '',
+      tokenStyle: isCharacter || isMonster ? 'circle' : undefined,
+      size: 40,
+      name: location?.name ?? character?.name ?? monster?.name ?? name,
       introduction: '',
       iconId: 1,
       x: Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width)),
@@ -471,7 +604,16 @@ const LocationMaps: React.FC = () => {
       labelColor: '#ffffff',
       labelStrokeColor: '#111827',
     };
-    await updateActiveMapPoints([...activeMap.points, point], `已放置地点“${location.name}”`);
+    if (await updateActiveMapPoints([...activeMap.points, point], `已放置${isCharacter ? '人物' : isMonster ? '怪物' : '地点'}“${point.name}”`)) {
+      if (createdLocation || createdCharacter || createdMonster) {
+        setCampaignData((previous) => ({
+          ...previous,
+          locations: createdLocation ? [...previous.locations, createdLocation] : previous.locations,
+          characters: createdCharacter ? [...previous.characters, createdCharacter] : previous.characters,
+          monsters: createdMonster ? [...previous.monsters, createdMonster] : previous.monsters,
+        }));
+      }
+    }
   };
 
   const pointPositionFromPointer = (
@@ -491,9 +633,10 @@ const LocationMaps: React.FC = () => {
     event: React.PointerEvent<HTMLButtonElement>,
     point: LocationMapPoint
   ) => {
-    if (!canManageCampaignContent || placingPoint || saveMutation.isPending) return;
+    if (event.button !== 0 || !canManageCampaignContent || placingPoint || saveMutation.isPending) return;
     event.stopPropagation();
     event.currentTarget.setPointerCapture(event.pointerId);
+    setHighlightedPointId(point.id);
     setDragPreview({
       pointId: point.id,
       x: point.x,
@@ -532,13 +675,32 @@ const LocationMaps: React.FC = () => {
       return;
     }
     const finalPosition = pointPositionFromPointer(event) ?? dragPreview;
+    lastDragAtRef.current = Date.now();
     setDragPreview(null);
     await updateActiveMapPoints(
       activeMap.points.map((item) => (
         item.id === point.id ? { ...item, x: finalPosition.x, y: finalPosition.y } : item
       )),
-      `已移动地点“${point.name}”`
+      ''
     );
+  };
+
+  const resizePointSize = (preview: NonNullable<typeof resizePreview>, clientX: number, clientY: number) => (
+    Math.max(16, Math.min(160, Math.round(
+      preview.initialSize
+      + (clientX - preview.startX) * preview.xDirection / mapZoom
+      + (clientY - preview.startY) * preview.yDirection / mapZoom
+    )))
+  );
+
+  const handleResizePointerUp = async (event: React.PointerEvent<HTMLSpanElement>, point: LocationMapPoint) => {
+    event.stopPropagation();
+    if (!resizePreview || resizePreview.pointId !== point.id || !activeMap) return;
+    const size = resizePointSize(resizePreview, event.clientX, event.clientY);
+    setResizePreview(null);
+    lastDragAtRef.current = Date.now();
+    if (size === (point.size ?? 40)) return;
+    await updateActiveMapPoints(activeMap.points.map((item) => item.id === point.id ? { ...item, size } : item), '');
   };
 
   const handlePointEditorDirtyChange = useCallback((dirty: boolean) => {
@@ -554,6 +716,7 @@ const LocationMaps: React.FC = () => {
     if (mapId === activeMapId) return;
     if ((pointEditorDirty || nameDirty) && !window.confirm('当前地图有未保存的编辑，确定放弃这些修改吗？')) return;
     setActiveMapId(mapId);
+    setHighlightedPointId(null);
   };
 
   const handleToggleDrawing = () => {
@@ -678,15 +841,10 @@ const LocationMaps: React.FC = () => {
   }
 
   return (
-    <div className="map-page space-y-4">
-      <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <div className={`map-page space-y-2 ${mapFocused ? 'is-focused' : ''}`}>
+      <header className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold">地图地点</h1>
-          <p className="mt-1 text-sm theme-text-secondary">
-            {canManageCampaignContent
-              ? '管理地图与背景图片；点位功能将在下一阶段加入。'
-              : '查看 GM 向玩家公开的地图。'}
-          </p>
+          <h1 className="text-lg font-bold">地图地点</h1>
         </div>
         {canManageCampaignContent ? (
           <button
@@ -702,10 +860,10 @@ const LocationMaps: React.FC = () => {
       </header>
 
       {statusText ? (
-        <div className="rounded border border-theme bg-theme-card px-3 py-2 text-sm">{statusText}</div>
+        <div className="map-status rounded border border-theme bg-theme-card px-3 py-2 text-sm">{statusText}</div>
       ) : null}
       {refreshPaused ? (
-        <div className="rounded border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+        <div className="map-feedback rounded border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800">
           正在本地编辑，联机自动刷新已暂停；保存或退出编辑后会恢复。
         </div>
       ) : null}
@@ -773,13 +931,14 @@ const LocationMaps: React.FC = () => {
         </section>
       ) : (
         <div
-          className={`grid min-h-[36rem] grid-cols-1 gap-4 ${
+          data-map-layout
+          className={`grid min-h-[36rem] grid-cols-1 gap-2 ${
             mapListCollapsed
               ? 'lg:grid-cols-[3.25rem_minmax(0,1fr)]'
               : 'lg:grid-cols-[16rem_minmax(0,1fr)]'
           }`}
         >
-          <aside className="relative workspace-list-pane">
+          <aside className="relative workspace-list-pane map-list-pane">
             <div className={`flex items-center ${mapListCollapsed ? 'justify-between lg:justify-center' : 'mb-3 justify-between'}`}>
               <div className={`text-sm font-semibold ${mapListCollapsed ? 'lg:hidden' : ''}`}>地图列表</div>
               <button
@@ -819,8 +978,8 @@ const LocationMaps: React.FC = () => {
           </aside>
 
           {activeMap ? (
-            <section className="workspace-editor-pane">
-              <div className="flex flex-col gap-3 border-b border-theme pb-4 md:flex-row md:items-center">
+            <section className="workspace-editor-pane map-editor">
+              <div className="map-management flex flex-wrap items-center gap-2 border-b border-theme pb-2">
                 {canManageCampaignContent ? (
                   <>
                     <input
@@ -834,14 +993,14 @@ const LocationMaps: React.FC = () => {
                       onKeyDown={(event) => {
                         if (event.key === 'Enter') void handleSaveName();
                       }}
-                      className="min-w-0 flex-1 rounded border border-theme bg-transparent px-3 py-2 font-semibold"
+                      className="min-w-36 flex-1 rounded border border-theme bg-transparent px-3 py-1.5 font-semibold"
                       aria-label="地图名称"
                     />
                     <button
                       type="button"
                       onClick={() => void handleSaveName()}
                       disabled={drawingEnabled || saveMutation.isPending || nameDraft.trim() === activeMap.name}
-                      className="inline-flex items-center justify-center gap-2 rounded border border-theme px-3 py-2 disabled:opacity-50"
+                      className="inline-flex items-center justify-center gap-2 rounded border border-theme px-2 py-1.5 text-sm disabled:opacity-50"
                     >
                       <Save size={16} />
                       保存名称
@@ -850,7 +1009,7 @@ const LocationMaps: React.FC = () => {
                       type="button"
                       onClick={() => imageUploadInputRef.current?.click()}
                       disabled={drawingEnabled || saveMutation.isPending || uploadingImage}
-                      className="inline-flex items-center justify-center gap-2 rounded border border-theme px-3 py-2 hover:bg-primary-light disabled:opacity-50"
+                      className="inline-flex items-center justify-center gap-2 rounded border border-theme px-2 py-1.5 text-sm hover:bg-primary-light disabled:opacity-50"
                     >
                       <Upload size={16} />
                       {uploadingImage ? '上传中...' : '上传本地图片'}
@@ -859,7 +1018,7 @@ const LocationMaps: React.FC = () => {
                       type="button"
                       onClick={() => setResourcePickerOpen(true)}
                       disabled={drawingEnabled || saveMutation.isPending || uploadingImage}
-                      className="inline-flex items-center justify-center gap-2 rounded border border-theme px-3 py-2 hover:bg-primary-light disabled:opacity-50"
+                      className="inline-flex items-center justify-center gap-2 rounded border border-theme px-2 py-1.5 text-sm hover:bg-primary-light disabled:opacity-50"
                     >
                       <FolderOpen size={16} />
                       从资源管理器选择
@@ -868,7 +1027,7 @@ const LocationMaps: React.FC = () => {
                       type="button"
                       onClick={() => void handleDeleteMap()}
                       disabled={drawingEnabled || saveMutation.isPending}
-                      className="inline-flex items-center justify-center gap-2 rounded border border-red-300 px-3 py-2 text-red-600 hover:bg-red-50 disabled:opacity-50"
+                      className="inline-flex items-center justify-center gap-2 rounded border border-red-300 px-2 py-1.5 text-sm text-red-600 hover:bg-red-50 disabled:opacity-50"
                     >
                       <Trash2 size={16} />
                       删除
@@ -879,28 +1038,95 @@ const LocationMaps: React.FC = () => {
                 )}
               </div>
 
-              {canManageCampaignContent && activeMap.imageRef && !drawingEnabled ? (
-                <div className="page-section mt-4 space-y-3">
-                  <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
+              {(activeMap.imageRef || mapFocused) && (
+                <div ref={toolbarRef} className="map-toolstrip mt-2 flex flex-wrap items-center gap-2 text-sm" style={mapFocused ? { left: toolbarPosition.x, top: toolbarPosition.y } : undefined}>
+                  {mapFocused && (
+                    <button
+                      type="button"
+                      className="cursor-move rounded border border-theme p-1.5"
+                      aria-label="拖动工具栏"
+                      title="拖动工具栏"
+                      onPointerDown={(event) => {
+                        const rect = toolbarRef.current?.getBoundingClientRect();
+                        if (!rect) return;
+                        event.preventDefault();
+                        event.currentTarget.setPointerCapture(event.pointerId);
+                        toolbarDragRef.current = { pointerId: event.pointerId, offsetX: event.clientX - rect.left, offsetY: event.clientY - rect.top };
+                      }}
+                      onPointerMove={(event) => {
+                        if (toolbarDragRef.current?.pointerId !== event.pointerId) return;
+                        const editor = toolbarRef.current?.parentElement;
+                        const toolbar = toolbarRef.current;
+                        if (!editor || !toolbar) return;
+                        const rect = editor.getBoundingClientRect();
+                        setToolbarPosition({
+                          x: Math.max(0, Math.min(editor.clientWidth - toolbar.offsetWidth, event.clientX - rect.left - toolbarDragRef.current.offsetX)),
+                          y: Math.max(0, Math.min(editor.clientHeight - toolbar.offsetHeight, event.clientY - rect.top - toolbarDragRef.current.offsetY)),
+                        });
+                      }}
+                      onPointerUp={() => { toolbarDragRef.current = null; }}
+                      onPointerCancel={() => { toolbarDragRef.current = null; }}
+                    >
+                      <GripVertical size={17} />
+                    </button>
+                  )}
+                  {mapFocused && (
+                    <select value={activeMap.id} onChange={(event) => handleSelectMap(event.target.value)} className="max-w-44 rounded border border-theme bg-theme-card px-2 py-1.5" aria-label="切换地图">
+                      {maps.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+                    </select>
+                  )}
+                  {canManageCampaignContent && activeMap.imageRef && <button type="button" disabled={drawingEnabled} onClick={() => { setToolPanel((current) => current === 'points' ? null : 'points'); setPlacingPoint(false); }} className={`rounded border px-3 py-1.5 disabled:opacity-50 ${toolPanel === 'points' ? 'border-primary bg-primary-light' : 'border-theme'}`}>
+                    添加点位{placingPoint ? ' · 放置中' : ''}
+                  </button>}
+                  {activeMap.imageRef && <button type="button" onClick={() => setToolPanel((current) => current === 'drawing' ? null : 'drawing')} className={`rounded border px-3 py-1.5 ${toolPanel === 'drawing' || drawingEnabled ? 'border-primary bg-primary-light' : 'border-theme'}`}>
+                    画板{drawingEnabled ? ' · 绘制中' : ''}
+                  </button>}
+                  {activeMap.imageRef && !mapFocused && <span className="theme-text-secondary">滚轮缩放 · 右键拖动平移</span>}
+                  {activeMap.imageRef && mapFocused && (
+                    <>
+                      <button type="button" onClick={() => changeMapZoom(Math.max(0.25, +(mapZoom / 1.25).toFixed(2)))} className="rounded border border-theme p-1.5" aria-label="缩小地图"><ZoomOut size={17} /></button>
+                      <span className="min-w-10 text-center">{Math.round(mapZoom * 100)}%</span>
+                      <button type="button" onClick={() => changeMapZoom(Math.min(4, +(mapZoom * 1.25).toFixed(2)))} className="rounded border border-theme p-1.5" aria-label="放大地图"><ZoomIn size={17} /></button>
+                      <button type="button" onClick={() => { setMapZoom(1); setMapPan({ x: 0, y: 0 }); }} className="rounded border border-theme px-2 py-1.5">适合窗口</button>
+                    </>
+                  )}
+                  <button type="button" onClick={() => setMapFocused((current) => !current)} className="rounded border border-theme p-1.5" aria-label={mapFocused ? '退出沉浸视图' : '最大化地图'} title={mapFocused ? '退出沉浸视图' : '最大化地图'}>
+                    {mapFocused ? <Minimize2 size={17} /> : <Maximize2 size={17} />}
+                  </button>
+                </div>
+              )}
+
+              {canManageCampaignContent && activeMap.imageRef && !drawingEnabled && toolPanel === 'points' ? (
+                <div className="map-point-tools page-section mt-2 space-y-2" style={mapFocused ? { left: toolbarPosition.x, top: toolbarPosition.y + (toolbarRef.current?.offsetHeight ?? 48) + 8 } : undefined}>
+                   <div className="grid gap-3 md:grid-cols-[auto_minmax(0,1fr)_auto] md:items-end">
+                     <label className="text-sm">
+                       <span className="mb-1 block font-medium">点位来源</span>
+                       <select value={pointSource} onChange={(event) => { setPointSource(event.target.value as typeof pointSource); setPlacingPoint(false); }} className="w-full rounded border border-theme bg-theme-card px-3 py-2">
+                         <option value="location">已有地点</option>
+                         <option value="temporary-location">临时地点</option>
+                         <option value="new-location">新增地点</option>
+                         <option value="character">已有角色</option>
+                         <option value="temporary-character">临时角色</option>
+                         <option value="new-character">新增角色</option>
+                         <option value="monster">已有怪物</option>
+                         <option value="temporary-monster">临时怪物</option>
+                         <option value="new-monster">新增怪物</option>
+                       </select>
+                     </label>
                     <label className="text-sm">
-                      <span className="mb-1 block font-medium">关联地点</span>
-                      <select
-                        value={selectedLocationId}
-                        onChange={(event) => setSelectedLocationId(event.target.value)}
-                        className="w-full rounded border border-theme bg-theme-card px-3 py-2"
-                      >
-                        {campaignData.locations.length === 0 ? (
-                          <option value="">请先创建地点</option>
-                        ) : null}
-                        {campaignData.locations.map((location) => (
-                          <option key={location.id} value={location.id}>{location.name}</option>
-                        ))}
-                      </select>
+                       <span className="mb-1 block font-medium">{pointSource.startsWith('temporary-') || pointSource.startsWith('new-') ? '点位名称' : pointSource === 'character' ? '关联角色' : pointSource === 'monster' ? '关联怪物' : '关联地点'}</span>
+                       {pointSource.startsWith('temporary-') || pointSource.startsWith('new-') ? (
+                         <input value={newPointName} onChange={(event) => setNewPointName(event.target.value)} placeholder={pointSource.includes('character') ? '输入角色名称' : pointSource.includes('monster') ? '输入怪物名称' : '输入地点名称'} className="w-full rounded border border-theme bg-theme-card px-3 py-2" />
+                       ) : (
+                         <select value={pointSource === 'character' ? selectedCharacterId : pointSource === 'monster' ? selectedMonsterId : selectedLocationId} onChange={(event) => pointSource === 'character' ? setSelectedCharacterId(event.target.value) : pointSource === 'monster' ? setSelectedMonsterId(event.target.value) : setSelectedLocationId(event.target.value)} className="w-full rounded border border-theme bg-theme-card px-3 py-2">
+                           {(pointSource === 'character' ? campaignData.characters : pointSource === 'monster' ? campaignData.monsters : campaignData.locations).map((entity) => <option key={entity.id} value={entity.id}>{entity.name}</option>)}
+                         </select>
+                       )}
                     </label>
                     <button
                       type="button"
                       onClick={() => setPlacingPoint((current) => !current)}
-                      disabled={!selectedLocationId || saveMutation.isPending}
+                       disabled={saveMutation.isPending || (pointSource === 'location' && !selectedLocationId) || (pointSource === 'character' && !selectedCharacterId) || (pointSource === 'monster' && !selectedMonsterId) || ((pointSource.startsWith('temporary-') || pointSource.startsWith('new-')) && !newPointName.trim())}
                       className={`inline-flex items-center justify-center gap-2 rounded px-4 py-2 text-sm disabled:opacity-50 ${
                         placingPoint
                           ? 'bg-primary text-white'
@@ -911,13 +1137,12 @@ const LocationMaps: React.FC = () => {
                       {placingPoint ? '取消放置' : '放置点位'}
                     </button>
                   </div>
-                  <p className="text-xs theme-text-secondary">
-                    选择地点后开启放置模式，再点击地图。新点位使用默认图标且不向 PL 显示，点击点位可继续编辑图标和公开信息。
-                  </p>
+                  <p className="text-xs theme-text-secondary">临时点位只保存在地图；新增地点同名时关联已有档案。新点位默认不向 PL 显示。</p>
                 </div>
               ) : null}
 
-              {activeMap.imageRef ? (
+              {activeMap.imageRef && (toolPanel === 'drawing' || drawingEnabled) ? (
+                <div className="map-drawing-tools" style={mapFocused ? { left: toolbarPosition.x, top: toolbarPosition.y + (toolbarRef.current?.offsetHeight ?? 48) + 8 } : undefined}>
                 <LocationMapDrawingToolbar
                   enabled={drawingEnabled}
                   tool={drawing.tool}
@@ -945,17 +1170,51 @@ const LocationMaps: React.FC = () => {
                   onClear={() => void handleClearDrawing()}
                   onRetry={() => void handleRetryDrawingOperations()}
                 />
+                </div>
               ) : null}
 
-              <div className="mt-4 flex min-h-[28rem] items-center justify-center overflow-auto rounded-md border border-theme bg-black/5 p-3">
+               {activeMap.imageRef && (
+                  <div className="map-zoom-tools mt-2 flex items-center gap-2 text-sm">
+                   <button type="button" onClick={() => changeMapZoom(Math.max(0.25, +(mapZoom / 1.25).toFixed(2)))} className="rounded border border-theme p-2" aria-label="缩小地图"><ZoomOut size={16} /></button>
+                   <span className="min-w-12 text-center">{Math.round(mapZoom * 100)}%</span>
+                   <button type="button" onClick={() => changeMapZoom(Math.min(4, +(mapZoom * 1.25).toFixed(2)))} className="rounded border border-theme p-2" aria-label="放大地图"><ZoomIn size={16} /></button>
+                   <button type="button" onClick={() => { setMapZoom(1); setMapPan({ x: 0, y: 0 }); }} className="rounded border border-theme px-3 py-2">适合窗口</button>
+                 </div>
+               )}
+               <div
+                 ref={mapViewportRef}
+                 className="map-viewport mt-2 flex h-[72dvh] min-h-[26rem] items-start justify-start overflow-hidden rounded-md border border-theme bg-black/5 p-3"
+                 onContextMenu={(event) => event.preventDefault()}
+                 onPointerDown={(event) => {
+                   if (event.button !== 2) return;
+                   event.preventDefault();
+                   event.currentTarget.setPointerCapture(event.pointerId);
+                   rightPanRef.current = { pointerId: event.pointerId, x: event.clientX, y: event.clientY, panX: mapPan.x, panY: mapPan.y };
+                 }}
+                 onPointerMove={(event) => {
+                   const pan = rightPanRef.current;
+                   if (!pan || pan.pointerId !== event.pointerId) return;
+                   setMapPan({ x: pan.panX + event.clientX - pan.x, y: pan.panY + event.clientY - pan.y });
+                 }}
+                 onPointerUp={(event) => { if (rightPanRef.current?.pointerId === event.pointerId) rightPanRef.current = null; }}
+                 onPointerCancel={(event) => { if (rightPanRef.current?.pointerId === event.pointerId) rightPanRef.current = null; }}
+               >
                 {activeMap.imageRef ? (
-                  <div className="relative inline-block max-w-full leading-none">
+                   <div className="relative m-auto inline-block shrink-0 leading-none" style={{ width: mapImageSize?.width, height: mapImageSize?.height, transform: `translate(${mapPan.x}px, ${mapPan.y}px) scale(${mapZoom})`, transformOrigin: 'center center' }}>
                     <img
                       src={buildResourceFileUrl(activeMap.imageRef)}
                       alt={activeMap.name}
                       draggable={false}
+                       onLoad={(event) => {
+                         const image = event.currentTarget;
+                         const viewport = mapViewportRef.current;
+                         if (!viewport) return;
+                          mapNaturalSizeRef.current = { width: image.naturalWidth, height: image.naturalHeight };
+                          const ratio = Math.min(1, (viewport.clientWidth - 24) / image.naturalWidth, (viewport.clientHeight - 24) / image.naturalHeight);
+                         setMapImageSize({ width: image.naturalWidth * ratio, height: image.naturalHeight * ratio });
+                       }}
                       onError={() => setImageLoadError(activeMap.imageRef)}
-                      className={`block max-h-[70vh] max-w-full select-none rounded object-contain shadow-sm ${
+                       className={`block h-full w-full select-none rounded shadow-sm ${
                         imageLoadError === activeMap.imageRef ? 'opacity-20' : ''
                       }`}
                     />
@@ -983,27 +1242,25 @@ const LocationMaps: React.FC = () => {
                     >
                       {activeMap.points.map((point) => {
                         const preview = dragPreview?.pointId === point.id ? dragPreview : point;
+                        const pointSize = resizePreview?.pointId === point.id ? resizePreview.size : point.size ?? 40;
                         return (
+                          <React.Fragment key={point.id}>
                           <button
-                            key={point.id}
                             type="button"
-                            title={canManageCampaignContent ? `${point.name}（拖动调整位置）` : point.name}
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              handleSelectPoint(point.id);
-                            }}
+                            title={`${point.name}（${canManageCampaignContent ? '单击选中并调整大小；拖动移动；双击查看' : '双击查看公开介绍'}）`}
+                            onClick={(event) => event.stopPropagation()}
                             onDoubleClick={(event) => {
                               event.stopPropagation();
-                              if (canManageCampaignContent && point.locationId) {
-                                navigate(`/locations/${point.locationId}`);
-                              }
+                              if (Date.now() - lastDragAtRef.current < 350) return;
+                              setHighlightedPointId(point.id);
+                              handleSelectPoint(point.id);
                             }}
                             onPointerDown={(event) => handlePointPointerDown(event, point)}
                             onPointerMove={(event) => handlePointPointerMove(event, point)}
                             onPointerUp={(event) => void handlePointPointerUp(event, point)}
                             onPointerCancel={() => setDragPreview(null)}
                             className={`absolute flex -translate-x-1/2 -translate-y-1/2 flex-col items-center border-0 bg-transparent p-0 ${
-                              selectedPointId === point.id ? 'z-10 scale-110' : ''
+                              highlightedPointId === point.id ? 'z-20' : ''
                             } ${
                               canManageCampaignContent && !placingPoint ? 'cursor-grab active:cursor-grabbing' : 'cursor-default'
                             }`}
@@ -1013,7 +1270,7 @@ const LocationMaps: React.FC = () => {
                               touchAction: 'none',
                             }}
                           >
-                            <MapPointIcon iconId={point.iconId} className="h-9 w-9 sm:h-10 sm:w-10" />
+                             <MapPointMarker point={point} size={pointSize} className="shrink-0" />
                             <span
                               className="mt-1 max-w-32 truncate whitespace-nowrap text-xs font-bold leading-4"
                               style={{
@@ -1025,6 +1282,56 @@ const LocationMaps: React.FC = () => {
                               {point.name}
                             </span>
                           </button>
+                          {canManageCampaignContent && !placingPoint && !drawingEnabled && highlightedPointId === point.id && (
+                            <div
+                              className="pointer-events-none absolute z-30 -translate-x-1/2 -translate-y-1/2 rounded-sm border border-primary"
+                              style={{ left: `${preview.x * 100}%`, top: `calc(${preview.y * 100}% - 10px)`, width: pointSize + 4 / mapZoom, height: pointSize + 4 / mapZoom, borderWidth: 1 / mapZoom }}
+                            >
+                              {([
+                                { corner: 'tl', x: -1, y: -1, cursor: 'cursor-nwse-resize' },
+                                { corner: 'tr', x: 1, y: -1, cursor: 'cursor-nesw-resize' },
+                                { corner: 'bl', x: -1, y: 1, cursor: 'cursor-nesw-resize' },
+                                { corner: 'br', x: 1, y: 1, cursor: 'cursor-nwse-resize' },
+                              ] as const).map((handle) => (
+                                <span
+                                  key={handle.corner}
+                                  role="slider"
+                                  aria-label={`调整${point.name}的大小`}
+                                  aria-valuemin={16}
+                                  aria-valuemax={160}
+                                  aria-valuenow={pointSize}
+                                  tabIndex={0}
+                                  className={`pointer-events-auto absolute flex items-center justify-center ${handle.cursor}`}
+                                  style={{
+                                    width: 16 / mapZoom,
+                                    height: 16 / mapZoom,
+                                    top: handle.y < 0 ? -8 / mapZoom : undefined,
+                                    bottom: handle.y > 0 ? -8 / mapZoom : undefined,
+                                    left: handle.x < 0 ? -8 / mapZoom : undefined,
+                                    right: handle.x > 0 ? -8 / mapZoom : undefined,
+                                  }}
+                                  onPointerDown={(event) => {
+                                    if (event.button !== 0 || saveMutation.isPending) return;
+                                    event.preventDefault();
+                                    event.stopPropagation();
+                                    event.currentTarget.setPointerCapture(event.pointerId);
+                                    setResizePreview({ pointId: point.id, startX: event.clientX, startY: event.clientY, initialSize: point.size ?? 40, xDirection: handle.x, yDirection: handle.y, size: point.size ?? 40 });
+                                  }}
+                                  onPointerMove={(event) => {
+                                    if (!event.currentTarget.hasPointerCapture(event.pointerId)) return;
+                                    event.stopPropagation();
+                                    setResizePreview((current) => current?.pointId === point.id ? { ...current, size: resizePointSize(current, event.clientX, event.clientY) } : current);
+                                  }}
+                                  onPointerUp={(event) => void handleResizePointerUp(event, point)}
+                                  onPointerCancel={(event) => { event.stopPropagation(); setResizePreview(null); }}
+                                  onClick={(event) => event.stopPropagation()}
+                                >
+                                  <span className="rounded-sm border border-white bg-primary shadow-sm" style={{ width: 7 / mapZoom, height: 7 / mapZoom, borderWidth: 1 / mapZoom }} />
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                          </React.Fragment>
                         );
                       })}
                     </div>
@@ -1062,17 +1369,24 @@ const LocationMaps: React.FC = () => {
               </div>
 
               {canManageCampaignContent && selectedPoint && !drawingEnabled ? (
-                <LocationMapPointPanel
-                  key={selectedPoint.id}
-                  point={selectedPoint}
-                  locations={campaignData.locations}
-                  busy={saveMutation.isPending}
-                  onSave={handleSavePoint}
-                  onDelete={handleDeletePoint}
-                  onOpenLocation={(locationId) => navigate(`/locations/${locationId}`)}
-                  onDirtyChange={handlePointEditorDirtyChange}
-                  onClose={handleClosePointEditor}
-                />
+                <>
+                  <div className="fixed inset-0 z-[49]" onClick={handleClosePointEditor} aria-hidden="true" />
+                  <LocationMapPointPanel
+                    key={selectedPoint.id}
+                    point={selectedPoint}
+                    locations={campaignData.locations}
+                    characters={campaignData.characters}
+                    monsters={campaignData.monsters}
+                    busy={saveMutation.isPending}
+                    onSave={handleSavePoint}
+                    onDelete={handleDeletePoint}
+                    onOpenLocation={(locationId) => navigate(`/locations/${locationId}`)}
+                    onOpenCharacter={(characterId) => navigate(`/characters/${characterId}`)}
+                    onOpenMonster={(monsterId) => navigate(`/monsters/${monsterId}`)}
+                    onDirtyChange={handlePointEditorDirtyChange}
+                    onClose={handleClosePointEditor}
+                  />
+                </>
               ) : null}
             </section>
           ) : null}

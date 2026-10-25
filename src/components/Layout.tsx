@@ -6,7 +6,7 @@ import { useCampaignSession, useCampaignTabs } from '../context/CampaignContext'
 import { GuideHelpButton, GuideId } from './common/InteractiveGuide';
 import ConfirmDialog from './common/ConfirmDialog';
 import ConnectionStatusPanel, { type BackendConnectionStatus } from './common/ConnectionStatusPanel';
-import { Menu, PanelRightOpen, Search } from 'lucide-react';
+import { Menu, PanelLeftClose, PanelLeftOpen, PanelRightOpen, Search } from 'lucide-react';
 import '../styles/workspace.css';
 
 const QuickReferencePanel = React.lazy(() => import('./common/QuickReferencePanel'));
@@ -18,6 +18,7 @@ const Layout: React.FC = () => {
   const [isTabPanelMaximized, setIsTabPanelMaximized] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileTabsOpen, setMobileTabsOpen] = useState(false);
   const [reloadDialogOpen, setReloadDialogOpen] = useState(false);
   const [quickSearchOpen, setQuickSearchOpen] = useState(false);
@@ -181,7 +182,7 @@ const Layout: React.FC = () => {
 
   return (
     <div className="app-shell theme-page">
-      {!isMobile && <Sidebar />}
+      {!isMobile && <Sidebar collapsed={sidebarCollapsed} />}
       {isMobile && (
         <>
           {mobileSidebarOpen && <div className="drawer-overlay" onClick={() => setMobileSidebarOpen(false)} aria-hidden="true" />}
@@ -248,6 +249,7 @@ const Layout: React.FC = () => {
         <header className="app-toolbar ui-glass">
           <div className="app-toolbar__location">
             {isMobile && <button type="button" className="shell-icon-button" onClick={() => setMobileSidebarOpen(true)} aria-label="打开侧边栏"><Menu size={18} /></button>}
+            {!isMobile && <button type="button" className="shell-icon-button" onClick={() => setSidebarCollapsed((value) => !value)} aria-label={sidebarCollapsed ? '展开侧边栏' : '收起侧边栏'} title={sidebarCollapsed ? '展开侧边栏' : '收起侧边栏'}>{sidebarCollapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}</button>}
             <span className="hidden sm:inline theme-text-secondary">工作区</span>
             <span className="hidden sm:inline theme-text-secondary" aria-hidden="true">/</span>
             <span className="truncate">{pageLabel}</span>
@@ -261,7 +263,7 @@ const Layout: React.FC = () => {
         </header>
         <div className="app-panels">
           <div className={`app-content ${isTabPanelMaximized && !isMobile ? 'hidden' : ''}`}>
-            <div className={`workspace-surface ${location.pathname === '/overview' ? 'workspace-surface--overview' : ''} ${['/relation-graphs', '/mind-maps'].includes(location.pathname) ? 'workspace-surface--canvas' : ''}`}>
+            <div className={`workspace-surface ${location.pathname === '/overview' ? 'workspace-surface--overview' : ''} ${['/relation-graphs', '/mind-maps', '/locations/maps'].includes(location.pathname) ? 'workspace-surface--canvas' : ''}`}>
               <Outlet />
             </div>
           </div>

@@ -16,7 +16,13 @@ const locationMapsDocumentType = "location_maps"
 
 type LocationMapPoint struct {
 	ID               string  `json:"id"`
+	Kind             string  `json:"kind,omitempty"`
 	LocationID       string  `json:"locationId,omitempty"`
+	CharacterID      string  `json:"characterId,omitempty"`
+	MonsterID        string  `json:"monsterId,omitempty"`
+	AvatarRef        string  `json:"avatarRef,omitempty"`
+	TokenStyle       string  `json:"tokenStyle,omitempty"`
+	Size             int     `json:"size,omitempty"`
 	Name             string  `json:"name"`
 	Introduction     string  `json:"introduction"`
 	IconID           int     `json:"iconId"`
@@ -112,9 +118,39 @@ func normalizeLocationMaps(maps []LocationMap, now int64) ([]LocationMap, error)
 				return nil, errors.New("duplicate_point_id")
 			}
 			pointIDs[point.ID] = struct{}{}
+			if point.Kind == "" {
+				point.Kind = "location"
+			}
+			if point.Kind != "location" && point.Kind != "character" && point.Kind != "monster" {
+				return nil, errors.New("invalid_point_kind")
+			}
 			point.LocationID = strings.TrimSpace(point.LocationID)
-			if point.LocationID == "" {
-				return nil, errors.New("location_id_required")
+			point.CharacterID = strings.TrimSpace(point.CharacterID)
+			point.MonsterID = strings.TrimSpace(point.MonsterID)
+			point.AvatarRef = strings.TrimSpace(point.AvatarRef)
+			if point.Size == 0 {
+				point.Size = 40
+			}
+			if point.Size < 16 || point.Size > 160 {
+				return nil, errors.New("invalid_point_size")
+			}
+			if point.Kind == "character" || point.Kind == "monster" {
+				point.LocationID = ""
+				if point.Kind == "character" {
+					point.MonsterID = ""
+				} else {
+					point.CharacterID = ""
+				}
+				if point.TokenStyle == "" || point.TokenStyle == "icon" {
+					point.TokenStyle = "circle"
+				}
+				if point.TokenStyle != "circle" && point.TokenStyle != "square" && point.TokenStyle != "token" && point.TokenStyle != "avatar" {
+					return nil, errors.New("invalid_token_style")
+				}
+			} else {
+				point.CharacterID = ""
+				point.MonsterID = ""
+				point.TokenStyle = ""
 			}
 			point.Name = strings.TrimSpace(point.Name)
 			if point.Name == "" {
@@ -189,6 +225,8 @@ func redactLocationMapDocumentForPL(doc LocationMapDocument) LocationMapDocument
 		for _, point := range maps[mapIndex].Points {
 			if point.VisibleToPlayers {
 				point.LocationID = ""
+				point.CharacterID = ""
+				point.MonsterID = ""
 				visible = append(visible, point)
 			}
 		}
@@ -248,7 +286,7 @@ func registerLocationMapRoutes(campaignAPI *gin.RouterGroup, db *gorm.DB) {
 				return
 			}
 			switch err.Error() {
-			case "duplicate_map_id", "duplicate_point_id", "location_id_required", "invalid_icon_id", "invalid_coordinates":
+			case "duplicate_map_id", "duplicate_point_id", "invalid_point_kind", "invalid_token_style", "invalid_icon_id", "invalid_coordinates":
 				c.JSON(400, gin.H{"error": err.Error()})
 			default:
 				c.JSON(500, gin.H{"error": "database_error"})

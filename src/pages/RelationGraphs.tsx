@@ -422,6 +422,20 @@ const RelationGraphs: React.FC = () => {
     setNewEntityName('');
   };
 
+  const addTemporaryCharacter = () => {
+    const name = newEntityName.trim();
+    if (!name || !activeGraph || !boardRef.current) return;
+    const node = relationGraphService.makeNode(
+      '', 'characters', name,
+      boardRef.current.clientWidth / scale / 2,
+      boardRef.current.clientHeight / scale / 2
+    );
+    node.isTemporary = true;
+    persistGraph({ ...activeGraph, nodes: [...activeGraph.nodes, node] });
+    setSelectedNodeIds([node.id]);
+    setNewEntityName('');
+  };
+
   const removeSelectedNodes = () => {
     if (!activeGraph || selectedNodeIds.length === 0) return;
     const nextNodes = activeGraph.nodes.filter((n) => !selectedNodeIds.includes(n.id));
@@ -460,6 +474,7 @@ const RelationGraphs: React.FC = () => {
   };
 
   const handleNodeDoubleClick = (node: RelationGraphNode) => {
+    if (node.isTemporary) return;
     const entity = findEntity(node);
     if (!entity) return;
     const type = node.entityType;
@@ -561,7 +576,7 @@ const RelationGraphs: React.FC = () => {
       </div>
 
       <div className="page-section shrink-0">
-        <div className="text-sm font-medium mb-2">节点添加（仅人物/怪物）</div>
+        <div className="text-sm font-medium mb-2">节点添加（人物/怪物）</div>
         <form onSubmit={createEntityAndAddNode} className="flex flex-col sm:flex-row gap-2 mb-2">
           <select
             value={newEntityType}
@@ -587,6 +602,11 @@ const RelationGraphs: React.FC = () => {
           >
             新建{graphEntityTypeLabel(newEntityType)}并加入
           </button>
+          {newEntityType === 'characters' && (
+            <button type="button" onClick={addTemporaryCharacter} disabled={!newEntityName.trim() || !activeGraph} className="px-3 py-2 rounded border border-theme bg-theme-card hover:bg-primary-light disabled:opacity-50">
+              添加临时角色
+            </button>
+          )}
         </form>
         <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
           <select

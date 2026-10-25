@@ -31,8 +31,10 @@ const messageFromPayload = (
       return '地图数据包含重复 ID';
     case 'duplicate_point_id':
       return '点位数据包含重复 ID';
-    case 'location_id_required':
-      return '点位必须关联一个地点';
+    case 'invalid_point_kind':
+      return '点位类型无效';
+    case 'invalid_token_style':
+      return '人物指示物样式无效';
     case 'invalid_icon_id':
       return '点位图标编号必须在 1—14 之间';
     case 'invalid_coordinates':

@@ -112,6 +112,8 @@ func prepItemDependencies(value any) []prepDependency {
 			add(stringFromAny(item["entityType"]), stringFromAny(item["entityId"]))
 			add(stringFromAny(item["linkedEntityType"]), stringFromAny(item["linkedEntityId"]))
 			add("locations", stringFromAny(item["locationId"]))
+			add("characters", stringFromAny(item["characterId"]))
+			add("monsters", stringFromAny(item["monsterId"]))
 			for _, child := range item {
 				visit(child)
 			}
@@ -647,11 +649,13 @@ func remapPrepReferences(content *prepPackageContent, ids, preferred map[string]
 			if !ok {
 				continue
 			}
-			newID, exists := ids[entityMapKey(stringFromAny(node["entityType"]), stringFromAny(node["entityId"]))]
-			if !exists {
-				continue
+			if node["isTemporary"] != true {
+				newID, exists := ids[entityMapKey(stringFromAny(node["entityType"]), stringFromAny(node["entityId"]))]
+				if !exists {
+					continue
+				}
+				node["entityId"] = newID
 			}
-			node["entityId"] = newID
 			keptNodeIDs[stringFromAny(node["id"])] = struct{}{}
 			keptNodes = append(keptNodes, node)
 		}
@@ -750,11 +754,31 @@ func remapPrepReferences(content *prepPackageContent, ids, preferred map[string]
 		mapIDs[oldID] = item.ID
 		points := make([]LocationMapPoint, 0, len(item.Points))
 		for _, point := range item.Points {
-			if next, exists := ids[entityMapKey("locations", point.LocationID)]; exists {
-				point.ID = uuid.NewString()
+			if point.Kind == "monster" {
+				if point.MonsterID != "" {
+					next, exists := ids[entityMapKey("monsters", point.MonsterID)]
+					if !exists {
+						continue
+					}
+					point.MonsterID = next
+				}
+			} else if point.Kind == "character" {
+				if point.CharacterID != "" {
+					next, exists := ids[entityMapKey("characters", point.CharacterID)]
+					if !exists {
+						continue
+					}
+					point.CharacterID = next
+				}
+			} else if point.LocationID != "" {
+				next, exists := ids[entityMapKey("locations", point.LocationID)]
+				if !exists {
+					continue
+				}
 				point.LocationID = next
-				points = append(points, point)
 			}
+			point.ID = uuid.NewString()
+			points = append(points, point)
 		}
 		item.Points = points
 	}
