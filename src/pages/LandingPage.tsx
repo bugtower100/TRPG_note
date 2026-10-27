@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useCampaignSession, useCampaignTheme } from '../context/CampaignContext';
-import { Download, Upload, Plus, ChevronDown, HardDrive } from 'lucide-react';
+import { Download, Upload, Plus, ChevronDown, HardDrive, LogOut } from 'lucide-react';
 import { dataService } from '../services/dataService';
 import { GuideHelpButton } from '../components/common/InteractiveGuide';
 import ReleaseUpdateButton from '../components/common/ReleaseUpdateButton';
@@ -300,14 +300,16 @@ const LandingPage: React.FC = () => {
                 <Download size={18} />
                 <span>导出所有模组</span>
             </button>
-            <button 
-                onClick={logout}
-                className="ml-2 font-medium theme-text-secondary hover:text-primary"
-            >
-                退出登录
-            </button>
               </div>
             </details>
+            <button
+              type="button"
+              onClick={logout}
+              className="inline-flex items-center gap-1.5 rounded-md border border-theme px-3 py-2 text-sm font-medium theme-text-secondary hover:bg-primary-light hover:text-primary"
+            >
+              <LogOut size={16} aria-hidden="true" />
+              退出登录
+            </button>
             {(isCampaignLoading || isCampaignSaving) && (
               <span className="text-sm theme-text-secondary">
                 {isCampaignLoading ? '正在加载模组...' : '正在保存模组...'}

@@ -2,6 +2,43 @@
   background: color-mix(in srgb, var(--bg-card) 88%, var(--bg-page) 12%);
 }
 
+.mind-map-work-area {
+  display: flex;
+  flex: 1;
+  flex-direction: column-reverse;
+  min-height: 0;
+  gap: 12px;
+}
+
+.mind-map-canvas-shell {
+  min-width: 0;
+  min-height: max(58vh, 420px);
+}
+
+.mind-map-details-panel {
+  width: 100%;
+  max-height: min(42dvh, 360px);
+  overflow-y: auto;
+  background: color-mix(in srgb, var(--bg-card) 84%, transparent);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+@media (min-width: 1100px) {
+  .mind-map-work-area {
+    flex-direction: row;
+  }
+
+  .mind-map-canvas-shell {
+    min-height: 0;
+  }
+
+  .mind-map-details-panel {
+    flex: 0 0 300px;
+    max-height: min(72vh, 540px);
+  }
+}
+
 .mind-map-node-card {
   position: relative;
   display: flex;
@@ -29,6 +66,23 @@
   box-shadow:
     0 0 0 4px color-mix(in srgb, var(--primary-color) 24%, transparent),
     0 10px 28px rgb(15 23 42 / 16%);
+}
+
+.mind-map-node-card-connecting {
+  outline: 3px dashed var(--primary-color);
+  outline-offset: 4px;
+}
+
+.mind-map-node-card-image {
+  height: 190px;
+  justify-content: flex-start;
+  padding: 8px 0;
+}
+
+.mind-map-node-image {
+  width: 196px;
+  height: 132px;
+  object-fit: contain;
 }
 
 .mind-map-node-title {
@@ -63,39 +117,6 @@
 .mind-map-keyword-link:hover {
   color: var(--primary-dark);
   text-decoration-style: solid;
-}
-
-.mind-map-node-reference {
-  position: absolute;
-  left: 7px;
-  bottom: 6px;
-  display: inline-flex;
-  max-width: 86px;
-  align-items: center;
-  gap: 3px;
-  overflow: hidden;
-  border-radius: 999px;
-  background: var(--primary-light);
-  color: var(--primary-color);
-  font-size: 0.625rem;
-  line-height: 1;
-  padding: 4px 6px;
-}
-
-.mind-map-node-reference span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.mind-map-node-reference:hover:not(:disabled) {
-  filter: brightness(0.96);
-}
-
-.mind-map-node-reference:disabled {
-  cursor: not-allowed;
-  color: #b91c1c;
-  opacity: 0.8;
 }
 
 .mind-map-node-kind {
@@ -163,6 +184,11 @@
   background: var(--primary-color) !important;
 }
 
+.mind-map-node-route-handle {
+  opacity: 0;
+  pointer-events: none;
+}
+
 .mind-map-flow .react-flow__controls {
   overflow: hidden;
   border: 1px solid var(--border-color);
@@ -220,13 +246,8 @@
     margin-left: 0;
   }
 
-  .mind-map-canvas-shell {
-    min-height: max(58vh, 420px);
-  }
-
   .mind-map-details-panel {
-    max-height: 88dvh;
-    padding-bottom: calc(1rem + env(safe-area-inset-bottom));
+    padding-bottom: calc(0.75rem + env(safe-area-inset-bottom));
   }
 
   .mind-map-node-toolbar {

@@ -5,24 +5,22 @@ import {
   type Edge,
   type Node,
 } from '@xyflow/react';
-import type { MindMapDocument, MindMapEntityReference } from '../../../types';
+import type { MindMapDocument } from '../../../types';
 import type {
-  MindMapEntityOption,
   MindMapKeywordSegment,
 } from './mindMapReferences';
 import type { TooltipTargetPayload } from '../../../components/common/richTextReference';
-import { getMindMapNodeEntityRefs } from '../../../utils/mindMapCompatibility';
 
 export const MIND_MAP_NODE_WIDTH = 220;
 export const MIND_MAP_NODE_HEIGHT = 96;
 
 export type MindMapNodeData = {
   title: string;
+  imageRef?: string;
   titleSegments?: MindMapKeywordSegment[];
   color?: string;
-  entityRefs: MindMapEntityReference[];
-  entityReferences?: Array<MindMapEntityOption | undefined>;
   isRoot: boolean;
+  hasParent: boolean;
   collapsed: boolean;
   hasChildren: boolean;
   hiddenDescendantCount: number;
@@ -34,6 +32,8 @@ export type MindMapNodeData = {
   onMoveDown?: () => void;
   onToggleCollapse?: () => void;
   onDelete?: () => void;
+  onStartConnection?: () => void;
+  connecting?: boolean;
   onOpenTarget?: (target: TooltipTargetPayload) => void;
   onPreviewTarget?: (target: TooltipTargetPayload, anchor: HTMLElement) => void;
   onHidePreview?: () => void;
@@ -132,7 +132,7 @@ export const layoutMindMap = (
   orderedNodes.forEach((node) => {
     graph.setNode(node.id, {
       width: MIND_MAP_NODE_WIDTH,
-      height: MIND_MAP_NODE_HEIGHT,
+      height: node.imageRef ? 190 : MIND_MAP_NODE_HEIGHT,
     });
   });
 
@@ -174,6 +174,21 @@ export const layoutMindMap = (
     });
   });
 
+  (mindMap.connections || []).forEach((connection) => {
+    if (!nodeIds.has(connection.sourceId) || !nodeIds.has(connection.targetId)) return;
+    edges.push({
+      id: `mind-map-connection:${connection.id}`,
+      source: connection.sourceId,
+      target: connection.targetId,
+      type: 'smoothstep',
+      label: connection.label,
+      labelShowBg: Boolean(connection.label),
+      markerEnd: { type: MarkerType.ArrowClosed, color: 'var(--primary-color)' },
+      style: { stroke: 'var(--primary-color)', strokeWidth: 1.6 },
+      className: 'mind-map-edge',
+    });
+  });
+
   layout(graph);
 
   const sourcePosition = isHorizontal ? Position.Right : Position.Bottom;
@@ -191,7 +206,7 @@ export const layoutMindMap = (
       type: 'mindMap',
       position: {
         x: position?.x ?? automaticPosition.x - MIND_MAP_NODE_WIDTH / 2,
-        y: position?.y ?? automaticPosition.y - MIND_MAP_NODE_HEIGHT / 2,
+        y: position?.y ?? automaticPosition.y - (node.imageRef ? 190 : MIND_MAP_NODE_HEIGHT) / 2,
       },
       sourcePosition,
       targetPosition,
@@ -199,9 +214,10 @@ export const layoutMindMap = (
       selectable: false,
       data: {
         title: node.title,
-        entityRefs: getMindMapNodeEntityRefs(node),
+        imageRef: node.imageRef,
         color: node.color,
         isRoot: node.id === mindMap.rootNodeId,
+        hasParent: Boolean(node.parentId),
         collapsed: node.collapsed,
         hasChildren: (childrenByParent.get(node.id) || []).length > 0,
         hiddenDescendantCount,
@@ -209,6 +225,25 @@ export const layoutMindMap = (
         canMoveDown: siblingIndex >= 0 && siblingIndex < siblings.length - 1,
       },
     };
+  });
+
+  const centers = new Map(nodes.map((node) => [node.id, {
+    x: node.position.x + MIND_MAP_NODE_WIDTH / 2,
+    y: node.position.y + (node.data.imageRef ? 190 : MIND_MAP_NODE_HEIGHT) / 2,
+  }]));
+  const directedPairs = new Set(edges.map((edge) => `${edge.source}\0${edge.target}`));
+  edges.forEach((edge) => {
+    if (!directedPairs.has(`${edge.target}\0${edge.source}`)) return;
+    const source = centers.get(edge.source);
+    const target = centers.get(edge.target);
+    if (!source || !target) return;
+    const horizontalPair = Math.abs(source.x - target.x) >= Math.abs(source.y - target.y);
+    const firstDirection = edge.source.localeCompare(edge.target) < 0;
+    const side = horizontalPair
+      ? (firstDirection ? 'upper' : 'lower')
+      : (firstDirection ? 'left' : 'right');
+    edge.sourceHandle = `source-${side}`;
+    edge.targetHandle = `target-${side}`;
   });
 
   return { nodes, edges };

@@ -24,6 +24,10 @@ func trayInit() {
 	systray.Run(onReady, onExit)
 }
 
+func checkStartupDirectory() bool {
+	return true
+}
+
 func startPlatformApp(router *gin.Engine, addr string, showConsole bool, hideUI bool) {
 	_ = showConsole
 	go httpServe(router, addr, hideUI)

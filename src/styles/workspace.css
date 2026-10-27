@@ -188,6 +188,30 @@
   flex: 3 1 480px;
 }
 
+.landing-page {
+  position: relative;
+  isolation: isolate;
+  overflow-x: clip;
+}
+
+.landing-page::before {
+  position: absolute;
+  z-index: -1;
+  top: max(-620px, -50vw);
+  right: max(-620px, -50vw);
+  width: min(95vw, 1100px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  --landing-ring-color: color-mix(in srgb, var(--primary-color) 26%, transparent);
+  background: radial-gradient(circle,
+    transparent 0 23.95%, var(--landing-ring-color) 24% 24.1%,
+    transparent 24.15% 45.95%, var(--landing-ring-color) 46% 46.1%,
+    transparent 46.15% 67.95%, var(--landing-ring-color) 68% 68.1%,
+    transparent 68.15%);
+  pointer-events: none;
+  content: '';
+}
+
 .landing-header {
   padding-block: 8px 24px;
   border-bottom: 1px solid var(--border-color);
@@ -928,6 +952,12 @@
   margin: 28px 0 8px;
   font-size: 17px;
   font-weight: 700;
+}
+
+.manual-article h4 {
+  margin: 18px 0 6px;
+  font-size: 15px;
+  font-weight: 600;
 }
 
 .manual-article p,

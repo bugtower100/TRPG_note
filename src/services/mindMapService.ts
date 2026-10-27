@@ -6,6 +6,7 @@ import type {
   MindMapEntityReference,
   MindMapLayoutDirection,
   MindMapNode,
+  MindMapNodePosition,
 } from '../types';
 import {
   getMindMapNodeEntityRefs,
@@ -29,7 +30,7 @@ const createRootNode = (title: string, timestamp: number): MindMapNode => ({
 });
 
 const createNode = (
-  parentId: string,
+  parentId: string | null,
   title: string,
   siblingOrder: number,
   timestamp: number
@@ -45,7 +46,7 @@ const createNode = (
   updatedAt: timestamp,
 });
 
-const nextSiblingOrder = (mindMap: MindMapDocument, parentId: string) =>
+const nextSiblingOrder = (mindMap: MindMapDocument, parentId: string | null) =>
   mindMap.nodes.reduce(
     (highest, node) => (
       node.parentId === parentId
@@ -64,7 +65,7 @@ export const mindMapService = {
 
   create(name: string): MindMapDocument {
     const timestamp = now();
-    const normalizedName = name.trim() || '新思维导图';
+    const normalizedName = name.trim() || '新思维导图/白板';
     const rootNode = createRootNode(normalizedName, timestamp);
     return {
       id: uuidv4(),
@@ -214,6 +215,56 @@ export const mindMapService = {
     return this.addChild(mindMap, sibling.parentId, title);
   },
 
+  addStandalone(
+    mindMap: MindMapDocument,
+    title: string,
+    position: MindMapNodePosition,
+    imageRef?: string
+  ): { mindMap: MindMapDocument; node: MindMapNode } {
+    const timestamp = now();
+    const node = {
+      ...createNode(null, title, nextSiblingOrder(mindMap, null), timestamp),
+      position,
+      ...(imageRef ? { imageRef } : {}),
+    };
+    return {
+      mindMap: { ...mindMap, nodes: [...mindMap.nodes, node], updatedAt: timestamp },
+      node,
+    };
+  },
+
+  addConnection(mindMap: MindMapDocument, sourceId: string, targetId: string): MindMapDocument {
+    if (sourceId === targetId || !mindMap.nodes.some((node) => node.id === sourceId)
+      || !mindMap.nodes.some((node) => node.id === targetId)
+      || mindMap.nodes.some((node) => node.parentId === sourceId && node.id === targetId)
+      || (mindMap.connections || []).some((edge) => edge.sourceId === sourceId && edge.targetId === targetId)) {
+      return mindMap;
+    }
+    const timestamp = now();
+    return {
+      ...mindMap,
+      connections: [...(mindMap.connections || []), { id: uuidv4(), sourceId, targetId }],
+      updatedAt: timestamp,
+    };
+  },
+
+  updateConnection(mindMap: MindMapDocument, id: string, label: string): MindMapDocument {
+    const normalized = label.trim().slice(0, 120);
+    if (!(mindMap.connections || []).some((edge) => edge.id === id && (edge.label || '') !== normalized)) return mindMap;
+    return {
+      ...mindMap,
+      connections: (mindMap.connections || []).map((edge) => edge.id === id
+        ? { ...edge, label: normalized || undefined } : edge),
+      updatedAt: now(),
+    };
+  },
+
+  removeConnection(mindMap: MindMapDocument, id: string): MindMapDocument {
+    const connections = (mindMap.connections || []).filter((edge) => edge.id !== id);
+    return connections.length === (mindMap.connections || []).length
+      ? mindMap : { ...mindMap, connections, updatedAt: now() };
+  },
+
   updateNode(
     mindMap: MindMapDocument,
     nodeId: string,
@@ -291,6 +342,9 @@ export const mindMapService = {
     return {
       ...mindMap,
       nodes: mindMap.nodes.filter((node) => !removedIds.has(node.id)),
+      connections: (mindMap.connections || []).filter(
+        (edge) => !removedIds.has(edge.sourceId) && !removedIds.has(edge.targetId)
+      ),
       updatedAt: now(),
     };
   },

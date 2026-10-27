@@ -1,69 +1,12 @@
 import type {
-  CampaignData,
-  GraphEntityType,
-  MindMapEntityReference,
-} from '../../../types';
-import type {
   RichKeywordData,
   TooltipTargetPayload,
 } from '../../../components/common/richTextReference';
-
-export const MIND_MAP_ENTITY_TYPE_LABELS: Record<GraphEntityType, string> = {
-  characters: '人物',
-  monsters: '怪物',
-  locations: '地点',
-  organizations: '组织',
-  events: '事件',
-  clues: '线索',
-  timelines: '时间线',
-};
-
-const MIND_MAP_ENTITY_TYPES = Object.keys(
-  MIND_MAP_ENTITY_TYPE_LABELS
-) as GraphEntityType[];
-
-export interface MindMapEntityOption {
-  key: string;
-  entityType: GraphEntityType;
-  entityId: string;
-  name: string;
-  typeLabel: string;
-}
 
 export interface MindMapKeywordSegment {
   text: string;
   target?: TooltipTargetPayload;
 }
-
-export const mindMapEntityReferenceKey = (
-  reference: MindMapEntityReference
-) => `${reference.entityType}:${reference.entityId}`;
-
-export const buildMindMapEntityOptions = (
-  campaignData: Pick<
-    CampaignData,
-    | 'characters'
-    | 'monsters'
-    | 'locations'
-    | 'organizations'
-    | 'events'
-    | 'clues'
-    | 'timelines'
-  >
-): MindMapEntityOption[] => (
-  MIND_MAP_ENTITY_TYPES.flatMap((entityType) => (
-    campaignData[entityType].map((entity) => ({
-      key: mindMapEntityReferenceKey({
-        entityType,
-        entityId: entity.id,
-      }),
-      entityType,
-      entityId: entity.id,
-      name: entity.name || '未命名',
-      typeLabel: MIND_MAP_ENTITY_TYPE_LABELS[entityType],
-    }))
-  ))
-);
 
 const keywordRegexCache = new WeakMap<RichKeywordData, RegExp>();
 

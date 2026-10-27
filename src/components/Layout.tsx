@@ -177,7 +177,7 @@ const Layout: React.FC = () => {
     : ({
         overview: '模组概览', characters: '角色资料', monsters: '怪物资料', locations: '地点与地图',
         organizations: '组织资料', events: '事件资料', timelines: '时间线', 'relation-graphs': '关系图',
-        'mind-maps': '思维导图', 'shared-content': '共享资料', settings: '设置',
+        'mind-maps': '思维导图/白板', 'shared-content': '共享资料', settings: '设置',
       } as Record<string, string>)[location.pathname.split('/')[1]] || '模组资料';
 
   return (

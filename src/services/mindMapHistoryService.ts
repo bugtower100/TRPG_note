@@ -34,7 +34,7 @@ export class MindMapHistoryConflictError extends Error {
   current: MindMapHistoryDocument;
 
   constructor(current: MindMapHistoryDocument) {
-    super('思维导图撤销历史已被其他会话更新。');
+    super('思维导图/白板撤销历史已被其他会话更新。');
     this.name = 'MindMapHistoryConflictError';
     this.current = normalizeHistoryDocument(current);
   }
@@ -50,7 +50,7 @@ const parseHistoryResponse = async (response: Response): Promise<MindMapHistoryD
   if (!response.ok || !payload) {
     const errorCode = payload?.error;
     if (errorCode === 'forbidden') {
-      throw new Error('你没有权限读取或保存思维导图撤销历史。');
+      throw new Error('你没有权限读取或保存思维导图/白板撤销历史。');
     }
     throw new Error(text || `撤销历史请求失败（HTTP ${response.status}）`);
   }

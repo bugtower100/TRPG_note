@@ -1,14 +1,18 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import {
   BrainCircuit,
   Focus,
+  ImagePlus,
   Keyboard,
   Network,
+  Link2,
   Pencil,
   Plus,
   Redo2,
   Trash2,
   Undo2,
+  Upload,
 } from 'lucide-react';
 import ConfirmDialog from '../components/common/ConfirmDialog';
 import { buildRichKeywordData } from '../components/common/richTextReference';
@@ -19,6 +23,7 @@ import {
   useCampaignTabs,
 } from '../context/CampaignContext';
 import MindMapCanvas from '../features/mind-maps/components/MindMapCanvas';
+import RelationGraphResourcePickerModal from '../features/relation-graphs/components/RelationGraphResourcePickerModal';
 import MindMapEdgeDetailsPanel from '../features/mind-maps/components/MindMapEdgeDetailsPanel';
 import MindMapNodeDetailsPanel from '../features/mind-maps/components/MindMapNodeDetailsPanel';
 import { useMindMapHistory } from '../features/mind-maps/hooks/useMindMapHistory';
@@ -26,13 +31,10 @@ import {
   findMindMapNavigationTarget,
   type MindMapNavigationKey,
 } from '../features/mind-maps/utils/mindMapKeyboardNavigation';
-import {
-  buildMindMapEntityOptions,
-  type MindMapEntityOption,
-} from '../features/mind-maps/utils/mindMapReferences';
 import { calculateAutomaticMindMapPositions } from '../features/mind-maps/utils/layoutMindMap';
 import { useCampaignMemberRole } from '../hooks/useCampaignMemberRole';
 import { mindMapService } from '../services/mindMapService';
+import { resourceService, RESOURCE_ROOT_PATH } from '../services/resourceService';
 import type { MindMapSiblingDirection } from '../services/mindMapService';
 import type {
   MindMapDocument,
@@ -53,7 +55,21 @@ const MindMapWorkspace = () => {
   const { openInTab } = useCampaignTabs();
   const [activeMindMapId, setActiveMindMapId] = useState<string | null>(null);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
-  const [selectedEdgeNodeId, setSelectedEdgeNodeId] = useState<string | null>(null);
+  const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
+  const [connectingNodeId, setConnectingNodeId] = useState<string | null>(null);
+  const [resourcePickerOpen, setResourcePickerOpen] = useState(false);
+  const [resourceKeyword, setResourceKeyword] = useState('');
+  const [resourceSelectedFolderPath, setResourceSelectedFolderPath] = useState(RESOURCE_ROOT_PATH);
+  const [resourceExpandedFolders, setResourceExpandedFolders] = useState<string[]>([RESOURCE_ROOT_PATH]);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [imageError, setImageError] = useState('');
+  const imageInputRef = useRef<HTMLInputElement | null>(null);
+  const resourceQuery = useQuery({
+    queryKey: ['resources', 'library'] as const,
+    queryFn: () => resourceService.list(),
+    enabled: resourcePickerOpen,
+    staleTime: 30_000,
+  });
   const [deletingNodeId, setDeletingNodeId] = useState<string | null>(null);
   const [pendingLayoutDirection, setPendingLayoutDirection] =
     useState<MindMapLayoutDirection | null>(null);
@@ -86,16 +102,6 @@ const MindMapWorkspace = () => {
     () => buildRichKeywordData(keywordSource),
     [keywordSource]
   );
-  const entityOptions = useMemo(
-    () => buildMindMapEntityOptions(keywordSource),
-    [keywordSource]
-  );
-  const entityOptionsByKey = useMemo(
-    () => new Map<string, MindMapEntityOption>(
-      entityOptions.map((option) => [option.key, option])
-    ),
-    [entityOptions]
-  );
   const activeMindMap = useMemo(
     () => mindMaps.find((mindMap) => mindMap.id === activeMindMapId) || null,
     [activeMindMapId, mindMaps]
@@ -106,9 +112,13 @@ const MindMapWorkspace = () => {
   );
   const selectedEdgeNode = useMemo(
     () => activeMindMap?.nodes.find(
-      (node) => node.id === selectedEdgeNodeId && Boolean(node.parentId)
+      (node) => selectedEdgeId === `mind-map-edge:${node.parentId}:${node.id}` && Boolean(node.parentId)
     ) || null,
-    [activeMindMap, selectedEdgeNodeId]
+    [activeMindMap, selectedEdgeId]
+  );
+  const selectedConnection = useMemo(
+    () => activeMindMap?.connections?.find((edge) => selectedEdgeId === `mind-map-connection:${edge.id}`) || null,
+    [activeMindMap, selectedEdgeId]
   );
   const selectedEdgeParent = useMemo(
     () => activeMindMap?.nodes.find(
@@ -162,10 +172,10 @@ const MindMapWorkspace = () => {
   }, [selectedNode, selectedNodeId]);
 
   useEffect(() => {
-    if (selectedEdgeNodeId && (!selectedEdgeNode || !selectedEdgeParent)) {
-      setSelectedEdgeNodeId(null);
+    if (selectedEdgeId && !selectedConnection && (!selectedEdgeNode || !selectedEdgeParent)) {
+      setSelectedEdgeId(null);
     }
-  }, [selectedEdgeNode, selectedEdgeNodeId, selectedEdgeParent]);
+  }, [selectedConnection, selectedEdgeNode, selectedEdgeId, selectedEdgeParent]);
 
   const persistMindMap = useCallback((nextMindMap: MindMapDocument) => {
     setCampaignData((current) => mindMapService.update(current, nextMindMap));
@@ -188,12 +198,13 @@ const MindMapWorkspace = () => {
   const selectMindMap = useCallback((mindMapId: string | null) => {
     setActiveMindMapId(mindMapId);
     setSelectedNodeId(null);
-    setSelectedEdgeNodeId(null);
+    setSelectedEdgeId(null);
+    setConnectingNodeId(null);
     setDeletingNodeId(null);
   }, []);
 
   const createMindMap = useCallback(() => {
-    const name = window.prompt('请输入思维导图名称', '新思维导图');
+    const name = window.prompt('请输入思维导图/白板名称', '新思维导图/白板');
     if (name === null) return;
     const created = mindMapService.create(name);
     setCampaignData((current) => ({
@@ -205,9 +216,9 @@ const MindMapWorkspace = () => {
 
   const renameMindMap = useCallback(() => {
     if (!activeMindMap) return;
-    const name = window.prompt('请输入新的思维导图名称', activeMindMap.name);
+    const name = window.prompt('请输入新的思维导图/白板名称', activeMindMap.name);
     if (name === null) return;
-    const normalizedName = name.trim() || '未命名思维导图';
+    const normalizedName = name.trim() || '未命名思维导图/白板';
     if (normalizedName === activeMindMap.name) return;
     commitMindMap({
       ...activeMindMap,
@@ -217,7 +228,7 @@ const MindMapWorkspace = () => {
 
   const deleteMindMap = useCallback(() => {
     if (!activeMindMap) return;
-    if (!window.confirm(`确定删除思维导图“${activeMindMap.name}”吗？`)) return;
+    if (!window.confirm(`确定删除思维导图/白板“${activeMindMap.name}”吗？`)) return;
     const currentIndex = mindMaps.findIndex((mindMap) => mindMap.id === activeMindMap.id);
     const remaining = mindMaps.filter((mindMap) => mindMap.id !== activeMindMap.id);
     const nextActive = remaining[Math.min(currentIndex, remaining.length - 1)] || null;
@@ -261,20 +272,24 @@ const MindMapWorkspace = () => {
     commitMindMap(mindMapService.setNodePosition(activeMindMap, nodeId, position));
   }, [activeMindMap, commitMindMap]);
 
-  const selectEdge = useCallback((targetNodeId: string) => {
+  const selectEdge = useCallback((edgeId: string) => {
     setSelectedNodeId(null);
-    setSelectedEdgeNodeId(targetNodeId);
+    setConnectingNodeId(null);
+    setSelectedEdgeId(edgeId);
   }, []);
 
   const saveEdgeLabel = useCallback((label: string) => {
-    if (!activeMindMap || !selectedEdgeNode) return;
-    commitMindMap(mindMapService.setIncomingEdgeLabel(
-      activeMindMap,
-      selectedEdgeNode.id,
-      label
-    ));
-    setSelectedEdgeNodeId(null);
-  }, [activeMindMap, commitMindMap, selectedEdgeNode]);
+    if (!activeMindMap) return;
+    if (selectedConnection) commitMindMap(mindMapService.updateConnection(activeMindMap, selectedConnection.id, label));
+    else if (selectedEdgeNode) commitMindMap(mindMapService.setIncomingEdgeLabel(activeMindMap, selectedEdgeNode.id, label));
+    setSelectedEdgeId(null);
+  }, [activeMindMap, commitMindMap, selectedConnection, selectedEdgeNode]);
+
+  const removeSelectedConnection = useCallback(() => {
+    if (!activeMindMap || !selectedConnection) return;
+    commitMindMap(mindMapService.removeConnection(activeMindMap, selectedConnection.id));
+    setSelectedEdgeId(null);
+  }, [activeMindMap, commitMindMap, selectedConnection]);
 
   const createRootNode = useCallback(() => {
     if (!activeMindMap) return;
@@ -304,6 +319,54 @@ const MindMapWorkspace = () => {
     if (!result) return;
     commitMindMap(result.mindMap);
     setSelectedNodeId(result.node.id);
+  }, [activeMindMap, commitMindMap]);
+
+  const addStandaloneNode = useCallback((title: string, imageRef?: string) => {
+    if (!activeMindMap) return;
+    const positions = calculateAutomaticMindMapPositions(activeMindMap);
+    const placed = activeMindMap.nodes.map((node) => node.position || positions.get(node.id))
+      .filter((position): position is { x: number; y: number } => Boolean(position));
+    const position = {
+      x: Math.max(0, ...placed.map((item) => item.x)) + 300,
+      y: placed.length ? Math.min(...placed.map((item) => item.y)) : 0,
+    };
+    const result = mindMapService.addStandalone(activeMindMap, title, position, imageRef);
+    commitMindMap(result.mindMap);
+    setSelectedEdgeId(null);
+    setSelectedNodeId(result.node.id);
+  }, [activeMindMap, commitMindMap]);
+
+  const addTextNode = useCallback(() => {
+    const title = window.prompt('请输入独立节点名称', '新节点');
+    if (title !== null) addStandaloneNode(title);
+  }, [addStandaloneNode]);
+
+  const addImageNode = useCallback((ref: string, title: string) => {
+    addStandaloneNode(title, ref);
+    setResourcePickerOpen(false);
+    setImageError('');
+  }, [addStandaloneNode]);
+
+  const uploadImage = useCallback(async (file?: File) => {
+    if (!file || uploadingImage) return;
+    setUploadingImage(true);
+    setImageError('');
+    try {
+      const uploaded = await resourceService.upload(file, RESOURCE_ROOT_PATH);
+      addImageNode(uploaded.ref, file.name.replace(/\.[^.]+$/, ''));
+    } catch (error) {
+      setImageError(error instanceof Error ? error.message : '图片上传失败');
+    } finally {
+      setUploadingImage(false);
+      if (imageInputRef.current) imageInputRef.current.value = '';
+    }
+  }, [addImageNode, uploadingImage]);
+
+  const connectNodes = useCallback((sourceId: string, targetId: string) => {
+    if (!activeMindMap) return;
+    commitMindMap(mindMapService.addConnection(activeMindMap, sourceId, targetId));
+    setConnectingNodeId(null);
+    setSelectedNodeId(null);
   }, [activeMindMap, commitMindMap]);
 
   const saveNode = useCallback((
@@ -393,9 +456,11 @@ const MindMapWorkspace = () => {
         return;
       }
       if (key === 'escape') {
-        if (!selectedNodeId) return;
+        if (!selectedNodeId && !connectingNodeId && !selectedEdgeId) return;
         event.preventDefault();
         setSelectedNodeId(null);
+        setConnectingNodeId(null);
+        setSelectedEdgeId(null);
         return;
       }
       if (!selectedNode) return;
@@ -406,7 +471,7 @@ const MindMapWorkspace = () => {
         return;
       }
       if (key === 'enter' && !withCommand && !event.altKey && !event.shiftKey) {
-        if (selectedNode.id === activeMindMap.rootNodeId) return;
+        if (!selectedNode.parentId) return;
         event.preventDefault();
         addSiblingNode(selectedNode.id);
         return;
@@ -448,11 +513,13 @@ const MindMapWorkspace = () => {
     activeMindMap,
     addChildNode,
     addSiblingNode,
+    connectingNodeId,
     deletingNodeId,
     moveSiblingNode,
     redoMindMap,
     selectedNode,
     selectedNodeId,
+    selectedEdgeId,
     toggleNodeCollapse,
     undoMindMap,
   ]);
@@ -463,7 +530,7 @@ const MindMapWorkspace = () => {
         <div>
           <h2 className="flex items-center gap-2 text-xl font-bold md:text-2xl">
             <BrainCircuit size={26} aria-hidden="true" />
-            思维导图
+            思维导图/白板
           </h2>
           <p className="mt-1 text-xs theme-text-secondary">
             方向键：节点导航；Tab：子节点；Enter：同级；Delete：删除；Ctrl/Cmd + ↑/↓：排序；Space：折叠；Esc：取消选择
@@ -475,10 +542,10 @@ const MindMapWorkspace = () => {
             value={activeMindMapId || ''}
             onChange={(event) => selectMindMap(event.target.value || null)}
             disabled={mindMaps.length === 0}
-            aria-label="选择思维导图"
+            aria-label="选择思维导图/白板"
             className="min-w-44 rounded border border-theme bg-theme-card px-3 py-2 text-sm disabled:opacity-50"
           >
-            {mindMaps.length === 0 ? <option value="">暂无思维导图</option> : null}
+            {mindMaps.length === 0 ? <option value="">暂无思维导图/白板</option> : null}
             {mindMaps.map((mindMap) => (
               <option key={mindMap.id} value={mindMap.id}>
                 {mindMap.name}
@@ -517,6 +584,16 @@ const MindMapWorkspace = () => {
       {activeMindMap ? (
         <>
           <div className="mind-map-main-toolbar page-section flex shrink-0 flex-wrap items-center gap-2">
+            <button type="button" onClick={addTextNode} className="inline-flex items-center gap-1.5 rounded border border-theme px-3 py-1.5 text-sm hover:bg-primary-light">
+              <Plus size={16} aria-hidden="true" />独立节点
+            </button>
+            <button type="button" onClick={() => imageInputRef.current?.click()} disabled={uploadingImage} className="inline-flex items-center gap-1.5 rounded border border-theme px-3 py-1.5 text-sm hover:bg-primary-light disabled:opacity-50">
+              <Upload size={16} aria-hidden="true" />{uploadingImage ? '上传中…' : '上传图片'}
+            </button>
+            <button type="button" onClick={() => setResourcePickerOpen(true)} className="inline-flex items-center gap-1.5 rounded border border-theme px-3 py-1.5 text-sm hover:bg-primary-light">
+              <ImagePlus size={16} aria-hidden="true" />资源库图片
+            </button>
+            {connectingNodeId ? <span className="text-xs text-primary"><Link2 size={14} className="inline" /> 请选择目标节点，Esc 取消</span> : null}
             <span className="px-1 text-xs font-medium theme-text-secondary">自动布局</span>
             <button
               type="button"
@@ -603,25 +680,34 @@ const MindMapWorkspace = () => {
               快捷键
             </span>
           </div>
+          {imageError ? <p className="text-sm text-red-600" role="alert">{imageError}</p> : null}
 
-          <div className="mind-map-canvas-shell relative min-h-[58vh] flex-1 overflow-hidden rounded-xl border border-theme bg-theme-card md:min-h-0">
+          <div className="mind-map-work-area">
+          <div className="mind-map-canvas-shell relative flex-1 overflow-hidden rounded-xl border border-theme bg-theme-card">
             {activeMindMap.nodes.length > 0 ? (
               <MindMapCanvas
                 mindMap={activeMindMap}
                 campaignData={campaignData}
                 fitRequest={fitRequest}
                 selectedNodeId={selectedNodeId}
-                selectedEdgeNodeId={selectedEdgeNodeId}
+                selectedEdgeId={selectedEdgeId}
+                connectingNodeId={connectingNodeId}
                 keywordData={keywordData}
-                entityOptionsByKey={entityOptionsByKey}
                 onSelectNode={(nodeId) => {
-                  setSelectedEdgeNodeId(null);
+                  setSelectedEdgeId(null);
                   setSelectedNodeId(nodeId);
                 }}
                 onSelectEdge={selectEdge}
+                onConnect={connectNodes}
+                onStartConnection={(nodeId) => {
+                  setSelectedNodeId(null);
+                  setSelectedEdgeId(null);
+                  setConnectingNodeId((current) => current === nodeId ? null : nodeId);
+                }}
                 onClearSelection={() => {
                   setSelectedNodeId(null);
-                  setSelectedEdgeNodeId(null);
+                  setSelectedEdgeId(null);
+                  setConnectingNodeId(null);
                 }}
                 onAddChild={addChildNode}
                 onAddSibling={addSiblingNode}
@@ -634,7 +720,7 @@ const MindMapWorkspace = () => {
             ) : (
               <div className="flex h-full min-h-[58vh] items-center justify-center px-6 text-center">
                 <div>
-                  <p className="text-sm theme-text-secondary">当前思维导图没有中心主题。</p>
+                  <p className="text-sm theme-text-secondary">当前思维导图/白板没有中心主题。</p>
                   <button
                     type="button"
                     onClick={createRootNode}
@@ -646,39 +732,44 @@ const MindMapWorkspace = () => {
                 </div>
               </div>
             )}
-            {selectedNode ? (
-              <MindMapNodeDetailsPanel
-                node={selectedNode}
-                isRoot={selectedNode.id === activeMindMap.rootNodeId}
-                directChildCount={selectedDirectChildCount}
-                branchNodeCount={selectedBranchNodeCount}
-                keywordData={keywordData}
-                entityOptions={entityOptions}
-                entityOptionsByKey={entityOptionsByKey}
-                onClose={() => setSelectedNodeId(null)}
-                onSave={saveNode}
-                onAddChild={addChildNode}
-                onAddSibling={addSiblingNode}
-                onRequestDelete={setDeletingNodeId}
-                onOpenTarget={openKeywordTarget}
-              />
-            ) : null}
-            {selectedEdgeNode && selectedEdgeParent ? (
+            {(selectedEdgeNode && selectedEdgeParent) || selectedConnection ? (
               <MindMapEdgeDetailsPanel
-                parentTitle={selectedEdgeParent.title}
-                childTitle={selectedEdgeNode.title}
-                label={selectedEdgeNode.incomingEdgeLabel}
-                onClose={() => setSelectedEdgeNodeId(null)}
+                parentTitle={selectedEdgeParent?.title || activeMindMap.nodes.find((node) => node.id === selectedConnection?.sourceId)?.title || ''}
+                childTitle={selectedEdgeNode?.title || activeMindMap.nodes.find((node) => node.id === selectedConnection?.targetId)?.title || ''}
+                label={selectedEdgeNode?.incomingEdgeLabel || selectedConnection?.label}
+                onClose={() => setSelectedEdgeId(null)}
                 onSave={saveEdgeLabel}
+                onDelete={selectedConnection ? removeSelectedConnection : undefined}
               />
             ) : null}
+          </div>
+          {selectedNode ? (
+            <MindMapNodeDetailsPanel
+              node={selectedNode}
+              isRoot={selectedNode.id === activeMindMap.rootNodeId}
+              directChildCount={selectedDirectChildCount}
+              branchNodeCount={selectedBranchNodeCount}
+              keywordData={keywordData}
+              onClose={() => setSelectedNodeId(null)}
+              onSave={saveNode}
+              onAddChild={addChildNode}
+              onAddSibling={addSiblingNode}
+              onStartConnection={(nodeId) => {
+                setSelectedNodeId(null);
+                setSelectedEdgeId(null);
+                setConnectingNodeId(nodeId);
+              }}
+              onRequestDelete={setDeletingNodeId}
+              onOpenTarget={openKeywordTarget}
+            />
+          ) : null}
           </div>
         </>
       ) : (
         <div className="flex flex-1 items-center justify-center rounded-xl border border-dashed border-theme bg-theme-card px-6">
           <div className="max-w-md text-center">
             <BrainCircuit className="mx-auto mb-3 text-primary" size={42} aria-hidden="true" />
-            <h3 className="text-lg font-semibold">创建第一张思维导图</h3>
+            <h3 className="text-lg font-semibold">创建第一张思维导图/白板</h3>
             <p className="mt-2 text-sm theme-text-secondary">
               新建时会同时生成中心主题节点，之后可在画布上继续扩展分支。
             </p>
@@ -688,7 +779,7 @@ const MindMapWorkspace = () => {
               className="mt-4 inline-flex items-center gap-2 rounded bg-primary px-4 py-2 text-sm text-white hover:bg-primary-dark"
             >
               <Plus size={17} aria-hidden="true" />
-              新建思维导图
+              新建思维导图/白板
             </button>
           </div>
         </div>
@@ -696,7 +787,7 @@ const MindMapWorkspace = () => {
       <ConfirmDialog
         open={pendingLayoutDirection !== null}
         title="确认重新自动布局"
-        description="自动布局会覆盖当前思维导图中已经手动调整的位置。执行后仍可使用撤销恢复。"
+        description="自动布局会覆盖当前思维导图/白板中已经手动调整的位置。执行后仍可使用撤销恢复。"
         confirmText="重新布局"
         cancelText="取消"
         onCancel={() => setPendingLayoutDirection(null)}
@@ -706,6 +797,23 @@ const MindMapWorkspace = () => {
           }
         }}
       />
+      <RelationGraphResourcePickerModal
+        open={resourcePickerOpen}
+        resources={resourceQuery.data?.items ?? []}
+        resourceFolders={resourceQuery.data?.folders ?? []}
+        keyword={resourceKeyword}
+        selectedFolderPath={resourceSelectedFolderPath}
+        expandedFolders={resourceExpandedFolders}
+        loading={resourceQuery.isLoading}
+        errorText={resourceQuery.isError ? '资源列表加载失败，请检查后端连接。' : undefined}
+        onKeywordChange={setResourceKeyword}
+        onSelectFolder={setResourceSelectedFolderPath}
+        onToggleFolder={(path) => setResourceExpandedFolders((current) => current.includes(path) ? current.filter((item) => item !== path) : [...current, path])}
+        onClose={() => setResourcePickerOpen(false)}
+        onSelectResource={(ref) => addImageNode(ref, resourceQuery.data?.items.find((item) => item.ref === ref)?.displayName || '图片')}
+        onRetry={() => void resourceQuery.refetch()}
+      />
+      <input ref={imageInputRef} type="file" accept="image/*" className="hidden" onChange={(event) => void uploadImage(event.target.files?.[0])} />
       <ConfirmDialog
         open={Boolean(deletingNode)}
         title="确认删除节点分支"
@@ -729,7 +837,7 @@ const MindMaps = () => {
   if (configQuery.isPending) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center text-sm theme-text-secondary">
-        正在确认思维导图权限...
+        正在确认思维导图/白板权限...
       </div>
     );
   }
@@ -739,7 +847,7 @@ const MindMaps = () => {
       <div className="flex min-h-[60vh] items-center justify-center">
         <div className="max-w-xl rounded-lg border border-red-300 bg-theme-card px-6 py-10 text-center">
           <p className="text-sm text-red-600">
-            无法确认思维导图权限，请检查网络连接后重试。
+            无法确认思维导图/白板权限，请检查网络连接后重试。
           </p>
           <button
             type="button"
@@ -757,7 +865,7 @@ const MindMaps = () => {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
         <div className="max-w-xl rounded-lg border border-dashed border-theme bg-theme-card px-6 py-12 text-center theme-text-secondary">
-          思维导图仅对 GM / 副 GM 开放。
+          思维导图/白板仅对 GM / 副 GM 开放。
         </div>
       </div>
     );

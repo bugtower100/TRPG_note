@@ -14,6 +14,10 @@ import (
 func trayInit() {
 }
 
+func checkStartupDirectory() bool {
+	return true
+}
+
 func hideWindow() {
 }
 

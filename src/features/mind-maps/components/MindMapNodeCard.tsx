@@ -16,6 +16,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import type { MindMapFlowNode } from '../utils/layoutMindMap';
+import { buildResourceFileUrl } from '../../../services/resourceService';
 import MindMapKeywordText from './MindMapKeywordText';
 
 interface ToolbarButtonProps {
@@ -50,9 +51,6 @@ const ToolbarButton = ({
 
 const MindMapNodeCard = memo(({ data, selected, sourcePosition, targetPosition }: NodeProps<MindMapFlowNode>) => {
   const borderColor = data.color || (data.isRoot ? 'var(--primary-color)' : 'var(--border-color)');
-  const primaryEntityReference = data.entityReferences?.find(
-    (reference) => reference !== undefined
-  );
 
   return (
     <>
@@ -66,9 +64,12 @@ const MindMapNodeCard = memo(({ data, selected, sourcePosition, targetPosition }
         <ToolbarButton label="添加子节点" onClick={data.onAddChild}>
           <GitBranchPlus size={16} aria-hidden="true" />
         </ToolbarButton>
+        <ToolbarButton label="从此节点连线" onClick={data.onStartConnection}>
+          <Link2 size={16} aria-hidden="true" />
+        </ToolbarButton>
         <ToolbarButton
           label="添加同级节点"
-          disabled={data.isRoot}
+          disabled={!data.hasParent}
           onClick={data.onAddSibling}
         >
           <Plus size={16} aria-hidden="true" />
@@ -106,7 +107,7 @@ const MindMapNodeCard = memo(({ data, selected, sourcePosition, targetPosition }
         </ToolbarButton>
       </NodeToolbar>
       <div
-        className={`mind-map-node-card ${data.isRoot ? 'mind-map-node-card-root' : ''} ${
+        className={`mind-map-node-card ${data.imageRef ? 'mind-map-node-card-image' : ''} ${data.connecting ? 'mind-map-node-card-connecting' : ''} ${data.isRoot ? 'mind-map-node-card-root' : ''} ${
           selected ? 'mind-map-node-card-selected' : ''
         }`}
         style={{ borderColor }}
@@ -115,9 +116,16 @@ const MindMapNodeCard = memo(({ data, selected, sourcePosition, targetPosition }
         <Handle
           type="target"
           position={targetPosition}
-          isConnectable={false}
+          isConnectable
           className="mind-map-node-handle"
         />
+        <Handle id="target-upper" type="target" position={Position.Top} isConnectable={false} className="mind-map-node-route-handle" />
+        <Handle id="target-lower" type="target" position={Position.Bottom} isConnectable={false} className="mind-map-node-route-handle" />
+        <Handle id="target-left" type="target" position={Position.Left} isConnectable={false} className="mind-map-node-route-handle" />
+        <Handle id="target-right" type="target" position={Position.Right} isConnectable={false} className="mind-map-node-route-handle" />
+        {data.imageRef ? (
+          <img className="mind-map-node-image" src={buildResourceFileUrl(data.imageRef)} alt={data.title} draggable={false} />
+        ) : null}
         <div className="mind-map-node-title">
           {data.titleSegments && data.onOpenTarget ? (
             <MindMapKeywordText
@@ -128,45 +136,6 @@ const MindMapNodeCard = memo(({ data, selected, sourcePosition, targetPosition }
             />
           ) : data.title}
         </div>
-        {data.entityRefs.length > 0 ? (
-          <button
-            type="button"
-            className="mind-map-node-reference nodrag nopan"
-            disabled={!primaryEntityReference || !data.onOpenTarget}
-            aria-label={
-              primaryEntityReference
-                ? `打开显式绑定条目：${primaryEntityReference.name}${
-                    data.entityRefs.length > 1 ? `，另有 ${data.entityRefs.length - 1} 条` : ''
-                  }`
-                : '显式绑定的条目已不存在'
-            }
-            onPointerDown={(event) => event.stopPropagation()}
-            onMouseEnter={(event) => {
-              if (!primaryEntityReference) return;
-              data.onPreviewTarget?.({
-                entityType: primaryEntityReference.entityType,
-                entityId: primaryEntityReference.entityId,
-                title: primaryEntityReference.name,
-              }, event.currentTarget);
-            }}
-            onMouseLeave={data.onHidePreview}
-            onClick={(event) => {
-              event.stopPropagation();
-              if (!primaryEntityReference || !data.onOpenTarget) return;
-              data.onOpenTarget({
-                entityType: primaryEntityReference.entityType,
-                entityId: primaryEntityReference.entityId,
-                title: primaryEntityReference.name,
-              });
-            }}
-          >
-            <Link2 size={12} aria-hidden="true" />
-            <span>
-              {primaryEntityReference?.name || '绑定失效'}
-              {data.entityRefs.length > 1 ? ` +${data.entityRefs.length - 1}` : ''}
-            </span>
-          </button>
-        ) : null}
         {data.isRoot ? <div className="mind-map-node-kind">中心主题</div> : null}
         {data.collapsed && data.hiddenDescendantCount > 0 ? (
           <div className="mind-map-node-collapsed-count">
@@ -176,9 +145,13 @@ const MindMapNodeCard = memo(({ data, selected, sourcePosition, targetPosition }
         <Handle
           type="source"
           position={sourcePosition}
-          isConnectable={false}
+          isConnectable
           className="mind-map-node-handle"
         />
+        <Handle id="source-upper" type="source" position={Position.Top} isConnectable={false} className="mind-map-node-route-handle" />
+        <Handle id="source-lower" type="source" position={Position.Bottom} isConnectable={false} className="mind-map-node-route-handle" />
+        <Handle id="source-left" type="source" position={Position.Left} isConnectable={false} className="mind-map-node-route-handle" />
+        <Handle id="source-right" type="source" position={Position.Right} isConnectable={false} className="mind-map-node-route-handle" />
       </div>
     </>
   );

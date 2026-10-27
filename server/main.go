@@ -1064,6 +1064,9 @@ func main() {
 		log.Printf("OpenAPI spec exported to %s", targetPath)
 		return
 	}
+	if !checkStartupDirectory() {
+		return
+	}
 
 	cfg := loadConfig()
 	db := openDB(cfg)

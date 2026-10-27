@@ -7,6 +7,7 @@ interface MindMapEdgeDetailsPanelProps {
   label?: string;
   onClose: () => void;
   onSave: (label: string) => void;
+  onDelete?: () => void;
 }
 
 const MindMapEdgeDetailsPanel = memo(({
@@ -15,6 +16,7 @@ const MindMapEdgeDetailsPanel = memo(({
   label,
   onClose,
   onSave,
+  onDelete,
 }: MindMapEdgeDetailsPanelProps) => {
   const [draft, setDraft] = useState(label || '');
 
@@ -64,6 +66,7 @@ const MindMapEdgeDetailsPanel = memo(({
         <div className="mt-3 flex items-center justify-between gap-2">
           <span className="text-xs theme-text-secondary">{draft.length}/120</span>
           <div className="flex gap-2">
+            {onDelete ? <button type="button" onClick={onDelete} className="inline-flex items-center gap-1 rounded border border-red-300 px-3 py-1.5 text-sm text-red-600 hover:bg-red-50"><Trash2 size={15} aria-hidden="true" />删除连线</button> : null}
             <button
               type="button"
               disabled={!label}

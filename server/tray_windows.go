@@ -5,11 +5,13 @@ package main
 import (
 	"fmt"
 	"math/rand"
+	"net"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"regexp"
 	"runtime"
+	"strings"
 	"syscall"
 	"time"
 	"unsafe"
@@ -21,8 +23,8 @@ import (
 	"github.com/fy0/systray"
 	"github.com/gen2brain/beeep"
 	win "github.com/lxn/win"
-	"github.com/monaco-io/request"
 	"golang.org/x/sys/windows"
+	"golang.org/x/sys/windows/registry"
 )
 
 func hideWindow() {
@@ -32,6 +34,78 @@ func hideWindow() {
 func showWindow() {
 	win.ShowWindow(win.GetConsoleWindow(), win.SW_SHOW)
 }
+
+const browserSettingKey = `Software\BTR\TRPGNote`
+const browserSettingName = "OpenBrowserOnLaunch"
+
+func openBrowserOnLaunch() bool {
+	key, err := registry.OpenKey(registry.CURRENT_USER, browserSettingKey, registry.QUERY_VALUE)
+	if err != nil {
+		return true
+	}
+	defer key.Close()
+	value, _, err := key.GetIntegerValue(browserSettingName)
+	return err != nil || value != 0
+}
+
+func setOpenBrowserOnLaunch(enabled bool) error {
+	key, _, err := registry.CreateKey(registry.CURRENT_USER, browserSettingKey, registry.SET_VALUE)
+	if err != nil {
+		return err
+	}
+	defer key.Close()
+	if enabled {
+		return key.SetDWordValue(browserSettingName, 1)
+	}
+	return key.SetDWordValue(browserSettingName, 0)
+}
+
+func sameDirectory(left, right string) bool {
+	return strings.EqualFold(filepath.Clean(left), filepath.Clean(right))
+}
+
+func startupLocation(executableDir, desktopDir, downloadsDir string) string {
+	if desktopDir != "" && sameDirectory(executableDir, desktopDir) {
+		return "桌面"
+	}
+	if downloadsDir != "" && sameDirectory(executableDir, downloadsDir) {
+		return "下载文件夹"
+	}
+	return ""
+}
+
+func checkStartupDirectory() bool {
+	executable, err := os.Executable()
+	if err != nil {
+		return true
+	}
+	executableDir := filepath.Dir(executable)
+	desktopDir, desktopErr := windows.KnownFolderPath(windows.FOLDERID_Desktop, windows.KF_FLAG_DEFAULT)
+	downloadsDir, downloadsErr := windows.KnownFolderPath(windows.FOLDERID_Downloads, windows.KF_FLAG_DEFAULT)
+	if desktopErr != nil {
+		desktopDir = ""
+	}
+	if downloadsErr != nil {
+		downloadsDir = ""
+	}
+	location := startupLocation(executableDir, desktopDir, downloadsDir)
+	if location != "" {
+		message := fmt.Sprintf("程序现在直接放在%s，没有单独的程序文件夹。\n\n请先新建一个文件夹，再把 TRPG模组笔记.exe 和 数据库检查工具.exe 放进去；如果旁边已有 data 文件夹，也要一起移动，避免丢失现有资料。\n\n建议点“否”退出并整理文件。是否仍要继续启动？", location)
+		title, _ := syscall.UTF16PtrFromString("请先整理程序文件夹")
+		content, _ := syscall.UTF16PtrFromString(message)
+		if win.MessageBox(0, content, title, win.MB_YESNO|win.MB_ICONWARNING|win.MB_DEFBUTTON2) != win.IDYES {
+			return false
+		}
+	}
+	if strings.EqualFold(filepath.Base(executable), "TRPG模组笔记.exe") {
+		if err := os.Chdir(executableDir); err != nil {
+			showMsgBox("跑团笔记 启动失败", "无法使用程序所在文件夹："+err.Error())
+			return false
+		}
+	}
+	return true
+}
+
 func trayInit() {
 	// 确保能收到系统消息，从而避免不能弹出菜单
 	runtime.LockOSThread()
@@ -119,6 +193,7 @@ func onReady() {
 	mOpenExeDir := systray.AddMenuItem("打开程序目录", "资源管理器访问程序所在目录")
 	mShowHide := systray.AddMenuItemCheckbox("显示终端窗口", "显示终端窗口", false)
 	mAutoBoot := systray.AddMenuItemCheckbox("开机自启动", "开机自启动", false)
+	mOpenOnLaunch := systray.AddMenuItemCheckbox("启动时自动打开网页", "启动程序后在默认浏览器打开界面；开机后台自启动时不打开", false)
 	mQuit := systray.AddMenuItem("退出", "退出程序")
 	mOpen.SetIcon(trayIcon)
 
@@ -141,6 +216,9 @@ func onReady() {
 
 	if getAutoStart().IsEnabled() {
 		mAutoBoot.Check()
+	}
+	if openBrowserOnLaunch() {
+		mOpenOnLaunch.Check()
 	}
 
 	for {
@@ -174,6 +252,18 @@ func onReady() {
 				}
 				mAutoBoot.Check()
 			}
+		case <-mOpenOnLaunch.ClickedCh:
+			enabled := !mOpenOnLaunch.Checked()
+			if err := setOpenBrowserOnLaunch(enabled); err != nil {
+				showMsgBox("跑团笔记", "网页自动打开设置保存失败："+err.Error())
+				log.Errorf("网页自动打开设置保存失败: %v", err)
+				continue
+			}
+			if enabled {
+				mOpenOnLaunch.Check()
+			} else {
+				mOpenOnLaunch.Uncheck()
+			}
 		case <-mShowHide.ClickedCh:
 			if mShowHide.Checked() {
 				win.ShowWindow(win.GetConsoleWindow(), win.SW_HIDE)
@@ -192,50 +282,45 @@ func onExit() {
 
 var _trayPortStr = "3211"
 
-func httpServe(e *gin.Engine, addr string, hideUI bool) {
-	log := zap.S()
-	portStr := "3211"
-	go func() {
-		ver := appVersion
-		for {
-			time.Sleep(5 * time.Second)
-			if systrayQuited {
-				break
-			}
-			runtime.LockOSThread()
-			systray.SetTooltip("跑团笔记 " + ver + " #" + portStr)
-			runtime.UnlockOSThread()
+func openWebUIWhenReady(port string, stopped <-chan struct{}) {
+	client := &http.Client{Timeout: time.Second}
+	probeURL := "http://127.0.0.1:" + port + "/web"
+	for attempt := 0; attempt < 20; attempt++ {
+		select {
+		case <-stopped:
+			return
+		default:
 		}
-	}()
-
-	showUI := func() {
-		if !hideUI {
-			time.Sleep(2 * time.Second)
-			url := fmt.Sprintf(`http://localhost:%s/web`, portStr)
-			url2 := fmt.Sprintf(`http://127.0.0.1:%s/web`, portStr)
-			c := request.Client{
-				URL:     url2,
-				Method:  "GET",
-				Timeout: 1,
+		response, err := client.Get(probeURL)
+		if err == nil {
+			response.Body.Close()
+			if response.StatusCode < 500 {
+				select {
+				case <-stopped:
+					return
+				default:
+				}
+				url := "http://localhost:" + port + "/web"
+				if err := exec.Command(`cmd`, `/c`, `start`, url).Start(); err != nil {
+					zap.S().Warnf("无法自动打开浏览器: %v", err)
+				}
+				return
 			}
-			resp := c.Send()
-			if resp.OK() {
-				time.Sleep(1 * time.Second)
-				_ = exec.Command(`cmd`, `/c`, `start`, url).Start()
-			}
+		}
+		select {
+		case <-stopped:
+			return
+		case <-time.After(500 * time.Millisecond):
 		}
 	}
+	zap.S().Warn("网页启动后未能自动打开，请使用托盘菜单中的“打开界面”。")
+}
 
+func httpServe(e *gin.Engine, addr string, hideUI bool) {
+	log := zap.S()
 	for {
-		rePort := regexp.MustCompile(`:(\d+)$`)
-		m := rePort.FindStringSubmatch(addr)
-		if len(m) > 0 {
-			portStr = m[1]
-			_trayPortStr = portStr
-		}
-
-		err := e.Run(addr)
-
+		_, portStr, _ := net.SplitHostPort(addr)
+		listener, err := net.Listen("tcp", addr)
 		if err != nil {
 			s1, _ := syscall.UTF16PtrFromString("跑团笔记")
 			s2, _ := syscall.UTF16PtrFromString(fmt.Sprintf("端口 %s 已被占用，点“是”随机换一个端口，点“否”退出。", portStr))
@@ -248,11 +333,18 @@ func httpServe(e *gin.Engine, addr string, hideUI bool) {
 				log.Errorf("端口已被占用，即将自动退出: %s", addr)
 				os.Exit(0)
 			}
-		} else {
-			log.Infof("如果浏览器没有自动打开，请手动访问:\nhttp://localhost:%s\n", portStr)
-			go showUI()
-			break
 		}
+		_trayPortStr = portStr
+		log.Infof("如果浏览器没有自动打开，请手动访问:\nhttp://localhost:%s/web\n", portStr)
+		stopped := make(chan struct{})
+		if !hideUI && openBrowserOnLaunch() {
+			go openWebUIWhenReady(portStr, stopped)
+		}
+		if err := e.RunListener(listener); err != nil {
+			log.Errorf("网页服务运行失败: %v", err)
+		}
+		close(stopped)
+		return
 	}
 }
 

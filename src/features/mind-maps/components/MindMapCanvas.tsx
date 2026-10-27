@@ -10,6 +10,7 @@ import {
   useNodesState,
   useReactFlow,
   type NodeTypes,
+  type Connection,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import '../mindMap.css';
@@ -24,9 +25,7 @@ import { RichTextTooltipContent } from '../../../components/common/richTextRefer
 import MindMapNodeCard from './MindMapNodeCard';
 import { layoutMindMap, type MindMapFlowNode } from '../utils/layoutMindMap';
 import {
-  mindMapEntityReferenceKey,
   tokenizeMindMapKeywords,
-  type MindMapEntityOption,
 } from '../utils/mindMapReferences';
 
 const nodeTypes = {
@@ -38,11 +37,13 @@ interface MindMapCanvasInnerProps {
   campaignData: CampaignData;
   fitRequest: number;
   selectedNodeId: string | null;
-  selectedEdgeNodeId: string | null;
+  selectedEdgeId: string | null;
+  connectingNodeId: string | null;
   keywordData: RichKeywordData;
-  entityOptionsByKey: Map<string, MindMapEntityOption>;
   onSelectNode: (nodeId: string) => void;
-  onSelectEdge: (targetNodeId: string) => void;
+  onSelectEdge: (edgeId: string) => void;
+  onConnect: (sourceId: string, targetId: string) => void;
+  onStartConnection: (nodeId: string) => void;
   onClearSelection: () => void;
   onAddChild: (nodeId: string) => void;
   onAddSibling: (nodeId: string) => void;
@@ -58,11 +59,13 @@ const MindMapCanvasInner = ({
   campaignData,
   fitRequest,
   selectedNodeId,
-  selectedEdgeNodeId,
+  selectedEdgeId,
+  connectingNodeId,
   keywordData,
-  entityOptionsByKey,
   onSelectNode,
   onSelectEdge,
+  onConnect,
+  onStartConnection,
   onClearSelection,
   onAddChild,
   onAddSibling,
@@ -107,15 +110,14 @@ const MindMapCanvasInner = ({
       data: {
         ...node.data,
         titleSegments: tokenizeMindMapKeywords(node.data.title, keywordData),
-        entityReferences: node.data.entityRefs.map(
-          (reference) => entityOptionsByKey.get(mindMapEntityReferenceKey(reference))
-        ),
         onAddChild: () => onAddChild(node.id),
         onAddSibling: () => onAddSibling(node.id),
         onMoveUp: () => onMoveSibling(node.id, 'up'),
         onMoveDown: () => onMoveSibling(node.id, 'down'),
         onToggleCollapse: () => onToggleCollapse(node.id),
         onDelete: () => onRequestDelete(node.id),
+        onStartConnection: () => onStartConnection(node.id),
+        connecting: node.id === connectingNodeId,
         onOpenTarget,
         onPreviewTarget: showPreview,
         onHidePreview: hidePreview,
@@ -123,12 +125,13 @@ const MindMapCanvasInner = ({
     })),
     [
       layoutResult.nodes,
-      entityOptionsByKey,
       keywordData,
       onAddChild,
       onAddSibling,
       onMoveSibling,
       onRequestDelete,
+      onStartConnection,
+      connectingNodeId,
       onOpenTarget,
       onToggleCollapse,
       showPreview,
@@ -145,7 +148,7 @@ const MindMapCanvasInner = ({
   const [nodes, setNodes, onNodesChange] = useNodesState<MindMapFlowNode>(derivedNodes);
   const edges = useMemo(
     () => layoutResult.edges.map((edge) => {
-      const selected = edge.target === selectedEdgeNodeId;
+      const selected = edge.id === selectedEdgeId;
       return {
         ...edge,
         selected,
@@ -155,7 +158,7 @@ const MindMapCanvasInner = ({
         },
       };
     }),
-    [layoutResult.edges, selectedEdgeNodeId]
+    [layoutResult.edges, selectedEdgeId]
   );
 
   useEffect(() => {
@@ -180,7 +183,7 @@ const MindMapCanvasInner = ({
       edges={edges}
       nodeTypes={nodeTypes}
       nodesDraggable
-      nodesConnectable={false}
+      nodesConnectable
       elementsSelectable
       onlyRenderVisibleElements
       deleteKeyCode={null}
@@ -189,9 +192,15 @@ const MindMapCanvasInner = ({
       fitView
       fitViewOptions={{ padding: 0.18, maxZoom: 1.25 }}
       className="mind-map-flow"
-      aria-label={`${mindMap.name}思维导图画布`}
-      onNodeClick={(_, node) => onSelectNode(node.id)}
-      onEdgeClick={(_, edge) => onSelectEdge(edge.target)}
+      aria-label={`${mindMap.name}思维导图/白板画布`}
+      onNodeClick={(_, node) => {
+        if (connectingNodeId && connectingNodeId !== node.id) onConnect(connectingNodeId, node.id);
+        else onSelectNode(node.id);
+      }}
+      onEdgeClick={(_, edge) => onSelectEdge(edge.id)}
+      onConnect={(connection: Connection) => {
+        if (connection.source && connection.target) onConnect(connection.source, connection.target);
+      }}
       onMoveStart={hidePreview}
       onNodeDragStart={hidePreview}
       onNodeDragStop={(_, node) => onNodePositionChange(node.id, node.position)}
@@ -244,11 +253,13 @@ interface MindMapCanvasProps {
   campaignData: CampaignData;
   fitRequest: number;
   selectedNodeId: string | null;
-  selectedEdgeNodeId: string | null;
+  selectedEdgeId: string | null;
+  connectingNodeId: string | null;
   keywordData: RichKeywordData;
-  entityOptionsByKey: Map<string, MindMapEntityOption>;
   onSelectNode: (nodeId: string) => void;
-  onSelectEdge: (targetNodeId: string) => void;
+  onSelectEdge: (edgeId: string) => void;
+  onConnect: (sourceId: string, targetId: string) => void;
+  onStartConnection: (nodeId: string) => void;
   onClearSelection: () => void;
   onAddChild: (nodeId: string) => void;
   onAddSibling: (nodeId: string) => void;

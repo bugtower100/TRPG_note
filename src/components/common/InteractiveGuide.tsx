@@ -32,7 +32,7 @@ const GUIDE_STEPS: Record<GuideId, Step[]> = {
       target: '[data-tour="sidebar-nav"]',
       skipBeacon: true,
       placement: 'right',
-      content: '侧边栏按用途分组。工作台负责跑团推进，资料区用于查阅，主持人的关系图、思维导图和时间线放在整理工具中。',
+      content: '侧边栏按用途分组。工作台负责跑团推进，资料区用于查阅，主持人的关系图、思维导图/白板和时间线放在整理工具中。',
     },
   ],
   landing: [

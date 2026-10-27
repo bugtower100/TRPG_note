@@ -297,6 +297,7 @@ export interface MindMapNode {
   color?: string;
   position?: MindMapNodePosition;
   incomingEdgeLabel?: string;
+  imageRef?: string;
   entityRefs: MindMapEntityReference[];
   /** V1 compatibility bridge. New data is written to entityRefs. */
   entityRef?: MindMapEntityReference;
@@ -309,9 +310,17 @@ export interface MindMapDocument {
   name: string;
   rootNodeId: string;
   nodes: MindMapNode[];
+  connections?: MindMapConnection[];
   layoutDirection: MindMapLayoutDirection;
   createdAt: number;
   updatedAt: number;
+}
+
+export interface MindMapConnection {
+  id: string;
+  sourceId: string;
+  targetId: string;
+  label?: string;
 }
 
 export interface MindMapHistoryState {

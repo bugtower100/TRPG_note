@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Archive, ArrowLeft, ArrowRight, BookOpen, Cloud, Database, ExternalLink, Images, Layers3, PackageOpen, RefreshCw, Search, Settings2, Smartphone, Sparkles, UserRound, Users, Wifi } from 'lucide-react';
+import { Archive, ArrowLeft, ArrowRight, BookOpen, BrainCircuit, CalendarDays, Cloud, Database, ExternalLink, Images, Kanban, Layers3, Map, Network, PackageOpen, RefreshCw, Search, Settings2, Smartphone, Sparkles, UserRound, Users, Wifi } from 'lucide-react';
 
 const SOURCE_URL = 'https://github.com/bugtower100/TRPG_note';
 const RELEASE_URL = `${SOURCE_URL}/releases`;
@@ -35,7 +35,7 @@ const moduleGroups = [
     title: '整理与管理',
     items: [
       { name: '关系图', path: '/relation-graphs', description: '把人物和其他资料连成关系网；临时角色只保存在关系图，不会创建角色档案。' },
-      { name: '思维导图', path: '/mind-maps', description: '把剧情、势力或推理线索拆成节点，适合梳理分支和备团结构。' },
+      { name: '思维导图/白板', path: '/mind-maps', description: '建立分支或独立节点，自由连线并插入图片，整理剧情、势力与推理线索。' },
       { name: '时间线', path: '/timelines', description: '按时间排列事件和重要节点，用于追踪人物行动、伏笔和故事节奏。' },
       { name: '设置', path: '/settings', description: '管理主题、备份与导入、资源、回收站、版本更新，以及本手册。' },
     ],
@@ -47,11 +47,17 @@ const topics = [
   { id: 'update', title: '如何更新', summary: '保留原有 data 目录，替换程序并核对版本。', category: '入门', icon: RefreshCw },
   { id: 'account', title: '账号与密码', summary: '登录、修改密码和区分模组进入密码。', category: '入门', icon: UserRound },
   { id: 'modules', title: '各版块如何使用', summary: '按跑团、资料、整理工具找到对应入口。', category: '使用', icon: Layers3 },
+  { id: 'entities', title: '角色等资料卡片怎么整理', summary: '角色、怪物、地点、组织、事件和角色卡的共通用法。', category: '使用', icon: BookOpen },
+  { id: 'play', title: '跑团工作台怎么使用', summary: '总览、线索、任务、团队笔记和场次回顾。', category: '使用', icon: Kanban },
+  { id: 'maps', title: '地图怎么使用', summary: '上传底图、放置点位、调整视图和使用画板。', category: '使用', icon: Map },
+  { id: 'relation', title: '关系图怎么使用', summary: '添加人物节点、连线、编辑关系与操作画布。', category: '使用', icon: Network },
+  { id: 'timeline', title: '时间线怎么使用', summary: '整理事件顺序，并在工作版对照多条时间线。', category: '使用', icon: CalendarDays },
+  { id: 'mindMap', title: '思维导图/白板怎么使用', summary: '添加独立节点、图片和连线，也可继续梳理分支。', category: '使用', icon: BrainCircuit },
   { id: 'prep', title: '备团包怎么使用', summary: '选择内容导出，并在其他模组中导入。', category: '使用', icon: PackageOpen },
   { id: 'backup', title: '备份与恢复', summary: '选择完整或轻量备份，并使用导入助手。', category: '使用', icon: Archive },
-  { id: 'online', title: '如何联机', summary: '让主持人和玩家进入同一个模组。', category: '连接', icon: Users },
+  { id: 'online', title: '如何联机与定向分享', summary: '让玩家加入模组、只向指定 PL 分享卡片，并设置副 GM。', category: '连接', icon: Users },
   { id: 'onlineFaq', title: '联机常见问题', summary: '排查无法连接、找不到模组和同步延迟。', category: '连接', icon: Wifi },
-  { id: 'cloud', title: '如何上云', summary: '使用 Docker 部署到云服务器或 NAS。', category: '连接', icon: Cloud },
+  { id: 'cloud', title: '如何上云', summary: '在 Windows 云服务器运行程序，或使用 Docker 部署到云服务器、NAS。', category: '连接', icon: Cloud },
   { id: 'mobile', title: '如何在手机上使用', summary: '局域网或云端访问同一套数据。', category: '连接', icon: Smartphone },
   { id: 'settings', title: '设置与外观', summary: '主题、编辑偏好、回收站和版本信息。', category: '维护', icon: Settings2 },
   { id: 'resources', title: '图片资源怎么管理', summary: '上传、分类、复用和删除图片资源。', category: '维护', icon: Images },
@@ -121,7 +127,8 @@ const OfficialManual = ({ onOpenSettingsSection }: { onOpenSettingsSection: (sec
 
             {topicId === 'start' && <>
               <h3>1. 下载并启动</h3>
-              <p>从 <a href={RELEASE_URL} target="_blank" rel="noopener noreferrer">GitHub Releases</a> 下载对应系统的安装包。Windows 用户解压后运行 <code>TRPG模组笔记.exe</code>。建议将程序放在独立文件夹；数据保存在程序同文件夹下的 <code>data</code> 目录。</p>
+              <p>从 <a href={RELEASE_URL} target="_blank" rel="noopener noreferrer">GitHub Releases</a> 下载对应系统的安装包。Windows 用户先完整解压到独立文件夹，再运行 <code>TRPG模组笔记.exe</code>。数据保存在程序同文件夹下的 <code>data</code> 目录。若程序直接放在桌面或下载文件夹，启动时会提示整理；已有 <code>data</code> 文件夹也要与程序一起移动。</p>
+              <p>程序启动后会在默认浏览器打开页面。需要调整时，可右键系统托盘图标，勾选或取消“启动时自动打开网页”；“开机自启动”在后台运行时仍不会弹出网页。</p>
               <p className="manual-notice">请检查自己是否放在单一文件夹下！</p>
               <h3>2. 创建模组</h3>
               <p>登录后创建模组，进入 <Link to="/overview">模组概览</Link>。建议先录入重要角色、关键地点和核心事件，再补充线索与时间线。</p>
@@ -140,6 +147,7 @@ const OfficialManual = ({ onOpenSettingsSection }: { onOpenSettingsSection: (sec
             {topicId === 'account' && <>
               <h3>如何登录和设置密码？</h3>
               <p>启动后输入“用户名 / 昵称”即可登录；没有设置过登录密码时，密码框可以留空。登录后返回模组首页，展开右上角“账号”，在“登录密码”中输入并确认新密码。留空保存会清除该浏览器中的登录密码。</p>
+              <p>使用完毕后，点击模组首页右上角的“退出登录”，即可回到登录页。</p>
               <h3>换设备后为什么还要输入用户名？</h3>
               <p>用户名记录和登录密码保存在当前浏览器中，不会自动复制到另一台设备。换浏览器或清除浏览器数据后，仍需输入原用户名；使用同一服务地址和用户名才能继续找到对应的模组。不要让不同参与者共用同一个用户名。</p>
               <h3>登录密码和模组进入密码有什么区别？</h3>
@@ -149,6 +157,64 @@ const OfficialManual = ({ onOpenSettingsSection }: { onOpenSettingsSection: (sec
             {topicId === 'modules' && <>
               <p>左侧导航按跑团、模组资料、整理工具和管理分组。玩家账号只会看到获授权的资料与功能。</p>
               {moduleGroups.map((group) => <section key={group.title}><h3>{group.title}</h3><div className="manual-module-list">{group.items.map((item) => <div key={item.name}>{item.path === '/settings' ? <button type="button" onClick={() => onOpenSettingsSection('general')}>{item.name} <ArrowRight size={14} /></button> : <Link to={item.path}>{item.name} <ArrowRight size={14} /></Link>}<p>{item.description}</p></div>)}</div></section>)}
+              <h3>按操作查看详细说明</h3>
+              <p>角色、怪物、地点、组织、事件等资料卡片的基本操作相近，放在同一篇说明；画布类工具和跑团工作台各有独立步骤。</p>
+              {(['entities', 'play', 'maps', 'relation', 'timeline', 'mindMap'] as const).map((id) => (
+                <button key={id} type="button" className="manual-inline-action" onClick={() => openTopic(id)}>
+                  {topics.find((item) => item.id === id)?.title} <ArrowRight size={16} />
+                </button>
+              ))}
+            </>}
+
+            {topicId === 'entities' && <>
+              <h3>先建立资料，再补充内容</h3>
+              <p>在角色、怪物、地点、组织或事件列表中创建条目，填写名称后进入详情页。可以先记最常用的身份、地点或事件经过，再按需要补充正文、分区、条目和图片。角色卡在“角色卡”版块单独管理，适合记录属性和跑团时需要查阅的数值。</p>
+              <h3>把资料串起来</h3>
+              <p>需要说明人物之间的关系时使用 <button type="button" className="manual-text-link" onClick={() => openTopic('relation')}>关系图</button>；地点需要空间位置时使用 <button type="button" className="manual-text-link" onClick={() => openTopic('maps')}>地图</button>；事件需要先后顺序时使用 <button type="button" className="manual-text-link" onClick={() => openTopic('timeline')}>时间线</button>。这些工具和资料卡片各有用途，不必在创建卡片时一次填完。</p>
+              <h3>只给玩家看选定内容</h3>
+              <p>GM 或副 GM 打开资料详情后，可点“分享整张卡片”；只想透露一部分时，在对应区块或条目的“…”菜单中选择“分享区块”或“分享条目”。在弹窗里只勾选目标 PL，并选择“仅查看”。详细步骤见 <button type="button" className="manual-text-link" onClick={() => openTopic('online')}>如何联机与定向分享</button>。</p>
+            </>}
+
+            {topicId === 'play' && <>
+              <p>进入 <Link to="/play">跑团工作台</Link> 后，用上方的“总览、线索、任务、笔记、场次”标签切换。总览会汇总正在使用的内容，适合开团时先检查进度。</p>
+              <h3>GM 的准备顺序</h3>
+              <ol><li>在线索中建立待揭示的信息；需要让玩家看到时，再对指定成员分享。</li><li>在任务看板建立准备事项、安排成员并更新状态。GM 可设置 PL 是否能查看或编辑看板。</li><li>用团队笔记记录多人需要共同查看的决定；进入编辑状态后留意自动保存提示，切换栏目时若尚未保存，页面会先处理保存。</li><li>在“场次”建立一次跑团的准备页，记录目标、流程、关联任务和现场内容。场次结束后，填写玩家回顾并点击“发布给玩家”；未完成的场次或空白回顾不能发布。</li></ol>
+              <h3>PL 看到什么</h3>
+              <p>PL 可查看收到的线索分享、获授权的任务看板和团队笔记，以及 GM 已发布的场次回顾。主持人的未发布准备内容不会自动出现在玩家界面。</p>
+              <p>场次目标和流程输入框可按 Enter 添加。其他操作以页面按钮和保存提示为准。</p>
+            </>}
+
+            {topicId === 'maps' && <>
+              <p>进入 <Link to="/locations/maps">地图</Link>，点击“新建地图”，再用“上传本地图片”或“从资源管理器选择”设置底图。地图名称修改后可按 Enter 或点“保存名称”。</p>
+              <h3>放置地点与人物</h3>
+              <ol><li>点击“添加点位”，选择已有地点、角色、怪物，或选择临时/新增类型并输入名称。</li><li>点击“放置点位”，再在地图上点击需要的位置。临时点位只保存在地图；新增类型会建立相应资料。新点位默认不向 PL 显示。</li><li>点选已放置的点位可调整大小或资料，拖动可改位置，双击可查看。需要玩家看到时，在点位设置中调整可见内容。</li></ol>
+              <h3>移动视图与画板</h3>
+              <p>滚轮缩放地图，按住鼠标右键拖动可平移；“最大化地图”适合现场展示。点击“画板”可进入绘制工具，使用自由绘制、矩形、椭圆或橡皮擦标注。编辑期间留意保存和同步提示。</p>
+            </>}
+
+            {topicId === 'relation' && <>
+              <p>进入 <Link to="/relation-graphs">关系图</Link>，先新建一张图。可以选择已有角色或怪物加入画布，也可在上方直接新建人物/怪物；“添加临时角色”只在这张图中保留，不会创建角色档案。</p>
+              <h3>建立关系</h3>
+              <ol><li>单击起点节点，点击“从选中节点开始连线”，再单击目标节点。</li><li>单击线条可选中关系，双击线条可打开关系编辑面板，填写方向、线型和文字描述；需要移除时点击“删除选中关系”。</li><li>拖动节点可调整布局，双击已有资料节点可打开对应卡片。</li></ol>
+              <h3>画布操作</h3>
+              <p>按住 Ctrl/Cmd 单击可多选节点，也可开启“框选模式”圈选；鼠标右键或中键拖动画布可平移。工具栏提供放大、缩小、重置视图、自动布局和撤销/重做。删除选中节点只移除图中的节点关系，操作前请核对当前选择。</p>
+            </>}
+
+            {topicId === 'timeline' && <>
+              <p>进入 <Link to="/timelines">时间线</Link> 后新建时间线，在“连续时间轴”点击“+ 添加节点”，填写短标题、时间、备注和优先级。单击节点可展开备注，拖动节点可调整顺序，蓝线提示插入位置；上方可按优先级筛选。</p>
+              <h3>并排对照多条时间线</h3>
+              <p>点击“工作版”，选择已有时间线并“添加到工作版”。每条时间线占一列，可以纵向拖动事件节点，让同一时刻或相关情节对齐；单击节点在右下角查看或编辑备注。工作版也可按优先级筛选，需回到原时间线时点击“打开原时间线”。</p>
+            </>}
+
+            {topicId === 'mindMap' && <>
+              <p>进入 <Link to="/mind-maps">思维导图/白板</Link> 后，新建一张画布会生成中心主题。单击节点打开详情，可添加子节点或同级节点，也可编辑名称和正文；节点标题中的资料关键词可直接点击跳转。</p>
+              <h3>自由放置节点和图片</h3>
+              <p>点击“独立节点”可创建不属于任何分支的节点；点击“上传图片”可选取本地图片，或点击“资源库图片”复用已有图片。图片加入后也是独立节点。节点和图片均可在画布上拖动，点“适应画布”可重新看到全部内容。</p>
+              <h3>连接与编辑关系</h3>
+              <p>选中起点节点，在节点工具栏或详情面板点击“从此节点连线”，详情会收起，再点击目标节点；也可以从节点边缘的连接点拖到目标节点。点击连线可填写箭头描述，自由连线还可单独删除。两个节点之间允许双向连线，画布会将两个方向的线分开显示。</p>
+              <h3>快捷键与布局</h3>
+              <p>先选中一个节点：方向键在节点间导航，Tab 添加子节点，Enter 为有父节点的普通节点添加同级，Delete 删除所选分支，Space 折叠或展开分支，Ctrl/Cmd + ↑/↓ 调整同级顺序，Esc 取消选择或连线。Ctrl/Cmd + Z 撤销；Ctrl/Cmd + Shift + Z 或 Ctrl/Cmd + Y 重做。输入文字时这些画布快捷键不会触发。</p>
+              <p>工具栏可切换“从左到右”或“从上到下”自动布局；若已有手动调整的位置，页面会先要求确认，执行后仍可撤销。</p>
             </>}
 
             {topicId === 'prep' && <>
@@ -172,11 +238,16 @@ const OfficialManual = ({ onOpenSettingsSection }: { onOpenSettingsSection: (sec
             {topicId === 'online' && <>
               <h3>1. 共用一个服务地址</h3>
               <p>主持人和玩家要打开同一台正在运行的程序。连接同一 Wi-Fi 时，可在玩家设备上访问 <code>http://主持人电脑的局域网 IP:端口/web</code>，端口以主持人电脑实际打开的地址为准。玩家设备上的 <code>localhost</code> 指向玩家自己的设备，不能用于连接主持人电脑。</p>
-              <p>不在同一网络时，可把程序部署到大家都能访问的服务器，或通过可信的虚拟局域网连接。长期远程使用可继续阅读 <button type="button" className="manual-text-link" onClick={() => openTopic('cloud')}>如何上云</button>。</p>
+              <p>不在同一网络时，可使用虚拟局域网，或用樱花映射等内网穿透工具把主持人电脑的应用端口映射出去。虚拟局域网向玩家提供虚拟局域网 IP 和应用端口；内网穿透则使用工具给出的外网地址访问应用的 <code>/web</code> 页面。主持人程序和映射客户端都要保持运行。也可把程序部署到云服务器，详见 <button type="button" className="manual-text-link" onClick={() => openTopic('cloud')}>如何上云</button>。</p>
               <h3>2. 主持人开放模组</h3>
               <ol><li>主持人在首页创建模组，展开该模组的“管理模组”。</li><li>在“访问控制”中选择“公开模组”，点击“保存公开设置”。需要控制加入时，再点击“设置进入密码”。</li><li>把服务地址和进入密码发给玩家。每位参与者使用自己的用户名进入，不要共用主持人的用户名。</li></ol>
               <h3>3. 玩家进入并协作</h3>
-              <p>玩家在浏览器打开同一服务地址，登录后从首页找到“公开模组”，点击“进入公开模组”；若出现密码提示，输入主持人提供的进入密码。主持人可在模组管理中查看成员、设置助理主持人，并按需向玩家共享资料。</p>
+              <p>玩家在浏览器打开同一服务地址，登录后从首页找到“公开模组”，点击“进入公开模组”；若出现密码提示，输入主持人提供的进入密码。玩家加入后，主持人可在首页该模组的“管理模组 → 成员列表”中确认其用户名。</p>
+              <h3>4. 悄悄分享卡片给指定 PL</h3>
+              <ol><li>GM 或副 GM 打开要分享的角色、怪物、地点等资料详情，点击“分享整张卡片”。只想透露一部分时，打开相应区块或条目的“…”菜单，选择“分享区块”或“分享条目”。</li><li>在分享窗口中，把“分享权限”设为“仅查看”，在“选择目标 PL”里只勾选要收到内容的玩家，然后点击“确认分享”。</li><li>请目标玩家到模组内的“共享资料”查看。未被勾选的 PL 不会因这次定向分享获得该内容；若此前通过其他方式已共享，还需检查原有分享。</li></ol>
+              <p>如果目标不在列表中，先让该玩家以自己的用户名加入模组。分享窗口也可一次勾选多个 PL；需要保密时，确认勾选名单后再提交。</p>
+              <h3>5. 设置副 GM（副 KP）</h3>
+              <p>模组创建者返回首页，展开该模组的“管理模组”，在“成员列表”找到已加入的 PL，点击名字旁的“副GM”即可授予助理主持人身份。要收回时，在同一位置点击“改回PL”。只有创建者能设置或收回副 GM；副 GM 可协助管理模组资料和分享，但不能任命其他副 GM。</p>
               <p>编辑后留意右上角的连接与保存状态。团队笔记、任务看板和地图等协作内容会从同一服务器读取；部分页面的刷新和保存提示也会单独显示。</p>
               <button type="button" className="manual-inline-action" onClick={() => openTopic('onlineFaq')}>继续阅读：联机常见问题 <ArrowRight size={16} /></button>
             </>}
@@ -195,14 +266,18 @@ const OfficialManual = ({ onOpenSettingsSection }: { onOpenSettingsSection: (sec
             </>}
 
             {topicId === 'cloud' && <>
-              <p>云服务器或 NAS 可运行无托盘的 Docker 版本，多人通过浏览器使用同一套数据。下面以 Linux 服务器为例。</p>
-              <h3>1. 准备服务器</h3>
+              <p>可以把 Windows 桌面版放在 Windows 云服务器上运行，也可以在 Linux 云服务器或 NAS 上使用 Docker。参与者都通过同一个服务器地址打开页面。</p>
+              <h3>Windows 云服务器</h3>
+              <ol><li>把 Windows 发布包解压到云服务器上的独立文件夹，运行 <code>TRPG模组笔记.exe</code>，先在服务器浏览器中检查 <code>http://localhost:8080/web</code> 是否能打开；若修改了应用端口，以实际端口为准。</li><li>在 Windows 防火墙中允许该 TCP 端口入站，并在云平台的安全组或网络规则中开放同一端口。程序需要持续运行，<code>data</code> 文件夹也要保留在程序目录中。</li><li>让玩家访问 <code>http://服务器公网 IP:8080/web</code>，端口以实际设置为准。若无法连接，分别检查程序、Windows 防火墙和云平台规则。</li></ol>
+              <h3>Docker 云服务器或 NAS</h3>
+              <p>Docker 版本不依赖系统托盘。下面以 Linux 服务器为例。</p>
+              <h4>1. 准备服务器</h4>
               <p>安装 Docker，确认服务器可拉取 <code>ghcr.io/bugtower100/trpg_note:latest</code>，并为数据卷保留持久存储空间。</p>
-              <h3>2. 启动容器</h3>
+              <h4>2. 启动容器</h4>
               <pre><code>{'docker run -d --name trpg-note --restart unless-stopped \\\n  -p 8080:8080 \\\n  -v trpg-note-data:/app/data \\\n  ghcr.io/bugtower100/trpg_note:latest'}</code></pre>
               <p><code>trpg-note-data</code> 会保存数据库和上传的图片。更新容器前请备份该卷或在应用内导出完整备份。</p>
-              <h3>3. 打开应用</h3>
-              <p>先确认服务器防火墙和云平台安全组允许访问所用端口，再访问 <code>http://服务器公网 IP:8080/web</code>。正式对外使用时，建议用域名和 HTTPS 反向代理，并限制不必要的端口暴露。</p>
+              <h4>3. 打开应用</h4>
+              <p>先确认服务器防火墙和云平台安全组允许访问所用端口，再访问 <code>http://服务器公网 IP:8080/web</code>。无论采用哪种部署方式，正式对外使用时都建议用域名和 HTTPS 反向代理，并限制不必要的端口暴露。</p>
             </>}
 
             {topicId === 'mobile' && <>

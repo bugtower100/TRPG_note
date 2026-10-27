@@ -58,7 +58,7 @@ const Sidebar: React.FC<SidebarProps> = ({ className = '', onNavigate, collapsed
       label: '整理工具',
       items: canManageCampaignContent ? [
         { to: '/relation-graphs', icon: <Share2 size={20} />, label: '关系图' },
-        { to: '/mind-maps', icon: <BrainCircuit size={20} />, label: '思维导图' },
+        { to: '/mind-maps', icon: <BrainCircuit size={20} />, label: '思维导图/白板' },
         { to: '/timelines', icon: <Clock size={20} />, label: '时间线' },
       ] : [],
     },

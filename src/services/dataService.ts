@@ -394,6 +394,9 @@ class DataService {
               ? node.color
               : undefined,
           position,
+          imageRef: typeof node?.imageRef === 'string' && node.imageRef.trim()
+            ? node.imageRef.trim()
+            : undefined,
           incomingEdgeLabel:
             typeof node?.incomingEdgeLabel === 'string' && node.incomingEdgeLabel.trim()
               ? node.incomingEdgeLabel.trim().slice(0, 120)
@@ -410,15 +413,28 @@ class DataService {
         nodes.some((node) => node.id === requestedRootNodeId)
           ? requestedRootNodeId
           : (nodes.find((node) => node.parentId === null)?.id || nodes[0]?.id || '');
+      const nodeIds = new Set(nodes.map((node) => node.id));
+      const connections = safeArray<any>(mindMap?.connections, []).flatMap((connection) => {
+        const sourceId = typeof connection?.sourceId === 'string' ? connection.sourceId : '';
+        const targetId = typeof connection?.targetId === 'string' ? connection.targetId : '';
+        if (!nodeIds.has(sourceId) || !nodeIds.has(targetId) || sourceId === targetId) return [];
+        return [{
+          id: typeof connection?.id === 'string' && connection.id ? connection.id : uuidv4(),
+          sourceId,
+          targetId,
+          label: typeof connection?.label === 'string' ? connection.label.trim().slice(0, 120) : undefined,
+        }];
+      });
 
       return {
         id: typeof mindMap?.id === 'string' && mindMap.id ? mindMap.id : uuidv4(),
         name:
           typeof mindMap?.name === 'string' && mindMap.name.trim()
             ? mindMap.name.trim()
-            : '新思维导图',
+            : '新思维导图/白板',
         rootNodeId,
         nodes,
+        connections,
         layoutDirection: mindMap?.layoutDirection === 'TB' ? 'TB' : 'LR',
         createdAt: typeof mindMap?.createdAt === 'number' ? mindMap.createdAt : Date.now(),
         updatedAt: typeof mindMap?.updatedAt === 'number' ? mindMap.updatedAt : Date.now(),

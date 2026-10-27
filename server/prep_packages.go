@@ -37,7 +37,7 @@ var prepCollectionLabels = map[string]string{
 	"timelines":       "时间线",
 	"gameSessions":    "场次中心",
 	"relationGraphs":  "关系图",
-	"mindMaps":        "思维导图",
+	"mindMaps":        "思维导图/白板",
 }
 
 var prepCollectionOrder = []string{
